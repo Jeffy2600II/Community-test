@@ -21,15 +21,14 @@ const POST_IMG_DIR = path.join(UPLOADS_DIR, 'post_images');
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
-// Serve static files as-is
 app.use(express.static('public'));
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// Force charset=utf-8 for all API and HTML responses
 app.use((req, res, next) => {
+    // Always set encoding for JSON responses
     if (req.path.startsWith('/api/')) {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
     }
@@ -99,7 +98,6 @@ function authMiddleware(req, res, next) {
 }
 
 // ----------- HTML Pages -----------
-// For proper UTF-8 display, always read HTML files with utf8 encoding
 function sendHtml(res, file) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     fs.readFile(path.join(__dirname, file), 'utf8', (err, data) => {
@@ -133,6 +131,8 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // ----------- API -----------
+
+// REGISTER
 app.post('/api/register', (req, res) => {
     const { username, email, password } = req.body;
     if (!username || !email || !password)
@@ -155,6 +155,8 @@ app.post('/api/register', (req, res) => {
     safeWriteJSON(path.join(userDir, 'comments.json'), []);
     res.json({ success: true });
 });
+
+// LOGIN
 app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
     const user = findUserByEmail(email);
@@ -164,10 +166,13 @@ app.post('/api/login', (req, res) => {
     res.cookie('token', token, { httpOnly: true });
     res.json({ success: true, token });
 });
+
+// LOGOUT
 app.post('/api/logout', (req, res) => {
     res.clearCookie('token');
     res.json({ success: true });
 });
+
 app.post('/api/switch-account', (req, res) => {
     const { token } = req.body;
     if (!token) return res.json({ success: false, msg: 'No token' });
@@ -179,17 +184,20 @@ app.post('/api/switch-account', (req, res) => {
         return res.json({ success: false, msg: 'Invalid token' });
     }
 });
+
 app.get('/api/profile', authMiddleware, (req, res) => {
     const userId = req.user.id;
     const profile = safeReadJSON(getUserProfilePath(userId));
     if (profile) delete profile.password;
     res.json({ success: true, profile });
 });
+
 app.get('/api/user/:username', (req, res) => {
     const user = findUserByUsername(req.params.username);
     if (!user) return res.json({ success: false, msg: 'ไม่พบผู้ใช้' });
     res.json({ success: true, profile: user });
 });
+
 app.post('/api/profile/update', authMiddleware, (req, res) => {
     const userId = req.user.id;
     const { displayName, email } = req.body;
@@ -200,6 +208,8 @@ app.post('/api/profile/update', authMiddleware, (req, res) => {
     safeWriteJSON(profilePath, profile);
     res.json({ success: true });
 });
+
+// UPLOAD PROFILE PIC
 app.post('/api/profile/upload-pic', authMiddleware, upload.single('profilePic'), (req, res) => {
     const userId = req.user.id;
     const profilePath = getUserProfilePath(userId);
@@ -211,6 +221,7 @@ app.post('/api/profile/upload-pic', authMiddleware, upload.single('profilePic'),
     safeWriteJSON(profilePath, profile);
     res.json({ success: true, pic: profile.profilePic });
 });
+
 app.post('/api/profile/remove-pic', authMiddleware, (req, res) => {
     const userId = req.user.id;
     const profilePath = getUserProfilePath(userId);
@@ -224,6 +235,7 @@ app.post('/api/profile/remove-pic', authMiddleware, (req, res) => {
 });
 
 // --- POST CRUD ---
+// CREATE POST
 app.post('/api/post/create', authMiddleware, upload.single('postImage'), (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -253,6 +265,8 @@ app.post('/api/post/create', authMiddleware, upload.single('postImage'), (req, r
     safeWriteJSON(userPostsPath, userPosts);
     res.json({ success: true, postId });
 });
+
+// EDIT POST
 app.post('/api/post/:id/edit', authMiddleware, upload.single('postImage'), (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -274,6 +288,8 @@ app.post('/api/post/:id/edit', authMiddleware, upload.single('postImage'), (req,
     safeWriteJSON(postPath, post);
     res.json({ success: true });
 });
+
+// DELETE POST
 app.delete('/api/post/:id', authMiddleware, (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
@@ -294,6 +310,8 @@ app.delete('/api/post/:id', authMiddleware, (req, res) => {
     safeWriteJSON(userPostsPath, userPosts);
     res.json({ success: true });
 });
+
+// GET POST BY ID
 app.get('/api/post/:id', (req, res) => {
     const postId = req.params.id;
     const postPath = getPostPath(postId);
@@ -311,16 +329,24 @@ app.get('/api/post/:id', (req, res) => {
     }
     res.json({ success: true, post, comments, owner: post.username, myUsername });
 });
+
+// GET ALL POSTS (UTF-8 safe)
 app.get('/api/posts', (req, res) => {
     const postDirs = fs.readdirSync(POSTS_DIR);
     let posts = [];
     for (let postId of postDirs) {
-        const post = safeReadJSON(getPostPath(postId));
-        if (post) posts.push(post);
+        const postPath = getPostPath(postId);
+        if (fs.existsSync(postPath)) {
+            // Always read as utf8!
+            const post = JSON.parse(fs.readFileSync(postPath, 'utf8'));
+            posts.push(post);
+        }
     }
     posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     res.json({ success: true, posts });
 });
+
+// GET ALL USER POSTS
 app.get('/api/user/:username/posts', (req, res) => {
     const user = findUserByUsername(req.params.username);
     if (!user) return res.json({ success: false, posts: [] });
