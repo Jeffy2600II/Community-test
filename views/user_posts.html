@@ -7,17 +7,13 @@
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-<header>
-    <h1><a href="/">COMMUNITY</a></h1>
-    <nav>
-        <a href="/">หน้าแรก</a>
-        <a href="/login">เข้าสู่ระบบ</a>
-    </nav>
-</header>
-<main>
-    <div class="section-title"><span>โพสต์ของสมาชิก</span></div>
-    <div id="userPosts"></div>
-</main>
+  <div id="headerSlot"></div>
+  <main>
+      <div class="section-title"><span>โพสต์ของสมาชิก</span></div>
+      <div id="userPosts"></div>
+  </main>
+  <div id="footerSlot"></div>
+<script src="/js/main.js"></script>
 <script>
 const username = location.pathname.split('/')[2];
 (async ()=>{
