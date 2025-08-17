@@ -1,21 +1,45 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap');
 body { font-family: 'Noto Sans Thai', 'Tahoma', 'Arial', sans-serif; margin: 0; background: #f7f7f7; color: #222; }
-header { background: #2c3e50; color: #fff; padding: 1em; }
-header h1, header nav { display:inline-block; vertical-align:middle; margin:0;}
-header nav { margin-left:2em;}
-header a { color: #fff; text-decoration: none; margin-right: 1em; }
+header { background: #2c3e50; color: #fff; padding: 0.6em 1em; display:flex; align-items:center; justify-content:space-between; }
+header h1 { display:inline-block; margin:0; font-size:1.2rem; }
+header nav { display:flex; align-items:center; gap:0.6rem; }
+header a { color: #fff; text-decoration: none; margin-right: 0.5em; }
 nav a { color: #fff; text-decoration: none; margin-right: 1em; }
 nav a:hover { text-decoration:underline }
-main { max-width: 700px; margin: 1em auto; background: #fff; padding: 2em; border-radius: 8px; min-height: 55vh; }
+main { max-width: 900px; margin: 1em auto; background: #fff; padding: 2em; border-radius: 8px; min-height: 55vh; }
 input, textarea, button { margin: .5em 0; padding: .5em; width: 100%; border-radius: 4px; border: 1px solid #ccc; font-family: inherit; }
-button { background: #2980b9; color: #fff; border: none; cursor: pointer; }
+button { background: #2980b9; color: #fff; border: none; cursor: pointer; padding: .5em .8em; border-radius: 4px; }
 button:hover { background: #1abc9c; }
 .post { border-bottom: 1px solid #eee; margin-bottom: 1em; padding-bottom: 1em; }
 .post-img { max-width: 300px; display: block; margin: 1em 0; border-radius:8px; }
 .comment { background: #f1f1f1; margin: .5em 0; padding: .5em; border-radius: 4px; }
 form { margin-bottom: 2em; }
 .profile-card { background:#f2f2f2;padding:1em;border-radius:8px;display:inline-block;}
-.profile-pic { border-radius:50%;border:2px solid #ccc; }
+.profile-pic { border-radius:50%;border:2px solid #ccc; width:40px; height:40px; object-fit:cover; }
 .section-title {margin:1em 0 1em 0;}
 .section-title span {background:#1abc9c;color:#fff;padding:.4em 1em;border-radius:20px;}
 .small {font-size:smaller;color:#888;}
+
+/* Header account dropdown & notifications */
+.account-area { display:flex; align-items:center; gap:0.6rem; }
+.notify-bell { position:relative; cursor:pointer; padding:8px; border-radius:6px; }
+.notify-bell:hover { background: rgba(255,255,255,0.05); }
+.notify-badge { position:absolute; top:4px; right:4px; background:#e74c3c; color:#fff; font-size:0.7rem; padding:2px 6px; border-radius:12px; }
+
+/* Avatar button */
+.avatar-btn { display:flex; align-items:center; gap:0.5rem; background:transparent; color:#fff; border:none; cursor:pointer; padding:6px; border-radius:6px; }
+.avatar-img { width:36px; height:36px; border-radius:50%; object-fit:cover; border:2px solid rgba(255,255,255,0.15); }
+
+/* Dropdown panel */
+.dropdown-panel { position:absolute; right:1em; top:64px; background:#fff; color:#222; width:320px; border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.12); overflow:hidden; z-index:50; }
+.dropdown-header { padding:12px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:0.6rem; }
+.dropdown-list { max-height:320px; overflow:auto; }
+.dropdown-item { padding:10px 12px; display:flex; align-items:center; gap:0.6rem; cursor:pointer; }
+.dropdown-item:hover { background:#f5f5f5; }
+.dropdown-item .small { color:#666; font-size:0.85rem; }
+
+/* Modal helper classes */
+.modal-hidden { display:none; position:fixed; left:0; right:0; top:0; bottom:0; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; z-index:60; }
+.modal-panel { background:#fff; padding:1em; border-radius:8px; width:100%; max-width:420px; box-shadow:0 10px 30px rgba(0,0,0,0.2); }
+.btn-muted { background:#ccc; color:#000; padding:.4em .7em; border-radius:4px; border:none; cursor:pointer; }
+.form-msg { margin-top:.6em; color:#d00; font-size:0.9rem; }
