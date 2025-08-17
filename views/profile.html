@@ -7,25 +7,15 @@
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-<header>
-    <h1><a href="/">COMMUNITY</a></h1>
-    <nav>
-        <a href="/">หน้าแรก</a>
-        <a href="/post/create">สร้างโพสต์</a>
-        <a href="/profile/edit">ตั้งค่า</a>
-        <a href="#" id="logoutBtn">ออกจากระบบ</a>
-    </nav>
-</header>
-<main>
-    <div class="section-title"><span>โปรไฟล์ของฉัน</span></div>
-    <div id="profileBox"></div>
-    <div id="myPosts"></div>
-</main>
+  <div id="headerSlot"></div>
+  <main>
+      <div class="section-title"><span>โปรไฟล์ของฉัน</span></div>
+      <div id="profileBox"></div>
+      <div id="myPosts"></div>
+  </main>
+  <div id="footerSlot"></div>
+<script src="/js/main.js"></script>
 <script>
-document.getElementById('logoutBtn').onclick = async () => {
-    await fetch('/api/logout', { method: 'POST' });
-    location.replace('/');
-};
 (async ()=>{
     const pr = await fetch('/api/profile');
     const { profile } = await pr.json();
