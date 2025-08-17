@@ -1,4 +1,4 @@
-// (แก้ไข server.js ฉบับเต็ม — วางทับไฟล์เดิม)
+// server.js
 const express = require('express');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
@@ -92,6 +92,50 @@ function authMiddleware(req, res, next) {
     }
 }
 
+// Notifications helpers (store per-user in users/{id}/notifications.json)
+function ensureUserNotificationsFile(userId) {
+    const p = path.join(getUserDir(userId), 'notifications.json');
+    if (!fs.existsSync(p)) fs.writeFileSync(p, '[]', 'utf8');
+    return p;
+}
+function addNotificationToUser(userId, type, message, meta = {}) {
+    const p = ensureUserNotificationsFile(userId);
+    const arr = JSON.parse(fs.readFileSync(p, 'utf8'));
+    const n = {
+        id: uuidv4(),
+        type,
+        message,
+        meta,
+        createdAt: new Date().toISOString(),
+        read: false
+    };
+    arr.unshift(n);
+    fs.writeFileSync(p, JSON.stringify(arr, null, 2), 'utf8');
+    return n;
+}
+function getNotificationsForUser(userId) {
+    const p = ensureUserNotificationsFile(userId);
+    const arr = JSON.parse(fs.readFileSync(p, 'utf8'));
+    return arr;
+}
+function markNotificationsRead(userId, ids = []) {
+    const p = ensureUserNotificationsFile(userId);
+    let arr = JSON.parse(fs.readFileSync(p, 'utf8'));
+    let changed = false;
+    if (!Array.isArray(ids) || ids.length === 0) {
+        // mark all read
+        arr = arr.map(n => ({ ...n, read: true }));
+        changed = true;
+    } else {
+        arr = arr.map(n => {
+            if (ids.includes(n.id) && !n.read) { changed = true; return { ...n, read: true }; }
+            return n;
+        });
+    }
+    if (changed) fs.writeFileSync(p, JSON.stringify(arr, null, 2), 'utf8');
+    return arr;
+}
+
 // -- Helpers for accounts-in-cookie (client-visible list) --
 function readAccountsFromReq(req) {
     try {
@@ -154,6 +198,7 @@ app.post('/api/register', (req, res) => {
     fs.writeFileSync(getUserProfilePath(userId), JSON.stringify(profile, null, 2), 'utf8');
     fs.writeFileSync(path.join(userDir, 'posts.json'), '[]', 'utf8');
     fs.writeFileSync(path.join(userDir, 'comments.json'), '[]', 'utf8');
+    fs.writeFileSync(path.join(userDir, 'notifications.json'), '[]', 'utf8');
     res.json({ success: true });
 });
 app.post('/api/login', (req, res) => {
@@ -294,7 +339,8 @@ app.get('/api/accounts', (req, res) => {
             const u = findUserByUsername(p.username);
             out.push({
                 username: p.username,
-                displayName: (u && u.displayName) || p.username
+                displayName: (u && u.displayName) || p.username,
+                profilePic: (u && u.profilePic) || ''
             });
         } catch {}
     }
@@ -308,8 +354,8 @@ app.get('/api/accounts', (req, res) => {
     res.json({ success: true, accounts: out, active });
 });
 
+// backward compatibility for token-based switch (kept)
 app.post('/api/switch-account', (req, res) => {
-    // kept for backward compatibility — expects token in body and will set it as active if valid
     const { token } = req.body;
     if (!token) return res.json({ success: false, msg: 'No token' });
     try {
@@ -371,6 +417,39 @@ app.post('/api/profile/remove-pic', authMiddleware, (req, res) => {
     res.json({ success: true });
 });
 
+// Notifications API
+app.get('/api/notifications', authMiddleware, (req, res) => {
+    const userId = req.user.id;
+    const nots = getNotificationsForUser(userId);
+    const unreadCount = nots.filter(n => !n.read).length;
+    res.json({ success: true, notifications: nots, unread: unreadCount });
+});
+app.post('/api/notifications/mark-read', authMiddleware, (req, res) => {
+    const userId = req.user.id;
+    const { ids } = req.body; // optional array of ids; if absent, mark all read
+    const updated = markNotificationsRead(userId, ids || []);
+    res.json({ success: true, notifications: updated, unread: updated.filter(n => !n.read).length });
+});
+
+// expose simple account settings endpoint (read-only summary)
+app.get('/api/account/settings', authMiddleware, (req, res) => {
+    const userId = req.user.id;
+    const profile = JSON.parse(fs.readFileSync(getUserProfilePath(userId), 'utf8'));
+    delete profile.password;
+    // example security metadata
+    const settings = {
+        profile,
+        security: {
+            twoFactorEnabled: false,
+            sessions: [] // in future could list sessions
+        },
+        preferences: {
+            emailNotifications: true
+        }
+    };
+    res.json({ success: true, settings });
+});
+
 // --- POST CRUD ---
 app.post('/api/post/create', authMiddleware, upload.single('postImage'), (req, res) => {
     const userId = req.user.id;
@@ -399,6 +478,10 @@ app.post('/api/post/create', authMiddleware, upload.single('postImage'), (req, r
     if (fs.existsSync(userPostsPath)) userPosts = JSON.parse(fs.readFileSync(userPostsPath, 'utf8'));
     userPosts.unshift(postId);
     fs.writeFileSync(userPostsPath, JSON.stringify(userPosts, null, 2), 'utf8');
+
+    // create a notification to self (example)
+    addNotificationToUser(userId, 'post_created', `คุณได้สร้างโพสต์ "${title}"`, { postId });
+
     res.json({ success: true, postId });
 });
 app.post('/api/post/:id/edit', authMiddleware, upload.single('postImage'), (req, res) => {
@@ -515,6 +598,16 @@ app.post('/api/post/:id/comment', authMiddleware, (req, res) => {
         userComments.push(comment.id);
         fs.writeFileSync(userCommentsPath, JSON.stringify(userComments, null, 2), 'utf8');
     }
+    // Notify post owner if different
+    try {
+        const post = JSON.parse(fs.readFileSync(getPostPath(postId), 'utf8'));
+        if (post && post.username && post.username !== username) {
+            const ownerObj = findUserByUsername(post.username);
+            if (ownerObj) {
+                addNotificationToUser(ownerObj._userId, 'comment', `${username} แสดงความคิดเห็นในโพสต์ของคุณ`, { postId, commentId: comment.id });
+            }
+        }
+    } catch {}
     res.json({ success: true });
 });
 app.delete('/api/post/:postId/comment/:commentId', authMiddleware, (req, res) => {
