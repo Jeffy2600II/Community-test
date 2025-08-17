@@ -1,9 +1,44 @@
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
-  <meta charset="UTF-8">
+    <meta charset="UTF-8">
+    <title>Community Home</title>
+    <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  123
+  <div id="headerSlot"></div>
+  <main>
+      <div class="section-title"><span></span></div>
+      <div id="feed"></div>
+  </main>
+  <div id="footerSlot"></div>
+<script src="/js/main.js"></script>
+<script>
+let myUsername = null;
+
+(async () => {
+    const res = await fetch('/api/posts');
+    const { posts } = await res.json();
+    let feed = '';
+    for (let post of posts) {
+        feed += `<div class="post">
+            <h2><a href="/post/${post.id}">${post.title}</a></h2>
+            <div> <a href="/user/${post.username}">${post.username}</a> - ${new Date(post.createdAt).toLocaleString()}</div>
+            ${post.image ? `<img src="${post.image}" class="post-img">` : ''}
+            <p>${post.content.slice(0, 160)}${post.content.length>160?'...':''}</p>
+            <a href="/post/${post.id}"></a>
+            ${myUsername === post.username ? `<a href="/post/${post.id}/edit"></a> <button onclick="deletePost('${post.id}')"></button>` : ''}
+        </div>`;
+    }
+    document.getElementById('feed').innerHTML = feed || '<i></i>';
+})();
+
+window.deletePost = async (postId) => {
+    if (confirm('?')) {
+        await fetch('/api/post/' + postId, {method:'DELETE'});
+        location.reload();
+    }
+};
+</script>
 </body>
 </html>
