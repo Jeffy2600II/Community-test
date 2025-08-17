@@ -39,7 +39,7 @@ let myUsername = null;
 })();
 
 window.deletePost = async (postId) => {
-    if (confirm('?')) {
+    if (confirm('?')) {
         await fetch('/api/post/' + postId, {method:'DELETE'});
         location.reload();
     }
