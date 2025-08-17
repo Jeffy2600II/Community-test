@@ -1,3 +1,4 @@
+// (แก้ไข server.js ฉบับเต็ม — วางทับไฟล์เดิม)
 const express = require('express');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
@@ -91,6 +92,39 @@ function authMiddleware(req, res, next) {
     }
 }
 
+// -- Helpers for accounts-in-cookie (client-visible list) --
+function readAccountsFromReq(req) {
+    try {
+        const s = req.cookies.accounts;
+        if (!s) return [];
+        const parsed = JSON.parse(s);
+        if (!Array.isArray(parsed)) return [];
+        return parsed;
+    } catch {
+        return [];
+    }
+}
+function writeAccountsCookie(res, accounts) {
+    try {
+        // store array of token strings as JSON in a non-HttpOnly cookie so client can read list
+        res.cookie('accounts', JSON.stringify(accounts), { httpOnly: false });
+    } catch {
+        // ignore
+    }
+}
+function filterValidAccounts(accounts) {
+    const out = [];
+    for (let token of accounts) {
+        try {
+            const payload = jwt.verify(token, SECRET);
+            out.push(token);
+        } catch {
+            // skip invalid/expired
+        }
+    }
+    return out;
+}
+
 // HTML pages
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'views/index.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views/login.html')));
@@ -99,7 +133,7 @@ app.get('/profile', authMiddleware, (req, res) => res.sendFile(path.join(__dirna
 app.get('/profile/edit', authMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'views/edit_profile.html')));
 app.get('/user/:username', (req, res) => res.sendFile(path.join(__dirname, 'views/user_profile.html')));
 
-// API: Auth/Register/Login/Switch/Logout
+// API: Auth/Register/Login/AddAccount/Logout/Switch/AccountsList
 app.post('/api/register', (req, res) => {
     const { username, email, password } = req.body;
     if (!username || !email || !password)
@@ -128,24 +162,171 @@ app.post('/api/login', (req, res) => {
     if (!user || user.password !== password)
         return res.json({ success: false, msg: 'Invalid credentials' });
     const token = jwt.sign({ id: user.id, email: user.email, username: user.username }, SECRET, { expiresIn: '2d' });
+    // set active session cookie (HttpOnly)
     res.cookie('token', token, { httpOnly: true });
-    res.json({ success: true, token });
+
+    // also add to accounts cookie list (store token strings) so client can see added accounts
+    const existing = readAccountsFromReq(req);
+    // keep only valid tokens, avoid duplicates for same username
+    let valid = filterValidAccounts(existing);
+    const already = valid.find(t => {
+        try { return jwt.verify(t, SECRET).username === user.username; } catch { return false; }
+    });
+    if (!already) {
+        valid.push(token);
+    } else {
+        // replace existing token for that username with new token
+        valid = valid.map(t => {
+            try {
+                const p = jwt.verify(t, SECRET);
+                if (p.username === user.username) return token;
+                return t;
+            } catch { return null; }
+        }).filter(Boolean);
+    }
+    writeAccountsCookie(res, valid);
+
+    res.json({ success: true });
 });
+
+// เพิ่มบัญชีแบบ "เพิ่มเข้ารายการบัญชี" โดยไม่เปลี่ยนบัญชี active
+app.post('/api/add-account', (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) return res.json({ success: false, msg: 'Missing fields' });
+    const user = findUserByEmail(email);
+    if (!user || user.password !== password) return res.json({ success: false, msg: 'Invalid credentials' });
+    const token = jwt.sign({ id: user.id, email: user.email, username: user.username }, SECRET, { expiresIn: '2d' });
+
+    // push token into accounts cookie (but do not set active token cookie)
+    let accounts = readAccountsFromReq(req);
+    accounts = filterValidAccounts(accounts);
+    const exists = accounts.find(t => {
+        try { return jwt.verify(t, SECRET).username === user.username; } catch { return false; }
+    });
+    if (!exists) accounts.push(token);
+    else {
+        // replace existing token for same username
+        accounts = accounts.map(t => {
+            try {
+                const p = jwt.verify(t, SECRET);
+                if (p.username === user.username) return token;
+                return t;
+            } catch { return null; }
+        }).filter(Boolean);
+    }
+    writeAccountsCookie(res, accounts);
+
+    // if no active token currently set, make this one active
+    if (!req.cookies.token) {
+        res.cookie('token', token, { httpOnly: true });
+    }
+
+    res.json({ success: true, username: user.username });
+});
+
+// logout clears active token (but keep accounts list)
 app.post('/api/logout', (req, res) => {
     res.clearCookie('token');
     res.json({ success: true });
 });
+
+// switch active account: body { username }
+app.post('/api/accounts/switch', (req, res) => {
+    const { username } = req.body;
+    if (!username) return res.json({ success: false, msg: 'Missing username' });
+    const accounts = filterValidAccounts(readAccountsFromReq(req));
+    for (let token of accounts) {
+        try {
+            const p = jwt.verify(token, SECRET);
+            if (p.username === username) {
+                // set as active
+                res.cookie('token', token, { httpOnly: true });
+                return res.json({ success: true });
+            }
+        } catch {}
+    }
+    return res.json({ success: false, msg: 'Account not found' });
+});
+
+// remove an account from saved list; body { username }
+app.post('/api/accounts/remove', (req, res) => {
+    const { username } = req.body;
+    if (!username) return res.json({ success: false, msg: 'Missing username' });
+    let accounts = filterValidAccounts(readAccountsFromReq(req));
+    accounts = accounts.filter(t => {
+        try {
+            const p = jwt.verify(t, SECRET);
+            return p.username !== username;
+        } catch { return false; }
+    });
+    writeAccountsCookie(res, accounts);
+    // if active token belonged to removed username, change active to first available or clear
+    const activeToken = req.cookies.token;
+    if (activeToken) {
+        try {
+            const p = jwt.verify(activeToken, SECRET);
+            if (p.username === username) {
+                if (accounts.length > 0) {
+                    res.cookie('token', accounts[0], { httpOnly: true });
+                } else {
+                    res.clearCookie('token');
+                }
+            }
+        } catch {
+            // invalid active token -> set first if exists
+            if (accounts.length > 0) res.cookie('token', accounts[0], { httpOnly: true });
+            else res.clearCookie('token');
+        }
+    } else {
+        if (accounts.length === 0) res.clearCookie('token');
+    }
+    res.json({ success: true });
+});
+
+// return list of saved accounts with minimal info and indicate active username
+app.get('/api/accounts', (req, res) => {
+    const accounts = filterValidAccounts(readAccountsFromReq(req));
+    const out = [];
+    for (let token of accounts) {
+        try {
+            const p = jwt.verify(token, SECRET);
+            // get displayName from user profile if exists
+            const u = findUserByUsername(p.username);
+            out.push({
+                username: p.username,
+                displayName: (u && u.displayName) || p.username
+            });
+        } catch {}
+    }
+    let active = null;
+    const activeToken = req.cookies.token;
+    if (activeToken) {
+        try {
+            active = jwt.verify(activeToken, SECRET).username;
+        } catch { active = null; }
+    }
+    res.json({ success: true, accounts: out, active });
+});
+
 app.post('/api/switch-account', (req, res) => {
+    // kept for backward compatibility — expects token in body and will set it as active if valid
     const { token } = req.body;
     if (!token) return res.json({ success: false, msg: 'No token' });
     try {
         jwt.verify(token, SECRET);
         res.cookie('token', token, { httpOnly: true });
+        // also ensure it's in accounts cookie
+        let accounts = filterValidAccounts(readAccountsFromReq(req));
+        if (!accounts.includes(token)) {
+            accounts.push(token);
+            writeAccountsCookie(res, accounts);
+        }
         return res.json({ success: true });
     } catch {
         return res.json({ success: false, msg: 'Invalid token' });
     }
 });
+
 app.get('/api/profile', authMiddleware, (req, res) => {
     const userId = req.user.id;
     const profile = JSON.parse(fs.readFileSync(getUserProfilePath(userId), 'utf8'));
