@@ -21,12 +21,14 @@ const POST_IMG_DIR = path.join(UPLOADS_DIR, 'post_images');
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
+// Serve static files as-is
 app.use(express.static('public'));
+
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// Middleware: Force charset=utf-8 for all API and HTML responses
+// Force charset=utf-8 for all API and HTML responses
 app.use((req, res, next) => {
     if (req.path.startsWith('/api/')) {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -97,6 +99,7 @@ function authMiddleware(req, res, next) {
 }
 
 // ----------- HTML Pages -----------
+// For proper UTF-8 display, always read HTML files with utf8 encoding
 function sendHtml(res, file) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     fs.readFile(path.join(__dirname, file), 'utf8', (err, data) => {
