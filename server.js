@@ -1,3 +1,4 @@
+// (updated) server.js
 const express = require('express');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
@@ -176,6 +177,19 @@ app.get('/profile', authMiddleware, (req, res) => res.sendFile(path.join(__dirna
 app.get('/profile/edit', authMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'views/edit_profile.html')));
 app.get('/user/:username', (req, res) => res.sendFile(path.join(__dirname, 'views/user_profile.html')));
 app.get('/accounts', authMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'views/accounts.html'))); // manage accounts page
+
+// --- NEW: Post page routes ---
+// Order matters: specific routes before parameterized /post/:id
+app.get('/post/create', authMiddleware, (req, res) => {
+    return res.sendFile(path.join(__dirname, 'views/create_post.html'));
+});
+app.get('/post/:id/edit', authMiddleware, (req, res) => {
+    return res.sendFile(path.join(__dirname, 'views/edit_post.html'));
+});
+app.get('/post/:id', (req, res) => {
+    return res.sendFile(path.join(__dirname, 'views/post.html'));
+});
+// --- end Post page routes ---
 
 // API: Auth/Register/Login/AddAccount/Logout/Switch/AccountsList
 app.post('/api/register', (req, res) => {
