@@ -6,33 +6,24 @@
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-<header>
-    <h1><a href="/">COMMUNITY</a></h1>
-    <nav>
-        <a href="/">หน้าแรก</a>
-        <a href="/profile">โปรไฟล์</a>
-        <a href="#" id="logoutBtn">ออกจากระบบ</a>
-    </nav>
-</header>
-<main>
-    <div class="section-title"><span>แก้ไขโปรไฟล์</span></div>
-    <form id="editProfileForm">
-        <input type="text" name="displayName" placeholder="ชื่อที่แสดง">
-        <input type="email" name="email" placeholder="อีเมล">
-        <button type="submit">บันทึก</button>
-        <p id="msg"></p>
-    </form>
-    <form id="picForm" enctype="multipart/form-data">
-        <label>รูปโปรไฟล์: <input type="file" name="profilePic"></label>
-        <button type="submit">อัปโหลด</button>
-        <button id="removePicBtn" type="button">ลบรูป</button>
-    </form>
-</main>
+  <div id="headerSlot"></div>
+  <main>
+      <div class="section-title"><span>แก้ไขโปรไฟล์</span></div>
+      <form id="editProfileForm">
+          <input type="text" name="displayName" placeholder="ชื่อที่แสดง">
+          <input type="email" name="email" placeholder="อีเมล">
+          <button type="submit">บันทึก</button>
+          <p id="msg"></p>
+      </form>
+      <form id="picForm" enctype="multipart/form-data">
+          <label>รูปโปรไฟล์: <input type="file" name="profilePic"></label>
+          <button type="submit">อัปโหลด</button>
+          <button id="removePicBtn" type="button">ลบรูป</button>
+      </form>
+  </main>
+  <div id="footerSlot"></div>
+<script src="/js/main.js"></script>
 <script>
-document.getElementById('logoutBtn').onclick = async () => {
-    await fetch('/api/logout', { method: 'POST' });
-    location.replace('/');
-};
 (async ()=>{
     const pr = await fetch('/api/profile');
     const { profile } = await pr.json();
