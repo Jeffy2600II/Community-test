@@ -96,7 +96,7 @@ async function renderNav() {
       <div class="dropdown-list" id="accountDropdownList"></div>
       <div style="padding:8px;border-top:1px solid #eee;display:flex;gap:.5rem;justify-content:space-between;">
         <a href="/profile/edit">Settings</a>
-        <a href="#" id="manageAccountsLink">Manage accounts</a>
+        <a href="/accounts" id="manageAccountsLink">Manage accounts</a>
         <a href="#" id="signOutTop">Sign out</a>
       </div>`;
     document.body.appendChild(dropdown);
@@ -250,8 +250,7 @@ async function renderNav() {
         };
         const manageLink = document.getElementById('manageAccountsLink');
         if (manageLink) manageLink.onclick = (ev) => {
-          ev.preventDefault();
-          location.href = '/profile';
+          // let it follow link to /accounts
         };
       }, 20);
     }
@@ -318,7 +317,12 @@ function setupAddAccountModal() {
   }
 }
 
-// init
+// helper to hide notification panel (used by avatar click)
+function notifPanelHide() {
+  // no-op placeholder for future
+}
+
+// เรียกใช้ในทุก HTML (หลังโหลด <body>)
 window.onload = async function() {
   await loadPartial('headerSlot', '/partial/header.html');
   await loadPartial('footerSlot', '/partial/footer.html');
