@@ -26,6 +26,14 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
+// Set charset=utf-8 for all API responses
+app.use((req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    }
+    next();
+});
+
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         if (file.fieldname === 'profilePic') cb(null, PROFILE_PIC_DIR);
@@ -91,13 +99,51 @@ function authMiddleware(req, res, next) {
     }
 }
 
-// HTML pages
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'views/index.html')));
-app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views/login.html')));
-app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'views/register.html')));
-app.get('/profile', authMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'views/user_profile.html')));
-app.get('/profile/edit', authMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'views/edit_profile.html')));
-app.get('/user/:username', (req, res) => res.sendFile(path.join(__dirname, 'views/user_profile.html')));
+// HTML pages (force charset for all html pages)
+app.get('/', (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.sendFile(path.join(__dirname, 'views/index.html'));
+});
+app.get('/login', (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.sendFile(path.join(__dirname, 'views/login.html'));
+});
+app.get('/register', (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.sendFile(path.join(__dirname, 'views/register.html'));
+});
+app.get('/profile', authMiddleware, (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.sendFile(path.join(__dirname, 'views/profile.html'));
+});
+app.get('/profile/edit', authMiddleware, (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.sendFile(path.join(__dirname, 'views/edit_profile.html'));
+});
+app.get('/user/:username', (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.sendFile(path.join(__dirname, 'views/user_profile.html'));
+});
+app.get('/user/:username/posts', (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.sendFile(path.join(__dirname, 'views/user_posts.html'));
+});
+app.get('/post/create', authMiddleware, (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.sendFile(path.join(__dirname, 'views/create_post.html'));
+});
+app.get('/post/:id', (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.sendFile(path.join(__dirname, 'views/post.html'));
+});
+app.get('/post/:id/edit', authMiddleware, (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.sendFile(path.join(__dirname, 'views/edit_post.html'));
+});
+app.get('/404', (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.sendFile(path.join(__dirname, 'views/404.html'));
+});
 
 // API: Auth/Register/Login/Switch/Logout
 app.post('/api/register', (req, res) => {
@@ -351,7 +397,9 @@ app.delete('/api/post/:postId/comment/:commentId', authMiddleware, (req, res) =>
 
 // 404 fallback
 app.use((req, res) => {
-    res.status(404).send('Not found');
+    res.status(404);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.sendFile(path.join(__dirname, 'views/404.html'));
 });
 
 app.listen(PORT, () => {
