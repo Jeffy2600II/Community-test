@@ -21,12 +21,14 @@ const POST_IMG_DIR = path.join(UPLOADS_DIR, 'post_images');
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
+// static files serve as-is (ensure browser reads as utf-8, especially for HTML/JS/CSS)
 app.use(express.static('public'));
+
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// Set charset=utf-8 for all API responses
+// Force charset=utf-8 for all API and HTML responses
 app.use((req, res, next) => {
     if (req.path.startsWith('/api/')) {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -34,17 +36,14 @@ app.use((req, res, next) => {
     next();
 });
 
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        if (file.fieldname === 'profilePic') cb(null, PROFILE_PIC_DIR);
-        else cb(null, POST_IMG_DIR);
-    },
-    filename: function (req, file, cb) {
-        const ext = path.extname(file.originalname);
-        cb(null, uuidv4() + ext);
-    }
-});
-const upload = multer({ storage: storage });
+// Utility functions
+function safeReadJSON(filepath) {
+    if (!fs.existsSync(filepath)) return null;
+    return JSON.parse(fs.readFileSync(filepath, 'utf8'));
+}
+function safeWriteJSON(filepath, obj) {
+    fs.writeFileSync(filepath, JSON.stringify(obj, null, 2), 'utf8');
+}
 
 function findUserByUsername(usernameRaw) {
     const username = decodeURIComponent(usernameRaw);
@@ -99,53 +98,37 @@ function authMiddleware(req, res, next) {
     }
 }
 
-// HTML pages (force charset for all html pages)
-app.get('/', (req, res) => {
+// ----------- HTML Pages -----------
+function sendHtml(res, file) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.sendFile(path.join(__dirname, 'views/index.html'));
-});
-app.get('/login', (req, res) => {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.sendFile(path.join(__dirname, 'views/login.html'));
-});
-app.get('/register', (req, res) => {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.sendFile(path.join(__dirname, 'views/register.html'));
-});
-app.get('/profile', authMiddleware, (req, res) => {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.sendFile(path.join(__dirname, 'views/profile.html'));
-});
-app.get('/profile/edit', authMiddleware, (req, res) => {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.sendFile(path.join(__dirname, 'views/edit_profile.html'));
-});
-app.get('/user/:username', (req, res) => {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.sendFile(path.join(__dirname, 'views/user_profile.html'));
-});
-app.get('/user/:username/posts', (req, res) => {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.sendFile(path.join(__dirname, 'views/user_posts.html'));
-});
-app.get('/post/create', authMiddleware, (req, res) => {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.sendFile(path.join(__dirname, 'views/create_post.html'));
-});
-app.get('/post/:id', (req, res) => {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.sendFile(path.join(__dirname, 'views/post.html'));
-});
-app.get('/post/:id/edit', authMiddleware, (req, res) => {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.sendFile(path.join(__dirname, 'views/edit_post.html'));
-});
-app.get('/404', (req, res) => {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.sendFile(path.join(__dirname, 'views/404.html'));
-});
+    res.sendFile(path.join(__dirname, file));
+}
+app.get('/', (req, res) => sendHtml(res, 'views/index.html'));
+app.get('/login', (req, res) => sendHtml(res, 'views/login.html'));
+app.get('/register', (req, res) => sendHtml(res, 'views/register.html'));
+app.get('/profile', authMiddleware, (req, res) => sendHtml(res, 'views/profile.html'));
+app.get('/profile/edit', authMiddleware, (req, res) => sendHtml(res, 'views/edit_profile.html'));
+app.get('/user/:username', (req, res) => sendHtml(res, 'views/user_profile.html'));
+app.get('/user/:username/posts', (req, res) => sendHtml(res, 'views/user_posts.html'));
+app.get('/post/create', authMiddleware, (req, res) => sendHtml(res, 'views/create_post.html'));
+app.get('/post/:id', (req, res) => sendHtml(res, 'views/post.html'));
+app.get('/post/:id/edit', authMiddleware, (req, res) => sendHtml(res, 'views/edit_post.html'));
+app.get('/404', (req, res) => sendHtml(res, 'views/404.html'));
 
-// API: Auth/Register/Login/Switch/Logout
+// ----------- Multer for file upload -----------
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        if (file.fieldname === 'profilePic') cb(null, PROFILE_PIC_DIR);
+        else cb(null, POST_IMG_DIR);
+    },
+    filename: function (req, file, cb) {
+        const ext = path.extname(file.originalname);
+        cb(null, uuidv4() + ext);
+    }
+});
+const upload = multer({ storage: storage });
+
+// ----------- API -----------
 app.post('/api/register', (req, res) => {
     const { username, email, password } = req.body;
     if (!username || !email || !password)
@@ -163,9 +146,9 @@ app.post('/api/register', (req, res) => {
         password,
         createdAt: new Date().toISOString()
     };
-    fs.writeFileSync(getUserProfilePath(userId), JSON.stringify(profile, null, 2), 'utf8');
-    fs.writeFileSync(path.join(userDir, 'posts.json'), '[]', 'utf8');
-    fs.writeFileSync(path.join(userDir, 'comments.json'), '[]', 'utf8');
+    safeWriteJSON(getUserProfilePath(userId), profile);
+    safeWriteJSON(path.join(userDir, 'posts.json'), []);
+    safeWriteJSON(path.join(userDir, 'comments.json'), []);
     res.json({ success: true });
 });
 app.post('/api/login', (req, res) => {
@@ -194,8 +177,8 @@ app.post('/api/switch-account', (req, res) => {
 });
 app.get('/api/profile', authMiddleware, (req, res) => {
     const userId = req.user.id;
-    const profile = JSON.parse(fs.readFileSync(getUserProfilePath(userId), 'utf8'));
-    delete profile.password;
+    const profile = safeReadJSON(getUserProfilePath(userId));
+    if (profile) delete profile.password;
     res.json({ success: true, profile });
 });
 app.get('/api/user/:username', (req, res) => {
@@ -207,32 +190,32 @@ app.post('/api/profile/update', authMiddleware, (req, res) => {
     const userId = req.user.id;
     const { displayName, email } = req.body;
     const profilePath = getUserProfilePath(userId);
-    const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+    const profile = safeReadJSON(profilePath);
     if (displayName) profile.displayName = displayName;
     if (email) profile.email = email;
-    fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2), 'utf8');
+    safeWriteJSON(profilePath, profile);
     res.json({ success: true });
 });
 app.post('/api/profile/upload-pic', authMiddleware, upload.single('profilePic'), (req, res) => {
     const userId = req.user.id;
     const profilePath = getUserProfilePath(userId);
-    const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+    const profile = safeReadJSON(profilePath);
     if (profile.profilePic && fs.existsSync(path.join(__dirname, 'public', profile.profilePic))) {
         fs.unlinkSync(path.join(__dirname, 'public', profile.profilePic));
     }
     profile.profilePic = '/uploads/profile_pics/' + req.file.filename;
-    fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2), 'utf8');
+    safeWriteJSON(profilePath, profile);
     res.json({ success: true, pic: profile.profilePic });
 });
 app.post('/api/profile/remove-pic', authMiddleware, (req, res) => {
     const userId = req.user.id;
     const profilePath = getUserProfilePath(userId);
-    const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+    const profile = safeReadJSON(profilePath);
     if (profile.profilePic && fs.existsSync(path.join(__dirname, 'public', profile.profilePic))) {
         fs.unlinkSync(path.join(__dirname, 'public', profile.profilePic));
     }
     profile.profilePic = '';
-    fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2), 'utf8');
+    safeWriteJSON(profilePath, profile);
     res.json({ success: true });
 });
 
@@ -256,14 +239,14 @@ app.post('/api/post/create', authMiddleware, upload.single('postImage'), (req, r
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
     };
-    fs.writeFileSync(getPostPath(postId), JSON.stringify(post, null, 2), 'utf8');
-    fs.writeFileSync(getPostCommentsPath(postId), '[]', 'utf8');
+    safeWriteJSON(getPostPath(postId), post);
+    safeWriteJSON(getPostCommentsPath(postId), []);
     // update user's posts
     const userPostsPath = path.join(getUserDir(userId), 'posts.json');
     let userPosts = [];
-    if (fs.existsSync(userPostsPath)) userPosts = JSON.parse(fs.readFileSync(userPostsPath, 'utf8'));
+    if (fs.existsSync(userPostsPath)) userPosts = safeReadJSON(userPostsPath);
     userPosts.unshift(postId);
-    fs.writeFileSync(userPostsPath, JSON.stringify(userPosts, null, 2), 'utf8');
+    safeWriteJSON(userPostsPath, userPosts);
     res.json({ success: true, postId });
 });
 app.post('/api/post/:id/edit', authMiddleware, upload.single('postImage'), (req, res) => {
@@ -272,7 +255,7 @@ app.post('/api/post/:id/edit', authMiddleware, upload.single('postImage'), (req,
     const postId = req.params.id;
     const postPath = getPostPath(postId);
     if (!fs.existsSync(postPath)) return res.json({ success: false, msg: 'Not found' });
-    const post = JSON.parse(fs.readFileSync(postPath, 'utf8'));
+    const post = safeReadJSON(postPath);
     if (post.username !== username) return res.json({ success: false, msg: 'Not owner' });
     const { title, content } = req.body;
     if (title) post.title = title;
@@ -284,7 +267,7 @@ app.post('/api/post/:id/edit', authMiddleware, upload.single('postImage'), (req,
         post.image = '/uploads/post_images/' + req.file.filename;
     }
     post.updatedAt = new Date().toISOString();
-    fs.writeFileSync(postPath, JSON.stringify(post, null, 2), 'utf8');
+    safeWriteJSON(postPath, post);
     res.json({ success: true });
 });
 app.delete('/api/post/:id', authMiddleware, (req, res) => {
@@ -293,7 +276,7 @@ app.delete('/api/post/:id', authMiddleware, (req, res) => {
     const postId = req.params.id;
     const postPath = getPostPath(postId);
     if (!fs.existsSync(postPath)) return res.json({ success: false, msg: 'Not found' });
-    const post = JSON.parse(fs.readFileSync(postPath, 'utf8'));
+    const post = safeReadJSON(postPath);
     if (post.username !== username) return res.json({ success: false, msg: 'Not owner' });
     if (post.image && fs.existsSync(path.join(__dirname, 'public', post.image))) {
         fs.unlinkSync(path.join(__dirname, 'public', post.image));
@@ -302,19 +285,19 @@ app.delete('/api/post/:id', authMiddleware, (req, res) => {
     // update user's posts
     const userPostsPath = path.join(getUserDir(userId), 'posts.json');
     let userPosts = [];
-    if (fs.existsSync(userPostsPath)) userPosts = JSON.parse(fs.readFileSync(userPostsPath, 'utf8'));
+    if (fs.existsSync(userPostsPath)) userPosts = safeReadJSON(userPostsPath);
     userPosts = userPosts.filter(pid => pid !== postId);
-    fs.writeFileSync(userPostsPath, JSON.stringify(userPosts, null, 2), 'utf8');
+    safeWriteJSON(userPostsPath, userPosts);
     res.json({ success: true });
 });
 app.get('/api/post/:id', (req, res) => {
     const postId = req.params.id;
     const postPath = getPostPath(postId);
     if (!fs.existsSync(postPath)) return res.json({ success: false, msg: 'Not found' });
-    const post = JSON.parse(fs.readFileSync(postPath, 'utf8'));
+    const post = safeReadJSON(postPath);
     let comments = [];
     if (fs.existsSync(getPostCommentsPath(postId)))
-        comments = JSON.parse(fs.readFileSync(getPostCommentsPath(postId), 'utf8'));
+        comments = safeReadJSON(getPostCommentsPath(postId));
     let myUsername = null;
     const token = req.cookies.token;
     if (token) {
@@ -328,11 +311,8 @@ app.get('/api/posts', (req, res) => {
     const postDirs = fs.readdirSync(POSTS_DIR);
     let posts = [];
     for (let postId of postDirs) {
-        const postPath = getPostPath(postId);
-        if (fs.existsSync(postPath)) {
-            const post = JSON.parse(fs.readFileSync(postPath, 'utf8'));
-            posts.push(post);
-        }
+        const post = safeReadJSON(getPostPath(postId));
+        if (post) posts.push(post);
     }
     posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     res.json({ success: true, posts });
@@ -343,10 +323,10 @@ app.get('/api/user/:username/posts', (req, res) => {
     const userPostsPath = path.join(getUserDir(user._userId), 'posts.json');
     let posts = [];
     if (fs.existsSync(userPostsPath)) {
-        const postIds = JSON.parse(fs.readFileSync(userPostsPath, 'utf8'));
+        const postIds = safeReadJSON(userPostsPath);
         for (let pid of postIds) {
-            const postPath = getPostPath(pid);
-            if (fs.existsSync(postPath)) posts.push(JSON.parse(fs.readFileSync(postPath, 'utf8')));
+            const post = safeReadJSON(getPostPath(pid));
+            if (post) posts.push(post);
         }
     }
     posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -368,17 +348,17 @@ app.post('/api/post/:id/comment', authMiddleware, (req, res) => {
     };
     const commentsPath = getPostCommentsPath(postId);
     let comments = [];
-    if (fs.existsSync(commentsPath)) comments = JSON.parse(fs.readFileSync(commentsPath, 'utf8'));
+    if (fs.existsSync(commentsPath)) comments = safeReadJSON(commentsPath);
     comments.push(comment);
-    fs.writeFileSync(commentsPath, JSON.stringify(comments, null, 2), 'utf8');
+    safeWriteJSON(commentsPath, comments);
     // update user's comments
     const userObj = findUserByUsername(username);
     if (userObj) {
         const userCommentsPath = path.join(getUserDir(userObj._userId), 'comments.json');
         let userComments = [];
-        if (fs.existsSync(userCommentsPath)) userComments = JSON.parse(fs.readFileSync(userCommentsPath, 'utf8'));
+        if (fs.existsSync(userCommentsPath)) userComments = safeReadJSON(userCommentsPath);
         userComments.push(comment.id);
-        fs.writeFileSync(userCommentsPath, JSON.stringify(userComments, null, 2), 'utf8');
+        safeWriteJSON(userCommentsPath, userComments);
     }
     res.json({ success: true });
 });
@@ -387,19 +367,18 @@ app.delete('/api/post/:postId/comment/:commentId', authMiddleware, (req, res) =>
     const username = req.user.username;
     const commentsPath = getPostCommentsPath(postId);
     if (!fs.existsSync(commentsPath)) return res.json({ success: false, msg: 'Not found' });
-    let comments = JSON.parse(fs.readFileSync(commentsPath, 'utf8'));
+    let comments = safeReadJSON(commentsPath);
     const idx = comments.findIndex(c => c.id === commentId && c.username === username);
     if (idx === -1) return res.json({ success: false, msg: 'Not owner' });
     comments.splice(idx, 1);
-    fs.writeFileSync(commentsPath, JSON.stringify(comments, null, 2), 'utf8');
+    safeWriteJSON(commentsPath, comments);
     res.json({ success: true });
 });
 
 // 404 fallback
 app.use((req, res) => {
     res.status(404);
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.sendFile(path.join(__dirname, 'views/404.html'));
+    sendHtml(res, 'views/404.html');
 });
 
 app.listen(PORT, () => {
