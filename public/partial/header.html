@@ -3,18 +3,19 @@
   <nav id="navBar"></nav>
 </header>
 
-<!-- Modal สำหรับเพิ่มบัญชี (add account) -->
-<div id="addAccountModal" style="display:none; position:fixed; left:0; right:0; top:0; bottom:0; background:rgba(0,0,0,0.4); align-items:center; justify-content:center;">
-  <div style="background:#fff; padding:1em; border-radius:8px; max-width:420px; margin:2em auto;">
+<!-- Account dropdown / notifications (rendered by JS) -->
+<!-- Add account modal -->
+<div id="addAccountModal" class="modal-hidden">
+  <div class="modal-panel">
     <h3>เพิ่มบัญชี</h3>
     <form id="addAccountForm">
       <input type="email" name="email" placeholder="อีเมล" required>
       <input type="password" name="password" placeholder="รหัสผ่าน" required>
       <div style="text-align:right;margin-top:.5em;">
-        <button id="cancelAddAccount" type="button" style="background:#ccc;color:#000;margin-right:0.5em;">ยกเลิก</button>
+        <button id="cancelAddAccount" type="button" class="btn-muted">ยกเลิก</button>
         <button type="submit">เพิ่มบัญชี</button>
       </div>
-      <p id="addAccountMsg" style="color:#d00;"></p>
+      <p id="addAccountMsg" class="form-msg"></p>
     </form>
   </div>
 </div>
