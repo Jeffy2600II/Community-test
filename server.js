@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
@@ -176,6 +175,7 @@ app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'views/regi
 app.get('/profile', authMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'views/user_profile.html')));
 app.get('/profile/edit', authMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'views/edit_profile.html')));
 app.get('/user/:username', (req, res) => res.sendFile(path.join(__dirname, 'views/user_profile.html')));
+app.get('/accounts', authMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'views/accounts.html'))); // manage accounts page
 
 // API: Auth/Register/Login/AddAccount/Logout/Switch/AccountsList
 app.post('/api/register', (req, res) => {
