@@ -21,11 +21,16 @@ let myUsername = null;
     const { posts } = await res.json();
     let feed = '';
     for (let post of posts) {
+        // Escape HTML for safety ( XSS)
+        const escapeHTML = str => str.replace(/[&<>'"]/g,
+            c => ({
+                '&':'&amp;','<':'&lt;','>':'&gt;','\'':'&#39;','"':'&quot;'
+            })[c]);
         feed += `<div class="post">
-            <h2><a href="/post/${post.id}">${post.title}</a></h2>
-            <div> <a href="/user/${post.username}">${post.username}</a> - ${new Date(post.createdAt).toLocaleString()}</div>
+            <h2><a href="/post/${post.id}">${escapeHTML(post.title)}</a></h2>
+            <div> <a href="/user/${post.username}">${escapeHTML(post.username)}</a> - ${new Date(post.createdAt).toLocaleString()}</div>
             ${post.image ? `<img src="${post.image}" class="post-img">` : ''}
-            <p>${post.content.slice(0, 160)}${post.content.length>160?'...':''}</p>
+            <p>${escapeHTML(post.content.slice(0, 160))}${post.content.length>160?'...':''}</p>
             <a href="/post/${post.id}"></a>
             ${myUsername === post.username ? `<a href="/post/${post.id}/edit"></a> <button onclick="deletePost('${post.id}')"></button>` : ''}
         </div>`;
