@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>จัดการบัญชี — Community</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* small tweaks specific to accounts page */
+    .accounts-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+    .accounts-list { display:flex; flex-direction:column; gap:0.6rem; }
+    .account-row { display:flex; align-items:center; gap:0.8rem; padding:0.8rem; border:1px solid #eee; border-radius:8px; background:#fff; }
+    .account-info { flex:1; }
+    .account-actions { display:flex; gap:0.5rem; }
+    .account-active { font-size:0.9rem; color:#27ae60; font-weight:700; padding:.2em .5em; border-radius:6px; background:#e8f8f1; }
+    .section-small { margin-top:1.2rem; padding:1rem; border:1px solid #eee; border-radius:8px; background:#fafafa; }
+  </style>
+</head>
+<body>
+  <div id="headerSlot"></div>
+  <main>
+    <div class="section-title"><span>จัดการบัญชี</span></div>
+
+    <div class="accounts-header">
+      <div>
+        <h2>บัญชีที่บันทึกไว้</h2>
+        <div class="small">คุณสามารถเพิ่ม, สลับ หรือเอาบัญชีออกจากรายการได้ที่นี่</div>
+      </div>
+      <div style="display:flex;gap:0.6rem;align-items:center;">
+        <button id="btnAddAccount">เพิ่มบัญชี</button>
+        <button id="btnSignOutAll" class="btn-muted">ออกจากระบบ (active)</button>
+      </div>
+    </div>
+
+    <div id="accountsList" class="accounts-list">
+      <i>กำลังโหลด...</i>
+    </div>
+
+    <div class="section-small" id="activeAccountPanel" style="display:none;">
+      <h3>บัญชีที่ใช้งานอยู่ (Active)</h3>
+      <div id="activeAccountInfo">...</div>
+      <div style="margin-top:.8rem;">
+        <a href="/profile">ไปที่โปรไฟล์</a> •
+        <a href="#" id="btnViewSettings">ดูการตั้งค่าบัญชี</a>
+      </div>
+    </div>
+
+    <div class="section-small" id="notificationsPanel" style="display:none;margin-top:1rem;">
+      <h3>การแจ้งเตือน</h3>
+      <div id="notificationsList"><i>กำลังโหลด...</i></div>
+    </div>
+
+    <!-- add account modal -->
+    <div id="addAccountModal" class="modal-hidden">
+      <div class="modal-panel">
+        <h3>เพิ่มบัญชี</h3>
+        <form id="addAccountForm">
+          <input type="email" name="email" placeholder="อีเมล" required>
+          <input type="password" name="password" placeholder="รหัสผ่าน" required>
+          <div style="text-align:right;margin-top:.5em;">
+            <button id="cancelAddAccount" type="button" class="btn-muted">ยกเลิก</button>
+            <button type="submit">เพิ่มบัญชี</button>
+          </div>
+          <p id="addAccountMsg" class="form-msg"></p>
+        </form>
+      </div>
+    </div>
+
+  </main>
+  <div id="footerSlot"></div>
+
+  <script src="/js/main.js"></script>
+  <script>
+    async function loadAccounts() {
+      const container = document.getElementById('accountsList');
+      container.innerHTML = '<i>กำลังโหลด...</i>';
+      try {
+        const res = await fetch('/api/accounts');
+        if (!res.ok) throw new Error('fetch failed');
+        const data = await res.json();
+        const { accounts, active } = data;
+        container.innerHTML = '';
+        if (!accounts || accounts.length === 0) {
+          container.innerHTML = '<i>ยังไม่มีบัญชีบันทึกไว้</i>';
+        } else {
+          for (let acc of accounts) {
+            const row = document.createElement('div');
+            row.className = 'account-row';
+            row.innerHTML = `
+              <img src="${acc.profilePic||'/img/default_profile.png'}" class="profile-pic" width="48" height="48" style="width:48px;height:48px;">
+              <div class="account-info">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div><strong>${acc.displayName||acc.username}</strong></div>
+                  ${active === acc.username ? '<div class="account-active">Active</div>' : ''}
+                </div>
+                <div class="small">${acc.username}</div>
+              </div>
+              <div class="account-actions">
+                ${active === acc.username
+                  ? `<button class="btn-muted" data-username="${acc.username}" data-action="signout">Sign out</button>`
+                  : `<button data-username="${acc.username}" data-action="use">Use</button>
+                     <button class="btn-muted" data-username="${acc.username}" data-action="remove">Remove</button>`}
+              </div>
+            `;
+            container.appendChild(row);
+          }
+          // attach handlers
+          container.querySelectorAll('button[data-action="use"]').forEach(b => {
+            b.onclick = async (e) => {
+              const un = b.getAttribute('data-username');
+              if (!confirm(`สลับไปใช้บัญชี ${un} ?`)) return;
+              const r = await fetch('/api/accounts/switch', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ username: un })
+              });
+              const d = await r.json();
+              if (d.success) location.reload(); else alert(d.msg || 'ไม่สำเร็จ');
+            };
+          });
+          container.querySelectorAll('button[data-action="remove"]').forEach(b => {
+            b.onclick = async (e) => {
+              const un = b.getAttribute('data-username');
+              if (!confirm(`ลบบัญชี ${un} จากรายการ?`)) return;
+              const r = await fetch('/api/accounts/remove', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ username: un })
+              });
+              const d = await r.json();
+              if (d.success) location.reload(); else alert(d.msg || 'ไม่สำเร็จ');
+            };
+          });
+          container.querySelectorAll('button[data-action="signout"]').forEach(b => {
+            b.onclick = async (e) => {
+              if (!confirm('ยืนยันออกจากระบบบัญชีปัจจุบัน?')) return;
+              await fetch('/api/logout', { method: 'POST' });
+              location.reload();
+            };
+          });
+        }
+
+        // active panel
+        if (active) {
+          document.getElementById('activeAccountPanel').style.display = '';
+          const act = accounts.find(a => a.username === active) || accounts[0];
+          document.getElementById('activeAccountInfo').innerHTML = `<img src="${act.profilePic||'/img/default_profile.png'}" class="profile-pic" width="48"> <strong>${act.displayName||act.username}</strong> <div class="small">${act.username}</div>`;
+        } else {
+          document.getElementById('activeAccountPanel').style.display = 'none';
+        }
+
+      } catch (err) {
+        container.innerHTML = '<i>ไม่สามารถโหลดรายการบัญชีได้</i>';
+      }
+    }
+
+    async function loadNotifications() {
+      try {
+        const res = await fetch('/api/notifications');
+        if (!res.ok) throw new Error('no');
+        const data = await res.json();
+        const panel = document.getElementById('notificationsPanel');
+        const list = document.getElementById('notificationsList');
+        panel.style.display = '';
+        if (!data.notifications || data.notifications.length === 0) {
+          list.innerHTML = '<i>ยังไม่มีการแจ้งเตือน</i>';
+        } else {
+          list.innerHTML = '<div style="display:flex;flex-direction:column;gap:.6rem;"></div>';
+          for (let n of data.notifications.slice(0,50)) {
+            const it = document.createElement('div');
+            it.style.padding = '.6rem';
+            it.style.border = '1px solid #eee';
+            it.style.borderRadius = '6px';
+            it.innerHTML = `<div style="display:flex;justify-content:space-between;">
+              <div><strong>${n.type}</strong><div class="small">${n.message}</div></div>
+              <div class="small">${new Date(n.createdAt).toLocaleString()}</div>
+            </div>`;
+            if (!n.read) it.style.background = '#fffef6';
+            list.appendChild(it);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // add account modal logic
+    document.getElementById('btnAddAccount').onclick = (e) => showAddAccountModal();
+    document.getElementById('cancelAddAccount').onclick = (e) => hideAddAccountModal();
+    document.getElementById('addAccountForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      const msg = document.getElementById('addAccountMsg');
+      msg.style.color = '#d00';
+      try {
+        const res = await fetch('/api/add-account', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(body)
+        });
+        const d = await res.json();
+        if (d.success) {
+          msg.style.color = '#080';
+          msg.innerText = `เพิ่มบัญชี ${d.username} สำเร็จ`;
+          setTimeout(() => { hideAddAccountModal(); loadAccounts(); }, 700);
+        } else {
+          msg.innerText = d.msg || 'ไม่สำเร็จ';
+        }
+      } catch {
+        msg.innerText = 'เกิดข้อผิดพลาดเครือข่าย';
+      }
+    };
+
+    function showAddAccountModal() {
+      const modal = document.getElementById('addAccountModal');
+      modal.classList.remove('modal-hidden');
+      modal.style.display = 'flex';
+    }
+    function hideAddAccountModal() {
+      const modal = document.getElementById('addAccountModal');
+      modal.classList.add('modal-hidden');
+      modal.style.display = 'none';
+    }
+
+    document.getElementById('btnSignOutAll').onclick = async (e) => {
+      if (!confirm('ยืนยันออกจากระบบบัญชีปัจจุบัน?')) return;
+      await fetch('/api/logout', { method: 'POST' });
+      location.reload();
+    };
+
+    document.getElementById('btnViewSettings').onclick = async (e) => {
+      e.preventDefault();
+      try {
+        const r = await fetch('/api/account/settings');
+        if (!r.ok) throw new Error();
+        const d = await r.json();
+        if (d.success) {
+          alert('Account settings:\n' + JSON.stringify(d.settings, null, 2));
+        } else alert('ไม่สามารถโหลดการตั้งค่าได้');
+      } catch {
+        alert('เกิดข้อผิดพลาด');
+      }
+    };
+
+    // init
+    (async ()=> {
+      await loadAccounts();
+      await loadNotifications();
+    })();
+  </script>
+</body>
+</html>
