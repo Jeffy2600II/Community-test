@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>ดูโพสต์</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header>
+    <h1><a href="/">COMMUNITY</a></h1>
+    <nav id="navBar"></nav>
+</header>
+<main>
+    <div id="postBox"></div>
+    <div id="commentBox"></div>
+    <form id="commentForm" style="display:none;">
+        <textarea name="content" placeholder="แสดงความคิดเห็น" required></textarea>
+        <button type="submit">แสดงความคิดเห็น</button>
+    </form>
+</main>
+<script>
+const postId = location.pathname.split('/').pop();
+let myUsername;
+async function renderNav() {
+    let html = `<a href="/">หน้าแรก</a>`;
+    try {
+        const me = await fetch('/api/profile');
+        if (me.ok) {
+            const { profile } = await me.json();
+            myUsername = profile.username;
+            html += `
+            <a href="/post/create">สร้างโพสต์</a>
+            <a href="/user/${profile.username}">${profile.displayName || profile.username}</a>
+            <a href="#" id="logoutBtn">ออกจากระบบ</a>
+            `;
+        } else {
+            html += `<a href="/login">เข้าสู่ระบบ</a>`;
+        }
+    } catch {
+        html += `<a href="/login">เข้าสู่ระบบ</a>`;
+    }
+    document.getElementById('navBar').innerHTML = html;
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.onclick = async () => {
+            await fetch('/api/logout', { method: 'POST' });
+            location.replace('/');
+        };
+    }
+}
+renderNav();
+
+async function loadPost() {
+    const res = await fetch('/api/post/' + postId);
+    const data = await res.json();
+    if (!data.success) return document.getElementById('postBox').innerText = 'ไม่พบโพสต์';
+    const { post, comments, owner, myUsername: apiUsername } = data;
+    myUsername = apiUsername;
+    let html = `<h2>${post.title}</h2>
+    <div>โดย <a href="/user/${post.username}">${post.username}</a> - ${new Date(post.createdAt).toLocaleString()}</div>
+    ${post.image ? `<img src="${post.image}" class="post-img">` : ''}
+    <p>${post.content}</p>`;
+    if (myUsername === post.username) {
+        html += `<a href="/post/${post.id}/edit">แก้ไข</a> <button id="delBtn">ลบ</button>`;
+    }
+    document.getElementById('postBox').innerHTML = html;
+    if (myUsername === post.username) {
+        document.getElementById('delBtn').onclick = async () => {
+            if (confirm('ลบโพสต์?')) {
+                await fetch('/api/post/' + postId, { method: 'DELETE' });
+                location.replace('/');
+            }
+        };
+    }
+    let cHtml = '<h3>คอมเมนต์</h3>';
+    for (let c of comments) {
+        cHtml += `<div class="comment">
+            <b><a href="/user/${c.username}">${c.username}</a></b> : ${c.content}
+            <span>(${new Date(c.createdAt).toLocaleString()})</span>
+            ${myUsername === c.username ? `<button onclick="deleteComment('${c.id}')">ลบ</button>` : ''}
+        </div>`;
+    }
+    document.getElementById('commentBox').innerHTML = cHtml;
+    if (myUsername) document.getElementById('commentForm').style.display = '';
+}
+loadPost();
+document.getElementById('commentForm').onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const res = await fetch('/api/post/' + postId + '/comment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.fromEntries(fd.entries()))
+    });
+    const data = await res.json();
+    if (data.success) {
+        e.target.reset();
+        loadPost();
+    }
+};
+window.deleteComment = async (cid) => {
+    if (confirm('ยืนยันลบคอมเมนต์?')) {
+        await fetch(`/api/post/${postId}/comment/${cid}`, {method:'DELETE'});
+        loadPost();
+    }
+};
+</script>
+</body>
+</html>

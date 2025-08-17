@@ -1,0 +1,21 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap');
+body { font-family: 'Noto Sans Thai', 'Tahoma', 'Arial', sans-serif; margin: 0; background: #f7f7f7; color: #222; }
+header { background: #2c3e50; color: #fff; padding: 1em; }
+header h1, header nav { display:inline-block; vertical-align:middle; margin:0;}
+header nav { margin-left:2em;}
+header a { color: #fff; text-decoration: none; margin-right: 1em; }
+nav a { color: #fff; text-decoration: none; margin-right: 1em; }
+nav a:hover { text-decoration:underline }
+main { max-width: 700px; margin: 1em auto; background: #fff; padding: 2em; border-radius: 8px; min-height: 55vh; }
+input, textarea, button { margin: .5em 0; padding: .5em; width: 100%; border-radius: 4px; border: 1px solid #ccc; font-family: inherit; }
+button { background: #2980b9; color: #fff; border: none; cursor: pointer; }
+button:hover { background: #1abc9c; }
+.post { border-bottom: 1px solid #eee; margin-bottom: 1em; padding-bottom: 1em; }
+.post-img { max-width: 300px; display: block; margin: 1em 0; border-radius:8px; }
+.comment { background: #f1f1f1; margin: .5em 0; padding: .5em; border-radius: 4px; }
+form { margin-bottom: 2em; }
+.profile-card { background:#f2f2f2;padding:1em;border-radius:8px;display:inline-block;}
+.profile-pic { border-radius:50%;border:2px solid #ccc; }
+.section-title {margin:1em 0 1em 0;}
+.section-title span {background:#1abc9c;color:#fff;padding:.4em 1em;border-radius:20px;}
+.small {font-size:smaller;color:#888;}

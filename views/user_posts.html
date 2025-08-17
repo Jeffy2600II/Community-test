@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>โพสต์ของสมาชิก</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header>
+    <h1><a href="/">COMMUNITY</a></h1>
+    <nav>
+        <a href="/">หน้าแรก</a>
+        <a href="/login">เข้าสู่ระบบ</a>
+    </nav>
+</header>
+<main>
+    <div class="section-title"><span>โพสต์ของสมาชิก</span></div>
+    <div id="userPosts"></div>
+</main>
+<script>
+const username = location.pathname.split('/')[2];
+(async ()=>{
+    const pr2 = await fetch('/api/user/' + username + '/posts');
+    const { posts } = await pr2.json();
+    let postlist = '';
+    postlist += posts.length ? posts.map(p=>`<div><a href="/post/${p.id}">${p.title}</a> <span class="small">${new Date(p.createdAt).toLocaleString()}</span></div>`).join('') : '<i>ยังไม่มีโพสต์</i>';
+    document.getElementById('userPosts').innerHTML = postlist;
+})();
+</script>
+</body>
+</html>

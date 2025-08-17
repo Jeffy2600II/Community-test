@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>โปรไฟล์ของฉัน</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header>
+    <h1><a href="/">COMMUNITY</a></h1>
+    <nav>
+        <a href="/">หน้าแรก</a>
+        <a href="/post/create">สร้างโพสต์</a>
+        <a href="/profile/edit">ตั้งค่า</a>
+        <a href="#" id="logoutBtn">ออกจากระบบ</a>
+    </nav>
+</header>
+<main>
+    <div class="section-title"><span>โปรไฟล์ของฉัน</span></div>
+    <div id="profileBox"></div>
+    <div id="myPosts"></div>
+</main>
+<script>
+document.getElementById('logoutBtn').onclick = async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    location.replace('/');
+};
+(async ()=>{
+    const pr = await fetch('/api/profile');
+    const { profile } = await pr.json();
+    let html = '';
+    html += `<div class="profile-card">
+        <img src="${profile.profilePic || '/img/default_profile.png'}" width="80" class="profile-pic"><br>
+        <b>${profile.displayName}</b><br>
+        <span>${profile.email}</span>
+        <p>ชื่อผู้ใช้: ${profile.username}</p>
+        <a href="/user/${profile.username}">ดูโปรไฟล์แบบสาธารณะ</a>
+        <a href="/profile/edit">แก้ไขโปรไฟล์</a>
+    </div>`;
+    document.getElementById('profileBox').innerHTML = html;
+    const pr2 = await fetch('/api/user/' + profile.username + '/posts');
+    const { posts } = await pr2.json();
+    let postlist = '<div class="section-title"><span>โพสต์ของฉัน</span></div>';
+    postlist += posts.length ? posts.map(p=>`<div><a href="/post/${p.id}">${p.title}</a> <span class="small">${new Date(p.createdAt).toLocaleString()}</span></div>`).join('') : '<i>ยังไม่มีโพสต์</i>';
+    document.getElementById('myPosts').innerHTML = postlist;
+})();
+</script>
+</body>
+</html>

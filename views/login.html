@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>เข้าสู่ระบบ - Community</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header>
+    <h1><a href="/">COMMUNITY</a></h1>
+    <nav>
+        <a href="/">หน้าแรก</a>
+        <a href="/register">สมัครสมาชิก</a>
+    </nav>
+</header>
+<main>
+    <div class="section-title"><span>เข้าสู่ระบบ</span></div>
+    <form id="loginForm">
+        <input type="email" name="email" placeholder="อีเมล" required>
+        <input type="password" name="password" placeholder="รหัสผ่าน" required>
+        <button type="submit">เข้าสู่ระบบ</button>
+        <p id="msg"></p>
+    </form>
+    <p><a href="/register">ยังไม่มีบัญชี? สมัครสมาชิก</a></p>
+</main>
+<script>
+document.getElementById('loginForm').onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.fromEntries(fd.entries()))
+    });
+    const data = await res.json();
+    document.getElementById('msg').innerText = data.success ? 'สำเร็จ! กำลังเปลี่ยนหน้า...' : data.msg;
+    if (data.success) setTimeout(() => location.replace('/'), 1200);
+};
+</script>
+</body>
+</html>

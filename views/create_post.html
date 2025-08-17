@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>สร้างโพสต์ใหม่</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header>
+    <h1><a href="/">COMMUNITY</a></h1>
+    <nav>
+        <a href="/">หน้าแรก</a>
+        <a href="/profile">โปรไฟล์</a>
+        <a href="#" id="logoutBtn">ออกจากระบบ</a>
+    </nav>
+</header>
+<main>
+    <div class="section-title"><span>สร้างโพสต์ใหม่</span></div>
+    <form id="postForm" enctype="multipart/form-data">
+        <input type="text" name="title" placeholder="หัวข้อ" required>
+        <textarea name="content" placeholder="เนื้อหา" required></textarea>
+        <label>แนบรูป: <input type="file" name="postImage"></label>
+        <button type="submit">โพสต์</button>
+        <p id="msg"></p>
+    </form>
+</main>
+<script>
+document.getElementById('logoutBtn').onclick = async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    location.replace('/');
+};
+document.getElementById('postForm').onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const res = await fetch('/api/post/create', {
+        method: 'POST',
+        body: fd
+    });
+    const data = await res.json();
+    document.getElementById('msg').innerText = data.success ? 'โพสต์สำเร็จ' : data.msg;
+    if (data.success) setTimeout(() => location.replace('/post/'+data.postId), 1200);
+};
+</script>
+</body>
+</html>
