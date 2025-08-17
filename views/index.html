@@ -8,7 +8,7 @@
 <body>
   <div id="headerSlot"></div>
   <main>
-      <div class="section-title"><span></span></div>
+      <div class="section-title"><span>ฟีดโพสต์ล่าสุด</span></div>
       <div id="feed"></div>
   </main>
   <div id="footerSlot"></div>
@@ -21,25 +21,25 @@ let myUsername = null;
     const { posts } = await res.json();
     let feed = '';
     for (let post of posts) {
-        // Escape HTML for safety ( XSS)
+        // Escape HTML for safety (ป้องกัน XSS)
         const escapeHTML = str => str.replace(/[&<>'"]/g,
             c => ({
                 '&':'&amp;','<':'&lt;','>':'&gt;','\'':'&#39;','"':'&quot;'
             })[c]);
         feed += `<div class="post">
             <h2><a href="/post/${post.id}">${escapeHTML(post.title)}</a></h2>
-            <div> <a href="/user/${post.username}">${escapeHTML(post.username)}</a> - ${new Date(post.createdAt).toLocaleString()}</div>
+            <div>โดย <a href="/user/${post.username}">${escapeHTML(post.username)}</a> - ${new Date(post.createdAt).toLocaleString()}</div>
             ${post.image ? `<img src="${post.image}" class="post-img">` : ''}
             <p>${escapeHTML(post.content.slice(0, 160))}${post.content.length>160?'...':''}</p>
-            <a href="/post/${post.id}"></a>
-            ${myUsername === post.username ? `<a href="/post/${post.id}/edit"></a> <button onclick="deletePost('${post.id}')"></button>` : ''}
+            <a href="/post/${post.id}">อ่านต่อ</a>
+            ${myUsername === post.username ? `<a href="/post/${post.id}/edit">แก้ไข</a> <button onclick="deletePost('${post.id}')">ลบ</button>` : ''}
         </div>`;
     }
-    document.getElementById('feed').innerHTML = feed || '<i></i>';
+    document.getElementById('feed').innerHTML = feed || '<i>ยังไม่มีโพสต์</i>';
 })();
 
 window.deletePost = async (postId) => {
-    if (confirm('?')) {
+    if (confirm('ลบโพสต์นี้?')) {
         await fetch('/api/post/' + postId, {method:'DELETE'});
         location.reload();
     }
