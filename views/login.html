@@ -30,8 +30,13 @@ document.getElementById('loginForm').onsubmit = async e => {
         body: JSON.stringify(Object.fromEntries(fd.entries()))
     });
     const data = await res.json();
-    document.getElementById('msg').innerText = data.success ? 'สำเร็จ! กำลังเปลี่ยนหน้า...' : data.msg;
-    if (data.success) setTimeout(() => location.replace('/'), 1200);
+    const msg = document.getElementById('msg');
+    if (data.success) {
+        msg.innerText = 'สำเร็จ! กำลังไปหน้าหลัก...';
+        setTimeout(() => location.replace('/'), 900);
+    } else {
+        msg.innerText = data.msg || 'เกิดข้อผิดพลาด';
+    }
 };
 </script>
 </body>
