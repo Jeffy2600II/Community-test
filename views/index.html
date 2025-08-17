@@ -6,52 +6,15 @@
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-<header>
-    <h1><a href="/">COMMUNITY</a></h1>
-    <nav id="navBar"></nav>
-</header>
-<main>
-    <div class="section-title"><span>ฟีดโพสต์ล่าสุด</span></div>
-    <div id="feed"></div>
-</main>
+  <div id="headerSlot"></div>
+  <main>
+      <div class="section-title"><span></span></div>
+      <div id="feed"></div>
+  </main>
+  <div id="footerSlot"></div>
 <script src="/js/main.js"></script>
 <script>
 let myUsername = null;
-async function renderNav() {
-    let html = `<a href="/">หน้าแรก</a>`;
-    try {
-        const me = await fetch('/api/profile');
-        if (me.ok) {
-            const { profile } = await me.json();
-            myUsername = profile.username;
-            html += `
-            <a href="/post/create">สร้างโพสต์</a>
-            <a href="/user/${profile.username}">${profile.displayName || profile.username}</a>
-            <a href="/profile/edit">ตั้งค่า</a>
-            <a href="#" id="logoutBtn">ออกจากระบบ</a>
-            `;
-        } else {
-            html += `
-            <a href="/login">เข้าสู่ระบบ</a>
-            <a href="/register">สมัครสมาชิก</a>
-            `;
-        }
-    } catch {
-        html += `
-        <a href="/login">เข้าสู่ระบบ</a>
-        <a href="/register">สมัครสมาชิก</a>
-        `;
-    }
-    document.getElementById('navBar').innerHTML = html;
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-        logoutBtn.onclick = async () => {
-            await fetch('/api/logout', { method: 'POST' });
-            location.replace('/');
-        };
-    }
-}
-renderNav();
 
 (async () => {
     const res = await fetch('/api/posts');
@@ -60,17 +23,18 @@ renderNav();
     for (let post of posts) {
         feed += `<div class="post">
             <h2><a href="/post/${post.id}">${post.title}</a></h2>
-            <div>โดย <a href="/user/${post.username}">${post.username}</a> - ${new Date(post.createdAt).toLocaleString()}</div>
+            <div> <a href="/user/${post.username}">${post.username}</a> - ${new Date(post.createdAt).toLocaleString()}</div>
             ${post.image ? `<img src="${post.image}" class="post-img">` : ''}
             <p>${post.content.slice(0, 160)}${post.content.length>160?'...':''}</p>
-            <a href="/post/${post.id}">อ่านต่อ</a>
-            ${myUsername === post.username ? `<a href="/post/${post.id}/edit">แก้ไข</a> <button onclick="deletePost('${post.id}')">ลบ</button>` : ''}
+            <a href="/post/${post.id}"></a>
+            ${myUsername === post.username ? `<a href="/post/${post.id}/edit"></a> <button onclick="deletePost('${post.id}')"></button>` : ''}
         </div>`;
     }
-    document.getElementById('feed').innerHTML = feed || '<i>ยังไม่มีโพสต์</i>';
+    document.getElementById('feed').innerHTML = feed || '<i></i>';
 })();
+
 window.deletePost = async (postId) => {
-    if (confirm('ลบโพสต์นี้?')) {
+    if (confirm('?')) {
         await fetch('/api/post/' + postId, {method:'DELETE'});
         location.reload();
     }
