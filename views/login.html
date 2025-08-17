@@ -16,15 +16,7 @@
           <button type="submit">เข้าสู่ระบบ</button>
           <p id="msg"></p>
       </form>
-      <div id="tokenArea" style="display:none; margin-top:1em;">
-        <div class="section-title"><span>โทเคนสำหรับสลับบัญชี (เก็บไว้)</span></div>
-        <p>ระบบจะส่งโทเคนให้คุณ หากต้องการสลับบัญชีบนอุปกรณ์อื่น ให้นำโทเคนนี้ไปวางในเมนู "สลับบัญชี" บนอุปกรณ์นั้น</p>
-        <textarea id="tokenBox" readonly style="width:100%;height:80px;"></textarea>
-        <div style="text-align:right;margin-top:0.5em;">
-          <button id="copyTokenBtn">คัดลอกโทเคน</button>
-        </div>
-      </div>
-      <p style="margin-top:1em;"><a href="/register">ยังไม่มีบัญชี? สมัครสมาชิก</a></p>
+      <p><a href="/register">ยังไม่มีบัญชี? สมัครสมาชิก</a></p>
   </main>
   <div id="footerSlot"></div>
 <script src="/js/main.js"></script>
@@ -38,24 +30,8 @@ document.getElementById('loginForm').onsubmit = async e => {
         body: JSON.stringify(Object.fromEntries(fd.entries()))
     });
     const data = await res.json();
-    const msgEl = document.getElementById('msg');
-    if (data.success) {
-        msgEl.innerText = 'สำเร็จ! ได้รับโทเคนแล้ว กำลังเปลี่ยนหน้า...';
-        // ถ้ามี token ใน response ให้แสดงเพื่อคัดลอก (เพื่อสลับบัญชีบนอุปกรณ์อื่น)
-        if (data.token) {
-            document.getElementById('tokenArea').style.display = '';
-            document.getElementById('tokenBox').value = data.token;
-            document.getElementById('copyTokenBtn').onclick = () => {
-                document.getElementById('tokenBox').select();
-                document.execCommand('copy');
-                alert('คัดลอกแล้ว');
-            };
-        }
-        // server already sets cookie; redirect ช้าสักนิดให้ผู้ใช้เห็น token
-        setTimeout(() => location.replace('/'), 1800);
-    } else {
-        msgEl.innerText = data.msg || 'เกิดข้อผิดพลาด';
-    }
+    document.getElementById('msg').innerText = data.success ? 'สำเร็จ! กำลังเปลี่ยนหน้า...' : data.msg;
+    if (data.success) setTimeout(() => location.replace('/'), 1200);
 };
 </script>
 </body>
