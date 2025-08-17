@@ -7,49 +7,20 @@
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-<header>
-    <h1><a href="/">COMMUNITY</a></h1>
-    <nav id="navBar"></nav>
-</header>
-<main>
-    <div id="postBox"></div>
-    <div id="commentBox"></div>
-    <form id="commentForm" style="display:none;">
-        <textarea name="content" placeholder="แสดงความคิดเห็น" required></textarea>
-        <button type="submit">แสดงความคิดเห็น</button>
-    </form>
-</main>
+  <div id="headerSlot"></div>
+  <main>
+      <div id="postBox"></div>
+      <div id="commentBox"></div>
+      <form id="commentForm" style="display:none;">
+          <textarea name="content" placeholder="แสดงความคิดเห็น" required></textarea>
+          <button type="submit">แสดงความคิดเห็น</button>
+      </form>
+  </main>
+  <div id="footerSlot"></div>
+<script src="/js/main.js"></script>
 <script>
 const postId = location.pathname.split('/').pop();
 let myUsername;
-async function renderNav() {
-    let html = `<a href="/">หน้าแรก</a>`;
-    try {
-        const me = await fetch('/api/profile');
-        if (me.ok) {
-            const { profile } = await me.json();
-            myUsername = profile.username;
-            html += `
-            <a href="/post/create">สร้างโพสต์</a>
-            <a href="/user/${profile.username}">${profile.displayName || profile.username}</a>
-            <a href="#" id="logoutBtn">ออกจากระบบ</a>
-            `;
-        } else {
-            html += `<a href="/login">เข้าสู่ระบบ</a>`;
-        }
-    } catch {
-        html += `<a href="/login">เข้าสู่ระบบ</a>`;
-    }
-    document.getElementById('navBar').innerHTML = html;
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-        logoutBtn.onclick = async () => {
-            await fetch('/api/logout', { method: 'POST' });
-            location.replace('/');
-        };
-    }
-}
-renderNav();
 
 async function loadPost() {
     const res = await fetch('/api/post/' + postId);
