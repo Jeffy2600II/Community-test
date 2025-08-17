@@ -21,14 +21,12 @@ const POST_IMG_DIR = path.join(UPLOADS_DIR, 'post_images');
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
-// static files serve as-is (ensure browser reads as utf-8, especially for HTML/JS/CSS)
 app.use(express.static('public'));
-
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// Force charset=utf-8 for all API and HTML responses
+// Middleware: Force charset=utf-8 for all API and HTML responses
 app.use((req, res, next) => {
     if (req.path.startsWith('/api/')) {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -101,7 +99,10 @@ function authMiddleware(req, res, next) {
 // ----------- HTML Pages -----------
 function sendHtml(res, file) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.sendFile(path.join(__dirname, file));
+    fs.readFile(path.join(__dirname, file), 'utf8', (err, data) => {
+        if (err) return res.status(500).end("Server Error");
+        res.end(data);
+    });
 }
 app.get('/', (req, res) => sendHtml(res, 'views/index.html'));
 app.get('/login', (req, res) => sendHtml(res, 'views/login.html'));
