@@ -7,29 +7,20 @@
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-<header>
-    <h1><a href="/">COMMUNITY</a></h1>
-    <nav>
-        <a href="/">หน้าแรก</a>
-        <a href="/profile">โปรไฟล์</a>
-        <a href="#" id="logoutBtn">ออกจากระบบ</a>
-    </nav>
-</header>
-<main>
-    <div class="section-title"><span>แก้ไขโพสต์</span></div>
-    <form id="editPostForm" enctype="multipart/form-data">
-        <input type="text" name="title" placeholder="หัวข้อ">
-        <textarea name="content" placeholder="เนื้อหา"></textarea>
-        <label>เปลี่ยนรูป: <input type="file" name="postImage"></label>
-        <button type="submit">อัปเดต</button>
-        <p id="msg"></p>
-    </form>
-</main>
+  <div id="headerSlot"></div>
+  <main>
+      <div class="section-title"><span>แก้ไขโพสต์</span></div>
+      <form id="editPostForm" enctype="multipart/form-data">
+          <input type="text" name="title" placeholder="หัวข้อ">
+          <textarea name="content" placeholder="เนื้อหา"></textarea>
+          <label>เปลี่ยนรูป: <input type="file" name="postImage"></label>
+          <button type="submit">อัปเดต</button>
+          <p id="msg"></p>
+      </form>
+  </main>
+  <div id="footerSlot"></div>
+<script src="/js/main.js"></script>
 <script>
-document.getElementById('logoutBtn').onclick = async () => {
-    await fetch('/api/logout', { method: 'POST' });
-    location.replace('/');
-};
 const postId = location.pathname.split('/').slice(-2)[0];
 (async ()=>{
     const res = await fetch('/api/post/' + postId);
