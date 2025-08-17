@@ -7,24 +7,20 @@
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-<header>
-    <h1><a href="/">COMMUNITY</a></h1>
-    <nav>
-        <a href="/">หน้าแรก</a>
-        <a href="/login">เข้าสู่ระบบ</a>
-    </nav>
-</header>
-<main>
-    <div class="section-title"><span>สมัครสมาชิกใหม่</span></div>
-    <form id="registerForm">
-        <input type="text" name="username" placeholder="ชื่อผู้ใช้" required>
-        <input type="email" name="email" placeholder="อีเมล" required>
-        <input type="password" name="password" placeholder="รหัสผ่าน" required>
-        <button type="submit">สมัคร</button>
-        <p id="msg"></p>
-    </form>
-    <p><a href="/login">มีบัญชีอยู่แล้ว? เข้าสู่ระบบ</a></p>
-</main>
+  <div id="headerSlot"></div>
+  <main>
+      <div class="section-title"><span>สมัครสมาชิกใหม่</span></div>
+      <form id="registerForm">
+          <input type="text" name="username" placeholder="ชื่อผู้ใช้" required>
+          <input type="email" name="email" placeholder="อีเมล" required>
+          <input type="password" name="password" placeholder="รหัสผ่าน" required>
+          <button type="submit">สมัคร</button>
+          <p id="msg"></p>
+      </form>
+      <p><a href="/login">มีบัญชีอยู่แล้ว? เข้าสู่ระบบ</a></p>
+  </main>
+  <div id="footerSlot"></div>
+<script src="/js/main.js"></script>
 <script>
 document.getElementById('registerForm').onsubmit = async e => {
     e.preventDefault();
