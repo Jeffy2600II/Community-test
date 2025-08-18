@@ -28,11 +28,11 @@
   </main>
   <div id="footerSlot"></div>
 
-  <!-- load main.js first so helper functions (saveAccountMeta) are available -->
-  <script src="/js/main.js"></script>
-
   <script>
+    // โหลด header/footer จาก main.js partial loader if available (main.js will call loadPartial),
+    // but keep standalone behavior if main.js not loaded yet.
     (function(){
+      // Determine whether this is an "add account" flow
       const params = new URLSearchParams(window.location.search);
       const isAdd = params.get('add') === '1' || params.get('add') === 'true';
       const formTitle = document.getElementById('formTitle');
@@ -43,38 +43,6 @@
       } else {
         formTitle.innerText = 'เข้าสู่ระบบ';
         submitBtn.innerText = 'เข้าสู่ระบบ';
-      }
-
-      function clientSaveMeta(account) {
-        try {
-          if (typeof saveAccountMeta === 'function') {
-            saveAccountMeta(account);
-            return;
-          }
-        } catch {}
-        // fallback
-        try {
-          const LS_KEY = 'COMMUNITY_ACCOUNTS_V1';
-          const raw = localStorage.getItem(LS_KEY);
-          const meta = raw ? JSON.parse(raw) : { accounts: [], active: null };
-          const now = Date.now();
-          const idx = meta.accounts.findIndex(a => a.username === account.username);
-          const entry = {
-            username: account.username,
-            displayName: account.displayName || account.username,
-            profilePic: account.profilePic || '/img/default_profile.png',
-            addedAt: idx >= 0 ? meta.accounts[idx].addedAt : now,
-            lastUsedAt: now,
-            order: idx >= 0 ? meta.accounts[idx].order : (meta.accounts.length || 0)
-          };
-          if (idx >= 0) meta.accounts[idx] = Object.assign({}, meta.accounts[idx], entry);
-          else meta.accounts.push(entry);
-          meta.active = account.username;
-          localStorage.setItem(LS_KEY, JSON.stringify(meta));
-          localStorage.setItem(LS_KEY + ':updatedAt', String(Date.now()));
-        } catch (e) {
-          // ignore
-        }
       }
 
       document.getElementById('loginForm').onsubmit = async (e) => {
@@ -96,21 +64,17 @@
             msg.innerText = data && data.msg ? data.msg : 'ไม่สำเร็จ ลองอีกครั้ง';
             return;
           }
-          // Server should send account metadata in data.account { username, displayName, profilePic }
-          if (data.account && data.account.username) {
-            clientSaveMeta({
-              username: data.account.username,
-              displayName: data.account.displayName,
-              profilePic: data.account.profilePic
-            });
-          }
+          // success
           msg.style.color = '#080';
           if (isAdd) {
-            msg.innerText = `เพิ่มบัญชี ${data.account && data.account.username ? data.account.username : ''} เรียบร้อย`;
+            msg.innerText = `เพิ่มบัญชี ${data.username || ''} เรียบร้อย`;
+            // dispatch event so header in this tab can update (if header loaded)
             window.dispatchEvent(new Event('accountsChanged'));
+            // redirect to manage accounts to show list (or back to previous page)
             setTimeout(() => { location.href = '/accounts'; }, 700);
           } else {
             msg.innerText = 'ล็อกอินสำเร็จ';
+            // after ordinary login, go to home
             setTimeout(() => { location.href = '/'; }, 500);
           }
         } catch (err) {
@@ -119,5 +83,8 @@
       };
     })();
   </script>
+
+  <!-- main.js will be loaded by other pages; we still include it if present -->
+  <script src="/js/main.js"></script>
 </body>
 </html>
