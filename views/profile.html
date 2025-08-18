@@ -17,7 +17,13 @@
 <script src="/js/main.js"></script>
 <script>
 (async ()=>{
+    // เรียก API ใช้ authMiddleware ที่ฝั่งเซิร์ฟเวอร์
     const pr = await fetch('/api/profile');
+    if (!pr.ok) {
+        // ถ้าไม่ผ่านการยืนยันตัวตน ให้เปลี่ยนทางไปหน้า login
+        location.href = '/login';
+        return;
+    }
     const data = await pr.json();
     if (!data.success) return document.getElementById('profileBox').innerText = 'ไม่สามารถโหลดโปรไฟล์';
     const { profile, followersCount, followingCount } = data;
@@ -25,17 +31,23 @@
     html += `<div class="profile-card">
         <img src="${profile.profilePic || '/img/default_profile.png'}" width="80" class="profile-pic"><br>
         <b>${profile.displayName}</b><br>
-        <span>${profile.email}</span>
+        <span>${profile.email || ''}</span>
         <p>ชื่อผู้ใช้: ${profile.username}</p>
         <div class="small">ติดตาม: ${followingCount} • ผู้ติดตาม: ${followersCount}</div>
-        <a href="/user/${profile.username}">ดูโปรไฟล์แบบสาธารณะ</a>
-        <a href="/profile/edit">แก้ไขโปรไฟล์</a>
+        <div style="margin-top:.6rem;">
+          <a href="/user/${encodeURIComponent(profile.username)}">ดูโปรไฟล์แบบสาธารณะ</a>
+          <a href="/profile/edit" style="margin-left:0.8rem">แก้ไขโปรไฟล์</a>
+        </div>
     </div>`;
     document.getElementById('profileBox').innerHTML = html;
-    const pr2 = await fetch('/api/user/' + profile.username + '/posts');
-    const { posts } = await pr2.json();
+
+    // โหลดโพสต์ของตนเอง
+    const pr2 = await fetch('/api/user/' + encodeURIComponent(profile.username) + '/posts');
+    if (!pr2.ok) return;
+    const postsData = await pr2.json();
+    const posts = postsData.posts || [];
     let postlist = '<div class="section-title"><span>โพสต์ของฉัน</span></div>';
-    postlist += posts.length ? posts.map(p=>`<div><a href="/post/${p.id}">${p.title}</a> <span class="small">${new Date(p.createdAt).toLocaleString()}</span></div>`).join('') : '<i>ยังไม่มีโพสต์</i>';
+    postlist += posts.length ? posts.map(p=>`<div class="post"><a href="/post/${p.id}">${p.title}</a> <div class="small">${new Date(p.createdAt).toLocaleString()}</div></div>`).join('') : '<i>ยังไม่มีโพสต์</i>';
     document.getElementById('myPosts').innerHTML = postlist;
 })();
 </script>
