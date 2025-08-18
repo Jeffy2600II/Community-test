@@ -17,11 +17,13 @@ let globalAccounts = [];
 let globalActive = null;
 let dropdownEl = null;
 let dropdownVisible = false;
-
-// overlay element that sits above the page but under the dropdown to swallow clicks
 let overlayEl = null;
-// escape key listener reference
 let escapeKeyListener = null;
+
+function currentPageForNext() {
+  // include path + search + hash (hash optional)
+  return encodeURIComponent(location.pathname + location.search + location.hash);
+}
 
 async function fetchAccounts() {
   try {
@@ -49,7 +51,6 @@ async function fetchNotifications() {
 
 function ensureDropdown() {
   if (dropdownEl && document.body.contains(dropdownEl)) return dropdownEl;
-  // create single dropdown container reused across opens
   dropdownEl = document.createElement('div');
   dropdownEl.id = 'accountDropdown';
   dropdownEl.className = 'dropdown-panel';
@@ -57,7 +58,7 @@ function ensureDropdown() {
   dropdownEl.style.position = 'absolute';
   dropdownEl.style.right = '1rem';
   dropdownEl.style.top = '64px';
-  dropdownEl.style.zIndex = '1001'; // above overlay
+  dropdownEl.style.zIndex = '1001';
   document.body.appendChild(dropdownEl);
   return dropdownEl;
 }
@@ -66,24 +67,18 @@ function createOverlay() {
   if (overlayEl && document.body.contains(overlayEl)) return overlayEl;
   overlayEl = document.createElement('div');
   overlayEl.id = 'dropdownOverlay';
-  // full screen invisible overlay
   overlayEl.style.position = 'fixed';
   overlayEl.style.inset = '0';
   overlayEl.style.background = 'transparent';
-  // put overlay under the dropdown (dropdown zIndex is 1001)
   overlayEl.style.zIndex = '1000';
-  // ensure it captures pointer events
   overlayEl.style.pointerEvents = 'auto';
 
-  // clicking the overlay only closes dropdown and prevents any other action
   overlayEl.addEventListener('click', function (ev) {
     ev.preventDefault();
     ev.stopPropagation();
-    // hide dropdown (which will remove overlay)
     hideDropdown();
   }, { passive: false });
 
-  // also prevent contextmenu / auxiliary clicks from propagating to underlying elements
   overlayEl.addEventListener('auxclick', function (ev) {
     ev.preventDefault();
     ev.stopPropagation();
@@ -99,13 +94,10 @@ function createOverlay() {
 
 function showOverlay() {
   const ov = createOverlay();
-  // append overlay to body if not present
   if (!document.body.contains(ov)) document.body.appendChild(ov);
-  // ensure dropdown is after overlay in DOM so it appears above
   if (dropdownEl && document.body.contains(dropdownEl)) {
     document.body.appendChild(dropdownEl);
   }
-  // attach escape key listener
   escapeKeyListener = function (ev) {
     if (ev.key === 'Escape' && dropdownVisible) {
       ev.preventDefault();
@@ -117,7 +109,6 @@ function showOverlay() {
 
 function hideOverlay() {
   if (overlayEl && document.body.contains(overlayEl)) {
-    // remove overlay so clicks go through again
     overlayEl.remove();
   }
   if (escapeKeyListener) {
@@ -128,7 +119,6 @@ function hideOverlay() {
 
 function showDropdown() {
   const d = ensureDropdown();
-  // show overlay first so it captures clicks; dropdown appended above overlay
   showOverlay();
   d.style.display = 'block';
   dropdownVisible = true;
@@ -146,7 +136,6 @@ async function renderNav() {
   if (!nav) return;
   nav.innerHTML = '';
 
-  // left links
   const left = elFrom(`<div style="display:flex;align-items:center;gap:12px;">
     <a href="/">หน้าแรก</a>
     <a href="/post/create">สร้างโพสต์</a>
@@ -156,11 +145,9 @@ async function renderNav() {
   const accountArea = document.createElement('div');
   accountArea.className = 'account-area';
 
-  // fetch accounts & notifications
   const accData = await fetchAccounts();
   const notifData = await fetchNotifications();
 
-  // notification bell
   const bell = document.createElement('div');
   bell.className = 'notify-bell';
   bell.style.position = 'relative';
@@ -173,7 +160,6 @@ async function renderNav() {
   }
   accountArea.appendChild(bell);
 
-  // If accounts exist, show avatar + name, else show login/register
   if (accData && accData.accounts && accData.accounts.length > 0) {
     globalAccounts = accData.accounts;
     globalActive = accData.active;
@@ -189,16 +175,12 @@ async function renderNav() {
     avatarBtn.style.cursor = 'pointer';
     accountArea.appendChild(avatarBtn);
 
-    // ensure dropdown exists and populate when needed
     const dd = ensureDropdown();
-    dd.innerHTML = ''; // will populate when opened
+    dd.innerHTML = '';
 
-    // clicking avatar toggles dropdown and populates
     avatarBtn.onclick = async (ev) => {
-      // stopPropagation so our own handlers don't immediately close it
       ev.stopPropagation();
       if (dropdownVisible) { hideDropdown(); return; }
-      // populate dropdown
       dd.innerHTML = '';
       const header = document.createElement('div');
       header.className = 'dropdown-header';
@@ -213,9 +195,7 @@ async function renderNav() {
       list.style.overflow = 'auto';
       dd.appendChild(list);
 
-      // Build account items: DO NOT show the active account as selectable
       for (let acc of globalAccounts) {
-        // SKIP active account so it's not shown as selectable
         if (acc.username === globalActive) continue;
 
         const item = document.createElement('div');
@@ -231,10 +211,8 @@ async function renderNav() {
           </div>
           <div style="min-width:80px; text-align:right;"><button class="btn-remove small" data-username="${acc.username}">Remove</button></div>`;
 
-        // clicking the item (row) will switch account
         item.style.cursor = 'pointer';
         item.onclick = async (e) => {
-          // prevent remove button click bubbling
           if (e.target && e.target.tagName && (e.target.tagName.toLowerCase() === 'button')) return;
           const confirmSwitch = confirm(`สลับไปใช้บัญชี ${acc.username} ?`);
           if (!confirmSwitch) return;
@@ -245,10 +223,8 @@ async function renderNav() {
           });
           const d = await r.json();
           if (d.success) {
-            // refresh UI state: re-fetch accounts and notifications and re-render navbar
             await renderNav();
             hideDropdown();
-            // notify other parts of the app (optional)
             window.dispatchEvent(new Event('accountsChanged'));
           } else {
             alert(d.msg || 'ไม่สามารถสลับบัญชีได้');
@@ -258,16 +234,16 @@ async function renderNav() {
         list.appendChild(item);
       }
 
-      // "Add account" control at bottom -> นำไปที่หน้า login?add=1
       const footer = document.createElement('div');
       footer.style.padding = '8px';
       footer.style.borderTop = '1px solid #eee';
       footer.style.display = 'flex';
       footer.style.justifyContent = 'space-between';
+      // include current page as next
+      const loginUrl = '/login?add=1&next=' + currentPageForNext();
       footer.innerHTML = `<div><a href="/accounts" style="text-decoration:none">Manage accounts</a></div><div><button id="dropdownAddBtn">Add account</button></div>`;
       dd.appendChild(footer);
 
-      // attach remove handlers (delegated)
       list.querySelectorAll('.btn-remove').forEach(btn => {
         btn.onclick = async (ev) => {
           ev.stopPropagation();
@@ -280,7 +256,6 @@ async function renderNav() {
           });
           const d = await r.json();
           if (d.success) {
-            // refresh
             await renderNav();
             hideDropdown();
             window.dispatchEvent(new Event('accountsChanged'));
@@ -290,23 +265,21 @@ async function renderNav() {
         };
       });
 
-      // add account button -> ไปหน้า /login?add=1
       const addBtn = document.getElementById('dropdownAddBtn');
       if (addBtn) {
         addBtn.onclick = (e) => {
           e.preventDefault();
-          location.href = '/login?add=1';
+          // navigate to login?add=1&next=current
+          location.href = '/login?add=1&next=' + currentPageForNext();
         };
       }
 
       showDropdown();
     };
 
-    // bell click: open notifications list within dropdown
     bell.onclick = async (ev) => {
       ev.stopPropagation();
       const dd = ensureDropdown();
-      // fetch notifications
       const nd = await fetchNotifications();
       dd.innerHTML = '';
       const header = document.createElement('div');
@@ -343,7 +316,6 @@ async function renderNav() {
       }
       dd.appendChild(list);
 
-      // attach mark all read
       const mar = dd.querySelector('#markAllRead');
       if (mar) {
         mar.onclick = async (ev) => {
@@ -354,7 +326,6 @@ async function renderNav() {
             body: JSON.stringify({})
           });
           hideDropdown();
-          // refresh nav to update badge
           await renderNav();
         };
       }
@@ -363,7 +334,6 @@ async function renderNav() {
     };
 
   } else {
-    // show auth links if no accounts saved
     accountArea.appendChild(elFrom('<a href="/login">เข้าสู่ระบบ</a>'));
     accountArea.appendChild(elFrom('<a href="/register">สมัครสมาชิก</a>'));
   }
@@ -371,23 +341,15 @@ async function renderNav() {
   nav.appendChild(accountArea);
 }
 
-// Modal: The main header code no longer creates its own add-account modal.
-// We rely on /accounts page for full manage UI. However we keep helper functions
-// to refresh nav after performing account actions on that page.
 function setupGlobalRefreshOnMessage() {
-  // Listen for custom event from other pages (like /accounts) to refresh header instantly
   window.addEventListener('accountsChanged', async () => {
     await renderNav();
   });
 }
 
-// initialize
 window.onload = async function() {
   await loadPartial('headerSlot', '/partial/header.html');
   await loadPartial('footerSlot', '/partial/footer.html');
   setupGlobalRefreshOnMessage();
   renderNav();
 };
-
-// Utility to dispatch accountsChanged from other views after add/remove/switch
-// (Other pages can call: window.dispatchEvent(new Event('accountsChanged')) )
