@@ -1,9 +1,14 @@
 // public/js/main.js
 // โหลด partial (header/footer) ด้วย fetch แล้วแทรก
 async function loadPartial(id, file) {
-  const resp = await fetch(file);
-  const html = await resp.text();
-  document.getElementById(id).innerHTML = html;
+  try {
+    const resp = await fetch(file);
+    const html = await resp.text();
+    const slot = document.getElementById(id);
+    if (slot) slot.innerHTML = html;
+  } catch (e) {
+    // ignore
+  }
 }
 
 // helper to create element from HTML string
@@ -53,6 +58,11 @@ function ensureDropdown() {
   dropdownEl.style.right = '1rem';
   dropdownEl.style.top = '64px';
   dropdownEl.style.zIndex = '999';
+  dropdownEl.style.minWidth = '260px';
+  dropdownEl.style.boxShadow = '0 6px 18px rgba(0,0,0,.08)';
+  dropdownEl.style.background = '#fff';
+  dropdownEl.style.borderRadius = '8px';
+  dropdownEl.style.overflow = 'hidden';
   document.body.appendChild(dropdownEl);
 
   // click outside -> hide
@@ -81,6 +91,39 @@ function hideDropdown() {
   dropdownVisible = false;
 }
 
+/**
+ * Attempts to switch to the given username.
+ * API expected: POST /api/accounts/switch { username }
+ * Response: { success: true, reload?: boolean, msg?: string }
+ */
+async function switchAccount(username) {
+  try {
+    const r = await fetch('/api/accounts/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username })
+    });
+    const d = await r.json();
+    if (!d || !d.success) {
+      alert(d && d.msg ? d.msg : 'ไม่สามารถสลับบัญชีได้');
+      return false;
+    }
+    // If server requests a full reload (to pick up HttpOnly cookies / session), do it.
+    if (d.reload) {
+      location.reload();
+      return true; // will reload
+    }
+    // Otherwise re-fetch accounts and re-render header
+    await renderNav();
+    // notify other parts of the app that accounts changed
+    window.dispatchEvent(new Event('accountsChanged'));
+    return true;
+  } catch (err) {
+    alert('เกิดข้อผิดพลาดขณะสลับบัญชี');
+    return false;
+  }
+}
+
 async function renderNav() {
   const nav = document.getElementById('navBar');
   if (!nav) return;
@@ -95,6 +138,9 @@ async function renderNav() {
 
   const accountArea = document.createElement('div');
   accountArea.className = 'account-area';
+  accountArea.style.display = 'flex';
+  accountArea.style.alignItems = 'center';
+  accountArea.style.gap = '12px';
 
   // fetch accounts & notifications
   const accData = await fetchAccounts();
@@ -104,11 +150,20 @@ async function renderNav() {
   const bell = document.createElement('div');
   bell.className = 'notify-bell';
   bell.style.position = 'relative';
-  bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 01-3.46 0"></path></svg>`;
+  bell.style.cursor = 'pointer';
+  bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 01-3.46 0"></path></svg>`;
   if (notifData && notifData.unread && notifData.unread > 0) {
     const badge = document.createElement('div');
     badge.className = 'notify-badge';
     badge.innerText = notifData.unread > 99 ? '99+' : notifData.unread;
+    badge.style.position = 'absolute';
+    badge.style.top = '-6px';
+    badge.style.right = '-6px';
+    badge.style.background = '#d33';
+    badge.style.color = '#fff';
+    badge.style.padding = '2px 6px';
+    badge.style.borderRadius = '12px';
+    badge.style.fontSize = '11px';
     bell.appendChild(badge);
   }
   accountArea.appendChild(bell);
@@ -123,10 +178,13 @@ async function renderNav() {
 
     const avatarBtn = document.createElement('button');
     avatarBtn.className = 'avatar-btn';
-    avatarBtn.innerHTML = `<img src="${avatarUrl}" class="avatar-img"> <span style="color:#fff">${activeAcc.displayName || activeAcc.username}</span>`;
+    avatarBtn.style.display = 'flex';
+    avatarBtn.style.alignItems = 'center';
+    avatarBtn.style.gap = '8px';
     avatarBtn.style.border = 'none';
     avatarBtn.style.background = 'transparent';
     avatarBtn.style.cursor = 'pointer';
+    avatarBtn.innerHTML = `<img src="${avatarUrl}" class="avatar-img" style="width:34px;height:34px;border-radius:6px;object-fit:cover;"> <span style="color:#111">${activeAcc.displayName || activeAcc.username}</span>`;
     accountArea.appendChild(avatarBtn);
 
     // ensure dropdown exists and populate when needed
@@ -143,13 +201,17 @@ async function renderNav() {
       header.className = 'dropdown-header';
       header.style.padding = '12px';
       header.style.borderBottom = '1px solid #eee';
-      header.innerHTML = `<img src="${avatarUrl}" class="avatar-img" style="width:40px;height:40px;margin-right:.5em"><div><div><strong>${activeAcc.displayName || activeAcc.username}</strong></div><div class="small">${activeAcc.username}</div></div>`;
+      header.innerHTML = `<div style="display:flex;align-items:center;gap:10px;">
+        <img src="${avatarUrl}" class="avatar-img" style="width:40px;height:40px;border-radius:6px;object-fit:cover;">
+        <div><div style="font-weight:700">${activeAcc.displayName || activeAcc.username}</div><div class="small" style="color:#666">${activeAcc.username}</div></div>
+      </div>`;
       dd.appendChild(header);
 
       const list = document.createElement('div');
       list.className = 'dropdown-list';
       list.style.maxHeight = '320px';
       list.style.overflow = 'auto';
+      list.style.padding = '6px 6px';
       dd.appendChild(list);
 
       // Build account items: DO NOT show the active account as selectable
@@ -161,37 +223,33 @@ async function renderNav() {
         item.className = 'dropdown-item';
         item.style.display = 'flex';
         item.style.alignItems = 'center';
-        item.style.padding = '10px 12px';
+        item.style.padding = '8px';
         item.style.gap = '0.6rem';
-        item.innerHTML = `<img src="${acc.profilePic||'/img/default_profile.png'}" class="avatar-img" style="width:32px;height:32px">
+        item.style.borderRadius = '6px';
+        item.style.cursor = 'pointer';
+        item.style.transition = 'background .12s';
+        item.onmouseover = () => item.style.background = '#fafafa';
+        item.onmouseout = () => item.style.background = 'transparent';
+
+        item.innerHTML = `<img src="${acc.profilePic||'/img/default_profile.png'}" class="avatar-img" style="width:36px;height:36px;border-radius:6px;object-fit:cover">
           <div style="flex:1">
-            <div><strong>${acc.displayName || acc.username}</strong></div>
-            <div class="small">${acc.username}</div>
+            <div style="font-weight:600">${acc.displayName || acc.username}</div>
+            <div class="small" style="color:#666">${acc.username}</div>
           </div>
-          <div style="min-width:80px; text-align:right;"><button class="btn-remove small" data-username="${acc.username}">Remove</button></div>`;
+          <div style="min-width:96px; text-align:right;">
+            <button class="btn-remove small" data-username="${acc.username}" style="margin-left:8px">Remove</button>
+          </div>`;
 
         // clicking the item (row) will switch account
-        item.style.cursor = 'pointer';
         item.onclick = async (e) => {
           // prevent remove button click bubbling
           if (e.target && e.target.tagName && (e.target.tagName.toLowerCase() === 'button')) return;
-          const confirmSwitch = confirm(`สลับไปใช้บัญชี ${acc.username} ?`);
-          if (!confirmSwitch) return;
-          const r = await fetch('/api/accounts/switch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: acc.username })
-          });
-          const d = await r.json();
-          if (d.success) {
-            // refresh UI state: re-fetch accounts and notifications and re-render navbar
-            await renderNav();
-            hideDropdown();
-            // notify other parts of the app (optional)
-            window.dispatchEvent(new Event('accountsChanged'));
-          } else {
-            alert(d.msg || 'ไม่สามารถสลับบัญชีได้');
-          }
+          if (!confirm(`สลับไปใช้บัญชี ${acc.username} ?`)) return;
+          // disable interactions briefly
+          item.style.pointerEvents = 'none';
+          const ok = await switchAccount(acc.username);
+          if (!ok) item.style.pointerEvents = ''; // re-enable if failed
+          else hideDropdown();
         };
 
         list.appendChild(item);
@@ -199,11 +257,12 @@ async function renderNav() {
 
       // "Add account" control at bottom -> นำไปที่หน้า login?add=1
       const footer = document.createElement('div');
-      footer.style.padding = '8px';
+      footer.style.padding = '10px';
       footer.style.borderTop = '1px solid #eee';
       footer.style.display = 'flex';
       footer.style.justifyContent = 'space-between';
-      footer.innerHTML = `<div><a href="/accounts" style="text-decoration:none">Manage accounts</a></div><div><button id="dropdownAddBtn">Add account</button></div>`;
+      footer.style.alignItems = 'center';
+      footer.innerHTML = `<div><a href="/accounts" style="text-decoration:none;color:#333">Manage accounts</a></div><div><button id="dropdownAddBtn">Add account</button></div>`;
       dd.appendChild(footer);
 
       // attach remove handlers (delegated)
@@ -212,19 +271,25 @@ async function renderNav() {
           ev.stopPropagation();
           const username = btn.getAttribute('data-username');
           if (!confirm(`ลบบัญชี ${username} จากรายการหรือไม่?`)) return;
-          const r = await fetch('/api/accounts/remove', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username })
-          });
-          const d = await r.json();
-          if (d.success) {
-            // refresh
-            await renderNav();
-            hideDropdown();
-            window.dispatchEvent(new Event('accountsChanged'));
-          } else {
-            alert(d.msg || 'ลบไม่สำเร็จ');
+          btn.disabled = true;
+          try {
+            const r = await fetch('/api/accounts/remove', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username })
+            });
+            const d = await r.json();
+            if (d && d.success) {
+              await renderNav();
+              hideDropdown();
+              window.dispatchEvent(new Event('accountsChanged'));
+            } else {
+              alert(d && d.msg ? d.msg : 'ลบไม่สำเร็จ');
+              btn.disabled = false;
+            }
+          } catch {
+            alert('เกิดข้อผิดพลาด');
+            btn.disabled = false;
           }
         };
       });
@@ -245,7 +310,6 @@ async function renderNav() {
     bell.onclick = async (ev) => {
       ev.stopPropagation();
       const dd = ensureDropdown();
-      // fetch notifications
       const nd = await fetchNotifications();
       dd.innerHTML = '';
       const header = document.createElement('div');
@@ -310,23 +374,18 @@ async function renderNav() {
   nav.appendChild(accountArea);
 }
 
-// Modal: The main header code no longer creates its own add-account modal.
-// We rely on /accounts page for full manage UI. However we keep helper functions
-// to refresh nav after performing account actions on that page.
+// Listen for external updates (other pages can dispatch this)
 function setupGlobalRefreshOnMessage() {
-  // Listen for custom event from other pages (like /accounts) to refresh header instantly
   window.addEventListener('accountsChanged', async () => {
     await renderNav();
   });
 }
 
 // initialize
-window.onload = async function() {
-  await loadPartial('headerSlot', '/partial/header.html');
-  await loadPartial('footerSlot', '/partial/footer.html');
+window.addEventListener('load', async function() {
+  // try to fill header/footer used by pages that include slots
+  try { await loadPartial('headerSlot', '/partial/header.html'); } catch {}
+  try { await loadPartial('footerSlot', '/partial/footer.html'); } catch {}
   setupGlobalRefreshOnMessage();
-  renderNav();
-};
-
-// Utility to dispatch accountsChanged from other views after add/remove/switch
-// (Other pages can call: window.dispatchEvent(new Event('accountsChanged')) )
+  await renderNav();
+});
