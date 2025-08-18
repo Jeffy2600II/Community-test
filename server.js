@@ -71,6 +71,12 @@ function getUserDir(userId) {
 function getUserProfilePath(userId) {
     return path.join(USERS_DIR, userId, 'profile.json');
 }
+function getFollowersPath(userId) {
+    return path.join(USERS_DIR, userId, 'followers.json');
+}
+function getFollowingPath(userId) {
+    return path.join(USERS_DIR, userId, 'following.json');
+}
 function getPostDir(postId) {
     return path.join(POSTS_DIR, postId);
 }
@@ -90,6 +96,57 @@ function authMiddleware(req, res, next) {
         res.clearCookie('token');
         res.redirect('/login');
     }
+}
+
+// --- Followers / Following helpers ---
+function ensureJsonFile(p, initial = '[]') {
+    if (!fs.existsSync(p)) fs.writeFileSync(p, initial, 'utf8');
+    return p;
+}
+function getFollowersForUser(userId) {
+    const p = getFollowersPath(userId);
+    ensureJsonFile(p);
+    try {
+        return JSON.parse(fs.readFileSync(p, 'utf8'));
+    } catch { return []; }
+}
+function getFollowingForUser(userId) {
+    const p = getFollowingPath(userId);
+    ensureJsonFile(p);
+    try {
+        return JSON.parse(fs.readFileSync(p, 'utf8'));
+    } catch { return []; }
+}
+function addFollower(targetUserId, followerUserId) {
+    // add followerUserId into targetUserId's followers list
+    const fPath = ensureJsonFile(getFollowersPath(targetUserId));
+    let followers = JSON.parse(fs.readFileSync(fPath, 'utf8'));
+    if (!followers.includes(followerUserId)) {
+        followers.push(followerUserId);
+        fs.writeFileSync(fPath, JSON.stringify(followers, null, 2), 'utf8');
+    }
+    // add target into follower's following
+    const folPath = ensureJsonFile(getFollowingPath(followerUserId));
+    let following = JSON.parse(fs.readFileSync(folPath, 'utf8'));
+    if (!following.includes(targetUserId)) {
+        following.push(targetUserId);
+        fs.writeFileSync(folPath, JSON.stringify(following, null, 2), 'utf8');
+    }
+}
+function removeFollower(targetUserId, followerUserId) {
+    const fPath = ensureJsonFile(getFollowersPath(targetUserId));
+    let followers = JSON.parse(fs.readFileSync(fPath, 'utf8'));
+    followers = followers.filter(id => id !== followerUserId);
+    fs.writeFileSync(fPath, JSON.stringify(followers, null, 2), 'utf8');
+
+    const folPath = ensureJsonFile(getFollowingPath(followerUserId));
+    let following = JSON.parse(fs.readFileSync(folPath, 'utf8'));
+    following = following.filter(id => id !== targetUserId);
+    fs.writeFileSync(folPath, JSON.stringify(following, null, 2), 'utf8');
+}
+function isFollowing(followerUserId, targetUserId) {
+    const following = getFollowingForUser(followerUserId);
+    return following.includes(targetUserId);
 }
 
 // Notifications helpers (store per-user in users/{id}/notifications.json)
@@ -139,7 +196,6 @@ function addNotificationToUser(userId, type, message, meta = {}) {
         fs.writeFileSync(p, JSON.stringify(arr, null, 2), 'utf8');
         return n;
     } catch (err) {
-        // fail-safe: do not crash on notification errors
         console.error('addNotificationToUser error:', err && err.message);
         return null;
     }
@@ -210,7 +266,6 @@ app.get('/user/:username', (req, res) => res.sendFile(path.join(__dirname, 'view
 app.get('/accounts', authMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'views/accounts.html'))); // manage accounts page
 
 // --- NEW: Post page routes ---
-// Order matters: specific routes before parameterized /post/:id
 app.get('/post/create', authMiddleware, (req, res) => {
     return res.sendFile(path.join(__dirname, 'views/create_post.html'));
 });
@@ -244,6 +299,8 @@ app.post('/api/register', (req, res) => {
     fs.writeFileSync(path.join(userDir, 'posts.json'), '[]', 'utf8');
     fs.writeFileSync(path.join(userDir, 'comments.json'), '[]', 'utf8');
     fs.writeFileSync(path.join(userDir, 'notifications.json'), '[]', 'utf8');
+    fs.writeFileSync(getFollowersPath(userId), '[]', 'utf8');
+    fs.writeFileSync(getFollowingPath(userId), '[]', 'utf8');
     res.json({ success: true });
 });
 app.post('/api/login', (req, res) => {
@@ -422,44 +479,89 @@ app.get('/api/profile', authMiddleware, (req, res) => {
     const userId = req.user.id;
     const profile = JSON.parse(fs.readFileSync(getUserProfilePath(userId), 'utf8'));
     delete profile.password;
-    res.json({ success: true, profile });
+    // add follower/following counts
+    const followers = getFollowersForUser(userId) || [];
+    const following = getFollowingForUser(userId) || [];
+    res.json({ success: true, profile, followersCount: followers.length, followingCount: following.length });
 });
 app.get('/api/user/:username', (req, res) => {
     const user = findUserByUsername(req.params.username);
     if (!user) return res.json({ success: false, msg: 'ไม่พบผู้ใช้' });
-    res.json({ success: true, profile: user });
-});
-app.post('/api/profile/update', authMiddleware, (req, res) => {
-    const userId = req.user.id;
-    const { displayName, email } = req.body;
-    const profilePath = getUserProfilePath(userId);
-    const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
-    if (displayName) profile.displayName = displayName;
-    if (email) profile.email = email;
-    fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2), 'utf8');
-    res.json({ success: true });
-});
-app.post('/api/profile/upload-pic', authMiddleware, upload.single('profilePic'), (req, res) => {
-    const userId = req.user.id;
-    const profilePath = getUserProfilePath(userId);
-    const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
-    if (profile.profilePic && fs.existsSync(path.join(__dirname, 'public', profile.profilePic))) {
-        fs.unlinkSync(path.join(__dirname, 'public', profile.profilePic));
+
+    // compute follower/following counts
+    const followers = getFollowersForUser(user._userId) || [];
+    const following = getFollowingForUser(user._userId) || [];
+
+    // determine myUsername if token exists
+    let myUsername = null;
+    let myUserId = null;
+    const token = req.cookies.token;
+    if (token) {
+        try {
+            const p = jwt.verify(token, SECRET);
+            myUsername = p.username;
+            myUserId = p.id;
+        } catch {}
     }
-    profile.profilePic = '/uploads/profile_pics/' + req.file.filename;
-    fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2), 'utf8');
-    res.json({ success: true, pic: profile.profilePic });
+
+    const isFollowingFlag = myUserId ? isFollowing(myUserId, user._userId) : false;
+
+    res.json({
+        success: true,
+        profile: user,
+        followersCount: followers.length,
+        followingCount: following.length,
+        isFollowing: isFollowingFlag,
+        myUsername
+    });
 });
-app.post('/api/profile/remove-pic', authMiddleware, (req, res) => {
-    const userId = req.user.id;
-    const profilePath = getUserProfilePath(userId);
-    const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
-    if (profile.profilePic && fs.existsSync(path.join(__dirname, 'public', profile.profilePic))) {
-        fs.unlinkSync(path.join(__dirname, 'public', profile.profilePic));
-    }
-    profile.profilePic = '';
-    fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2), 'utf8');
-    res.json({ success: true });
+
+// follow / unfollow endpoints
+app.post('/api/user/:username/follow', authMiddleware, (req, res) => {
+    const target = findUserByUsername(req.params.username);
+    if (!target) return res.json({ success: false, msg: 'Target not found' });
+    const actorId = req.user.id;
+    if (actorId === target._userId) return res.json({ success: false, msg: 'Cannot follow yourself' });
+    addFollower(target._userId, actorId);
+
+    // notify the target user that they have a new follower
+    addNotificationToUser(target._userId, 'new_follower', `${req.user.username} ติดตามคุณ`, { actorId, actorUsername: req.user.username });
+
+    const followers = getFollowersForUser(target._userId) || [];
+    res.json({ success: true, followersCount: followers.length });
+});
+app.post('/api/user/:username/unfollow', authMiddleware, (req, res) => {
+    const target = findUserByUsername(req.params.username);
+    if (!target) return res.json({ success: false, msg: 'Target not found' });
+    const actorId = req.user.id;
+    if (actorId === target._userId) return res.json({ success: false, msg: 'Cannot unfollow yourself' });
+    removeFollower(target._userId, actorId);
+    const followers = getFollowersForUser(target._userId) || [];
+    res.json({ success: true, followersCount: followers.length });
+});
+
+// list followers / following
+app.get('/api/user/:username/followers', (req, res) => {
+    const user = findUserByUsername(req.params.username);
+    if (!user) return res.json({ success: false, msg: 'User not found' });
+    const followers = getFollowersForUser(user._userId) || [];
+    const out = followers.map(uid => {
+        const p = JSON.parse(fs.readFileSync(getUserProfilePath(uid), 'utf8'));
+        delete p.password;
+        return { id: uid, username: p.username, displayName: p.displayName, profilePic: p.profilePic || '' };
+    });
+    res.json({ success: true, followers: out });
+});
+app.get('/api/user/:username/following', (req, res) => {
+    const user = findUserByUsername(req.params.username);
+    if (!user) return res.json({ success: false, msg: 'User not found' });
+    const following = getFollowingForUser(user._userId) || [];
+    const out = following.map(uid => {
+        const p = JSON.parse(fs.readFileSync(getUserProfilePath(uid), 'utf8'));
+        delete p.password;
+        return { id: uid, username: p.username, displayName: p.displayName, profilePic: p.profilePic || '' };
+    });
+    res.json({ success: true, following: out });
 });
 
 // Notifications API
@@ -524,9 +626,15 @@ app.post('/api/post/create', authMiddleware, upload.single('postImage'), (req, r
     userPosts.unshift(postId);
     fs.writeFileSync(userPostsPath, JSON.stringify(userPosts, null, 2), 'utf8');
 
-    // NOTE: do NOT create a notification to the user about their own post.
-    // If in the future you want to notify followers or other users, create notifications
-    // for those recipients and ensure meta.actorId/actorUsername is set so addNotificationToUser can skip self-notify.
+    // Notify followers about new post (exclude author automatically in addNotificationToUser)
+    try {
+        const followers = getFollowersForUser(userId) || [];
+        for (let followerId of followers) {
+            addNotificationToUser(followerId, 'new_post', `${username} โพสต์ใหม่: "${title}"`, { postId, actorId: userId, actorUsername: username });
+        }
+    } catch (e) {
+        console.error('notify followers error', e && e.message);
+    }
 
     res.json({ success: true, postId });
 });
