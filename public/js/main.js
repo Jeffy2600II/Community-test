@@ -1,30 +1,22 @@
 // public/js/main.js
-// โหลด partial (header/footer) ด้วย fetch แล้วแทรก
-async function loadPartial(id, file) {
-  const resp = await fetch(file);
-  const html = await resp.text();
-  const el = document.getElementById(id);
-  if (el) el.innerHTML = html;
-}
+// Header partial loader + account dropdown + safe local metadata store
+// - No sensitive data stored client-side (no tokens/passwords/sessions)
+// - localStorage stores only non-sensitive metadata to improve UX
+// - BroadcastChannel (with storage fallback) syncs tabs
+// - Dropdown opens immediately on click (no 300ms delay)
+// - pointerdown capture guard prevents underlying element activation when closing dropdown
 
-// helper to create element from HTML string
-function elFrom(html) {
-  const div = document.createElement('div');
-  div.innerHTML = html.trim();
-  return div.firstChild;
-}
-
-/* --------------------
-   Local metadata store
-   --------------------
-   Schema stored at localStorage key: COMMUNITY_ACCOUNTS_V1
+/* -------------------------
+   Local metadata store (client)
+   -------------------------
+   Schema at localStorage key: COMMUNITY_ACCOUNTS_V1
    {
      accounts: [
        { username, displayName, profilePic, addedAt, lastUsedAt, order }
      ],
      active: 'username'
    }
-   We only store non-sensitive metadata. NEVER store tokens/passwords/session ids here.
+   NOTE: NEVER store password, tokens, session ids here.
 */
 const LS_KEY = 'COMMUNITY_ACCOUNTS_V1';
 const BC_CHANNEL = 'community:accounts';
@@ -49,7 +41,7 @@ function saveLocalMeta(obj) {
         bc.postMessage({ type: 'meta:updated', payload: obj });
         bc.close();
       } else {
-        // fallback: write to a dedicated storage key (storage event)
+        // fallback: trigger storage event
         localStorage.setItem(LS_KEY + ':updatedAt', String(Date.now()));
       }
     } catch (e) {
@@ -75,7 +67,6 @@ function saveAccountMeta(account) {
   };
   if (existingIndex >= 0) meta.accounts[existingIndex] = Object.assign({}, meta.accounts[existingIndex], entry);
   else meta.accounts.push(entry);
-
   meta.active = account.username;
   saveLocalMeta(meta);
 }
@@ -98,42 +89,57 @@ function setActiveAccountMeta(username) {
     meta.active = username;
     saveLocalMeta(meta);
   } else {
-    // if not exist, add minimal entry so UI can show it (but prefer server to return metadata on login)
     meta.accounts.push({ username, displayName: username, profilePic: '/img/default_profile.png', addedAt: now, lastUsedAt: now, order: meta.accounts.length });
     meta.active = username;
     saveLocalMeta(meta);
   }
 }
 
-/* Sync: listen for other tabs */
+/* Sync: listen for changes from other tabs */
 if (window.BroadcastChannel) {
-  const bc = new BroadcastChannel(BC_CHANNEL);
-  bc.onmessage = (ev) => {
-    if (!ev.data) return;
-    if (ev.data.type === 'meta:updated') {
-      // re-render nav to pick up changes
-      try { renderNav(); } catch (e) {}
-    }
-  };
+  try {
+    const bc = new BroadcastChannel(BC_CHANNEL);
+    bc.onmessage = (ev) => {
+      if (!ev.data) return;
+      if (ev.data.type === 'meta:updated') {
+        renderNav().catch(()=>{});
+      }
+    };
+  } catch (e) {
+    // ignore
+  }
 } else {
-  // fallback to storage event
   window.addEventListener('storage', (e) => {
     if (e.key === LS_KEY + ':updatedAt') {
-      try { renderNav(); } catch (err) {}
+      renderNav().catch(()=>{});
     }
   });
 }
 
-/* --------------------
-   Fetch helpers
-   -------------------- */
-let globalAccounts = [];
-let globalActive = null;
-let dropdownEl = null;
-let dropdownVisible = false;
-let outsidePointerGuard = null;
-let outsideKeyGuard = null;
+/* -------------------------
+   Partial loader + helpers
+   ------------------------- */
+async function loadPartial(id, file) {
+  try {
+    const resp = await fetch(file);
+    if (!resp.ok) return;
+    const html = await resp.text();
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = html;
+  } catch (e) {
+    // ignore
+  }
+}
 
+function elFrom(html) {
+  const div = document.createElement('div');
+  div.innerHTML = html.trim();
+  return div.firstChild;
+}
+
+/* -------------------------
+   Server fetch helpers
+   ------------------------- */
 async function fetchAccounts() {
   try {
     const r = await fetch('/api/accounts');
@@ -158,9 +164,14 @@ async function fetchNotifications() {
   }
 }
 
-/* --------------------
-   Dropdown guards (prevent underlying activation)
-   -------------------- */
+/* -------------------------
+   Dropdown + guards
+   ------------------------- */
+let dropdownEl = null;
+let dropdownVisible = false;
+let outsidePointerGuard = null;
+let outsideKeyGuard = null;
+
 function ensureDropdown() {
   if (dropdownEl && document.body.contains(dropdownEl)) return dropdownEl;
   dropdownEl = document.createElement('div');
@@ -176,6 +187,7 @@ function ensureDropdown() {
 }
 
 function addOutsideGuards() {
+  // pointerdown capture guard: runs before other handlers and before browser active state
   outsidePointerGuard = function (ev) {
     if (!dropdownVisible || !dropdownEl) return;
     if (dropdownEl.contains(ev.target)) return;
@@ -212,6 +224,7 @@ function showDropdown() {
   dropdownVisible = true;
   addOutsideGuards();
 }
+
 function hideDropdown() {
   if (!dropdownEl) return;
   dropdownEl.style.display = 'none';
@@ -219,9 +232,9 @@ function hideDropdown() {
   removeOutsideGuards();
 }
 
-/* --------------------
-   Render nav / accounts dropdown
-   -------------------- */
+/* -------------------------
+   Render functions
+   ------------------------- */
 function renderAccountListInto(dd, accountsList, activeUsername) {
   dd.innerHTML = '';
   const header = document.createElement('div');
@@ -242,7 +255,7 @@ function renderAccountListInto(dd, accountsList, activeUsername) {
   list.style.overflow = 'auto';
   dd.appendChild(list);
 
-  // show accounts EXCEPT active (per your request)
+  // show accounts EXCEPT active (per requirement)
   for (let acc of accountsList) {
     if (acc.username === activeUsername) continue;
     const item = document.createElement('div');
@@ -269,7 +282,7 @@ function renderAccountListInto(dd, accountsList, activeUsername) {
       });
       const d = await r.json();
       if (d.success) {
-        // server should set session cookie; client updates metadata locally
+        // server should set session cookie; client updates meta
         setActiveAccountMeta(acc.username);
         await renderNav();
         hideDropdown();
@@ -318,7 +331,6 @@ function renderAccountListInto(dd, accountsList, activeUsername) {
   if (addBtn) {
     addBtn.onclick = (e) => {
       e.preventDefault();
-      // navigate to login page in "add account" mode
       location.href = '/login?add=1';
     };
   }
@@ -338,25 +350,24 @@ async function renderNav() {
   const accountArea = document.createElement('div');
   accountArea.className = 'account-area';
 
-  // Prefer server authoritative data; fallback to local meta when server not available
-  let accData = await fetchAccounts();
-  let localMeta = loadLocalMeta();
+  // prefer server authoritative; fallback to local meta
+  let accData = null;
+  try { accData = await fetchAccounts(); } catch {}
+  const localMeta = loadLocalMeta();
 
   let accountsToShow = [];
   let activeUsername = null;
   if (accData && accData.accounts) {
     accountsToShow = accData.accounts.map(a => ({ username: a.username, displayName: a.displayName, profilePic: a.profilePic }));
     activeUsername = accData.active;
-    // also sync this server info into local store for UX
-    // only save non-sensitive metadata
+    // sync server info into local meta (non-sensitive)
     for (let a of accountsToShow) saveAccountMeta({ username: a.username, displayName: a.displayName, profilePic: a.profilePic });
   } else {
-    // fallback: use local meta
     accountsToShow = (localMeta.accounts || []).map(a => ({ username: a.username, displayName: a.displayName, profilePic: a.profilePic }));
     activeUsername = localMeta.active;
   }
 
-  // notification bell
+  // notifications bell
   const notif = await fetchNotifications();
   const bell = document.createElement('div');
   bell.className = 'notify-bell';
@@ -385,16 +396,15 @@ async function renderNav() {
     const dd = ensureDropdown();
     dd.innerHTML = '';
 
-    // clicking avatar toggles dropdown - open immediately (no delay)
+    // open immediately on click (no debounce)
     avatarBtn.addEventListener('click', async (ev) => {
       ev.stopPropagation();
       if (dropdownVisible) { hideDropdown(); return; }
-      // populate from accountsToShow and activeUsername
       renderAccountListInto(dd, accountsToShow, activeUsername);
       showDropdown();
     });
 
-    // bell click: show notifications in dropdown
+    // bell click -> notifications dropdown
     bell.onclick = async (ev) => {
       ev.stopPropagation();
       const dd = ensureDropdown();
@@ -455,13 +465,10 @@ async function renderNav() {
   nav.appendChild(accountArea);
 }
 
-/* listen for local accountsChanged */
-function setupGlobalRefreshOnMessage() {
-  window.addEventListener('accountsChanged', async () => { await renderNav(); });
-}
-setupGlobalRefreshOnMessage();
+/* Listen for explicit event to refresh */
+window.addEventListener('accountsChanged', async () => { await renderNav(); });
 
-/* initialize */
+/* init */
 window.addEventListener('load', async () => {
   await loadPartial('headerSlot', '/partial/header.html');
   await loadPartial('footerSlot', '/partial/footer.html');
