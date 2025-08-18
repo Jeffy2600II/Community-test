@@ -1,0 +1,5 @@
+# .gitignore
+
+# กันไม่ให้ Git track โฟลเดอร์ข้อมูลผู้ใช้
+data/
+public/uploads/
