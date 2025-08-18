@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "id": "d680dedb-9d54-4e9d-8300-6633b4b2ac08",
+    "type": "post_created",
+    "message": "คุณได้สร้างโพสต์ \"Hjfjfj\"",
+    "meta": {
+      "postId": "185784af-2341-4188-92c5-3861a9bc5660"
+    },
+    "createdAt": "2025-08-18T06:52:50.014Z",
+    "read": false
+  }
+]
