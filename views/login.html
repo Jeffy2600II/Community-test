@@ -4,12 +4,6 @@
   <meta charset="utf-8">
   <title>เข้าสู่ระบบ — Community</title>
   <link rel="stylesheet" href="/css/style.css">
-  <style>
-    .form { max-width:420px; margin:2rem auto; padding:1.2rem; border:1px solid #eee; border-radius:8px; background:#fff; }
-    .form input { width:100%; padding:.6rem; margin:.4rem 0; box-sizing:border-box; }
-    .form button { padding:.6rem 1rem; }
-    .small { font-size:0.9rem; color:#666; margin-top:.6rem; display:block; }
-  </style>
 </head>
 <body>
   <div id="headerSlot"></div>
@@ -28,93 +22,62 @@
   </main>
   <div id="footerSlot"></div>
 
+  <script src="/js/main.js"></script>
   <script>
     (function(){
       const params = new URLSearchParams(window.location.search);
       const isAdd = params.get('add') === '1' || params.get('add') === 'true';
-      // read next param (may be encoded)
-      const nextParam = params.get('next') || '';
-      const formTitle = document.getElementById('formTitle');
-      const submitBtn = document.getElementById('submitBtn');
+      document.getElementById('formTitle').innerText = isAdd ? 'เพิ่มบัญชี (Login เพื่อบันทึกบัญชีนี้)' : 'เข้าสู่ระบบ';
+      document.getElementById('submitBtn').innerText = isAdd ? 'เพิ่มบัญชี' : 'เข้าสู่ระบบ';
 
-      if (isAdd) {
-        formTitle.innerText = 'เพิ่มบัญชี (Login เพื่อบันทึกบัญชีนี้)';
-        submitBtn.innerText = 'เพิ่มบัญชี';
-      } else {
-        formTitle.innerText = 'เข้าสู่ระบบ';
-        submitBtn.innerText = 'เข้าสู่ระบบ';
-      }
-
-      // safe redirect helper: allow only same-origin absolute-path (starting with single '/')
-      function safeRedirect(url) {
-        if (!url) return null;
+      async function clientSave(account) {
+        // If local storage is protected, prompt user for passphrase to save into encrypted store
         try {
-          // decode plus trim
-          const decoded = decodeURIComponent(url);
-          // must start with single slash and not with double slash
-          if (decoded.startsWith('/') && !decoded.startsWith('//')) {
-            // prevent "javascript:" or schema injection
-            if (decoded.includes(':')) {
-              // if contains colon before any slash, reject
-              const firstSlash = decoded.indexOf('/', 1); // skip initial slash
-              const colonIndex = decoded.indexOf(':');
-              if (colonIndex !== -1 && (firstSlash === -1 || colonIndex < firstSlash)) {
-                return null;
-              }
-            }
-            return decoded;
+          const rec = await window.communityStore.loadLocalMeta();
+          if (rec && rec.protected) {
+            const pass = prompt('พื้นที่เก็บบัญชีในเครื่องถูกป้องกัน กรุณาป้อน passphrase เพื่อบันทึกข้อมูลบัญชีนี้:');
+            if (!pass) return;
+            await window.communityStore.saveAccountMeta(account, { passphrase: pass });
+          } else {
+            await window.communityStore.saveAccountMeta(account);
           }
         } catch (e) {
-          return null;
+          // fallback: try to save without passphrase
+          try { await window.communityStore.saveAccountMeta(account); } catch (err) {}
         }
-        return null;
       }
 
       document.getElementById('loginForm').onsubmit = async (e) => {
         e.preventDefault();
-        const msg = document.getElementById('msg');
-        msg.style.color = '#d00';
-        msg.innerText = '';
         const fd = new FormData(e.target);
         const body = Object.fromEntries(fd.entries());
+        const endpoint = isAdd ? '/api/add-account' : '/api/login';
+        const msgEl = document.getElementById('msg');
+        msgEl.style.color = '#d00';
+        msgEl.innerText = '';
         try {
-          const endpoint = isAdd ? '/api/add-account' : '/api/login';
           const res = await fetch(endpoint, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {'Content-Type':'application/json'},
             body: JSON.stringify(body)
           });
           const data = await res.json();
           if (!data || !data.success) {
-            msg.innerText = data && data.msg ? data.msg : 'ไม่สำเร็จ ลองอีกครั้ง';
+            msgEl.innerText = data && data.msg ? data.msg : 'ไม่สำเร็จ ลองอีกครั้ง';
             return;
           }
-          // success
-          msg.style.color = '#080';
-          // determine redirect target: prefer safe nextParam, fallback: for add -> /accounts, for login -> /
-          const safeNext = safeRedirect(nextParam);
-          if (safeNext) {
-            msg.innerText = 'สำเร็จ กำลังนำกลับไปยังหน้าที่คุณมา';
-            // dispatch event to update header if same tab has header loaded
-            window.dispatchEvent(new Event('accountsChanged'));
-            setTimeout(() => { location.href = safeNext; }, 300);
-            return;
+          // expect server to include non-sensitive account metadata
+          if (data.account && data.account.username) {
+            await clientSave({ username: data.account.username, displayName: data.account.displayName, profilePic: data.account.profilePic });
           }
-          if (isAdd) {
-            msg.innerText = `เพิ่มบัญชี ${data.username || ''} เรียบร้อย`;
-            window.dispatchEvent(new Event('accountsChanged'));
-            setTimeout(() => { location.href = '/accounts'; }, 500);
-          } else {
-            msg.innerText = 'ล็อกอินสำเร็จ';
-            setTimeout(() => { location.href = '/'; }, 300);
-          }
+          msgEl.style.color = '#080';
+          msgEl.innerText = isAdd ? 'เพิ่มบัญชีเรียบร้อย' : 'ล็อกอินสำเร็จ';
+          setTimeout(() => { location.href = isAdd ? '/accounts' : '/'; }, 600);
         } catch (err) {
-          msg.innerText = 'เกิดข้อผิดพลาดเครือข่าย';
+          msgEl.innerText = 'เกิดข้อผิดพลาดเครือข่าย';
         }
       };
     })();
   </script>
-
-  <script src="/js/main.js"></script>
 </body>
 </html>
