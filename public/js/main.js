@@ -197,7 +197,7 @@ async function renderNav() {
         list.appendChild(item);
       }
 
-      // "Add account" control at bottom
+      // "Add account" control at bottom -> นำไปที่หน้า login?add=1
       const footer = document.createElement('div');
       footer.style.padding = '8px';
       footer.style.borderTop = '1px solid #eee';
@@ -229,14 +229,12 @@ async function renderNav() {
         };
       });
 
-      // add account button
+      // add account button -> ไปหน้า /login?add=1
       const addBtn = document.getElementById('dropdownAddBtn');
       if (addBtn) {
         addBtn.onclick = (e) => {
           e.preventDefault();
-          // open accounts page's add modal or navigate there
-          // prefer to navigate to /accounts where there's a full UI
-          location.href = '/accounts';
+          location.href = '/login?add=1';
         };
       }
 
