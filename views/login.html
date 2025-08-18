@@ -29,20 +29,45 @@
   <div id="footerSlot"></div>
 
   <script>
-    // โหลด header/footer จาก main.js partial loader if available (main.js will call loadPartial),
-    // but keep standalone behavior if main.js not loaded yet.
     (function(){
-      // Determine whether this is an "add account" flow
       const params = new URLSearchParams(window.location.search);
       const isAdd = params.get('add') === '1' || params.get('add') === 'true';
+      // read next param (may be encoded)
+      const nextParam = params.get('next') || '';
       const formTitle = document.getElementById('formTitle');
       const submitBtn = document.getElementById('submitBtn');
+
       if (isAdd) {
         formTitle.innerText = 'เพิ่มบัญชี (Login เพื่อบันทึกบัญชีนี้)';
         submitBtn.innerText = 'เพิ่มบัญชี';
       } else {
         formTitle.innerText = 'เข้าสู่ระบบ';
         submitBtn.innerText = 'เข้าสู่ระบบ';
+      }
+
+      // safe redirect helper: allow only same-origin absolute-path (starting with single '/')
+      function safeRedirect(url) {
+        if (!url) return null;
+        try {
+          // decode plus trim
+          const decoded = decodeURIComponent(url);
+          // must start with single slash and not with double slash
+          if (decoded.startsWith('/') && !decoded.startsWith('//')) {
+            // prevent "javascript:" or schema injection
+            if (decoded.includes(':')) {
+              // if contains colon before any slash, reject
+              const firstSlash = decoded.indexOf('/', 1); // skip initial slash
+              const colonIndex = decoded.indexOf(':');
+              if (colonIndex !== -1 && (firstSlash === -1 || colonIndex < firstSlash)) {
+                return null;
+              }
+            }
+            return decoded;
+          }
+        } catch (e) {
+          return null;
+        }
+        return null;
       }
 
       document.getElementById('loginForm').onsubmit = async (e) => {
@@ -66,16 +91,22 @@
           }
           // success
           msg.style.color = '#080';
+          // determine redirect target: prefer safe nextParam, fallback: for add -> /accounts, for login -> /
+          const safeNext = safeRedirect(nextParam);
+          if (safeNext) {
+            msg.innerText = 'สำเร็จ กำลังนำกลับไปยังหน้าที่คุณมา';
+            // dispatch event to update header if same tab has header loaded
+            window.dispatchEvent(new Event('accountsChanged'));
+            setTimeout(() => { location.href = safeNext; }, 300);
+            return;
+          }
           if (isAdd) {
             msg.innerText = `เพิ่มบัญชี ${data.username || ''} เรียบร้อย`;
-            // dispatch event so header in this tab can update (if header loaded)
             window.dispatchEvent(new Event('accountsChanged'));
-            // redirect to manage accounts to show list (or back to previous page)
-            setTimeout(() => { location.href = '/accounts'; }, 700);
+            setTimeout(() => { location.href = '/accounts'; }, 500);
           } else {
             msg.innerText = 'ล็อกอินสำเร็จ';
-            // after ordinary login, go to home
-            setTimeout(() => { location.href = '/'; }, 500);
+            setTimeout(() => { location.href = '/'; }, 300);
           }
         } catch (err) {
           msg.innerText = 'เกิดข้อผิดพลาดเครือข่าย';
@@ -84,7 +115,6 @@
     })();
   </script>
 
-  <!-- main.js will be loaded by other pages; we still include it if present -->
   <script src="/js/main.js"></script>
 </body>
 </html>
