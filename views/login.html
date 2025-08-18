@@ -1,43 +1,90 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <title>เข้าสู่ระบบ - Community</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/css/style.css">
+  <meta charset="utf-8">
+  <title>เข้าสู่ระบบ — Community</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .form { max-width:420px; margin:2rem auto; padding:1.2rem; border:1px solid #eee; border-radius:8px; background:#fff; }
+    .form input { width:100%; padding:.6rem; margin:.4rem 0; box-sizing:border-box; }
+    .form button { padding:.6rem 1rem; }
+    .small { font-size:0.9rem; color:#666; margin-top:.6rem; display:block; }
+  </style>
 </head>
 <body>
   <div id="headerSlot"></div>
   <main>
-      <div class="section-title"><span>เข้าสู่ระบบ</span></div>
+    <div class="form">
+      <h2 id="formTitle">เข้าสู่ระบบ</h2>
       <form id="loginForm">
-          <input type="email" name="email" placeholder="อีเมล" required>
-          <input type="password" name="password" placeholder="รหัสผ่าน" required>
-          <button type="submit">เข้าสู่ระบบ</button>
-          <p id="msg"></p>
+        <input type="email" name="email" placeholder="อีเมล" required>
+        <input type="password" name="password" placeholder="รหัสผ่าน" required>
+        <div style="text-align:right;margin-top:.6rem">
+          <button type="submit" id="submitBtn">เข้าสู่ระบบ</button>
+        </div>
+        <p id="msg" class="small"></p>
       </form>
-      <p><a href="/register">ยังไม่มีบัญชี? สมัครสมาชิก</a></p>
+    </div>
   </main>
   <div id="footerSlot"></div>
-<script src="/js/main.js"></script>
-<script>
-document.getElementById('loginForm').onsubmit = async e => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(Object.fromEntries(fd.entries()))
-    });
-    const data = await res.json();
-    const msg = document.getElementById('msg');
-    if (data.success) {
-        msg.innerText = 'สำเร็จ! กำลังไปหน้าหลัก...';
-        setTimeout(() => location.replace('/'), 900);
-    } else {
-        msg.innerText = data.msg || 'เกิดข้อผิดพลาด';
-    }
-};
-</script>
+
+  <script>
+    // โหลด header/footer จาก main.js partial loader if available (main.js will call loadPartial),
+    // but keep standalone behavior if main.js not loaded yet.
+    (function(){
+      // Determine whether this is an "add account" flow
+      const params = new URLSearchParams(window.location.search);
+      const isAdd = params.get('add') === '1' || params.get('add') === 'true';
+      const formTitle = document.getElementById('formTitle');
+      const submitBtn = document.getElementById('submitBtn');
+      if (isAdd) {
+        formTitle.innerText = 'เพิ่มบัญชี (Login เพื่อบันทึกบัญชีนี้)';
+        submitBtn.innerText = 'เพิ่มบัญชี';
+      } else {
+        formTitle.innerText = 'เข้าสู่ระบบ';
+        submitBtn.innerText = 'เข้าสู่ระบบ';
+      }
+
+      document.getElementById('loginForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById('msg');
+        msg.style.color = '#d00';
+        msg.innerText = '';
+        const fd = new FormData(e.target);
+        const body = Object.fromEntries(fd.entries());
+        try {
+          const endpoint = isAdd ? '/api/add-account' : '/api/login';
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          const data = await res.json();
+          if (!data || !data.success) {
+            msg.innerText = data && data.msg ? data.msg : 'ไม่สำเร็จ ลองอีกครั้ง';
+            return;
+          }
+          // success
+          msg.style.color = '#080';
+          if (isAdd) {
+            msg.innerText = `เพิ่มบัญชี ${data.username || ''} เรียบร้อย`;
+            // dispatch event so header in this tab can update (if header loaded)
+            window.dispatchEvent(new Event('accountsChanged'));
+            // redirect to manage accounts to show list (or back to previous page)
+            setTimeout(() => { location.href = '/accounts'; }, 700);
+          } else {
+            msg.innerText = 'ล็อกอินสำเร็จ';
+            // after ordinary login, go to home
+            setTimeout(() => { location.href = '/'; }, 500);
+          }
+        } catch (err) {
+          msg.innerText = 'เกิดข้อผิดพลาดเครือข่าย';
+        }
+      };
+    })();
+  </script>
+
+  <!-- main.js will be loaded by other pages; we still include it if present -->
+  <script src="/js/main.js"></script>
 </body>
 </html>
