@@ -4,6 +4,12 @@
   <meta charset="utf-8">
   <title>เข้าสู่ระบบ — Community</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .form { max-width:420px; margin:2rem auto; padding:1.2rem; border:1px solid #eee; border-radius:8px; background:#fff; }
+    .form input { width:100%; padding:.6rem; margin:.4rem 0; box-sizing:border-box; }
+    .form button { padding:.6rem 1rem; }
+    .small { font-size:0.9rem; color:#666; margin-top:.6rem; display:block; }
+  </style>
 </head>
 <body>
   <div id="headerSlot"></div>
@@ -22,59 +28,93 @@
   </main>
   <div id="footerSlot"></div>
 
+  <!-- load main.js first so helper functions (saveAccountMeta) are available -->
   <script src="/js/main.js"></script>
+
   <script>
     (function(){
       const params = new URLSearchParams(window.location.search);
       const isAdd = params.get('add') === '1' || params.get('add') === 'true';
-      document.getElementById('formTitle').innerText = isAdd ? 'เพิ่มบัญชี (Login เพื่อบันทึกบัญชีนี้)' : 'เข้าสู่ระบบ';
-      document.getElementById('submitBtn').innerText = isAdd ? 'เพิ่มบัญชี' : 'เข้าสู่ระบบ';
+      const formTitle = document.getElementById('formTitle');
+      const submitBtn = document.getElementById('submitBtn');
+      if (isAdd) {
+        formTitle.innerText = 'เพิ่มบัญชี (Login เพื่อบันทึกบัญชีนี้)';
+        submitBtn.innerText = 'เพิ่มบัญชี';
+      } else {
+        formTitle.innerText = 'เข้าสู่ระบบ';
+        submitBtn.innerText = 'เข้าสู่ระบบ';
+      }
 
-      async function clientSave(account) {
-        // If local storage is protected, prompt user for passphrase to save into encrypted store
+      function clientSaveMeta(account) {
         try {
-          const rec = await window.communityStore.loadLocalMeta();
-          if (rec && rec.protected) {
-            const pass = prompt('พื้นที่เก็บบัญชีในเครื่องถูกป้องกัน กรุณาป้อน passphrase เพื่อบันทึกข้อมูลบัญชีนี้:');
-            if (!pass) return;
-            await window.communityStore.saveAccountMeta(account, { passphrase: pass });
-          } else {
-            await window.communityStore.saveAccountMeta(account);
+          if (typeof saveAccountMeta === 'function') {
+            saveAccountMeta(account);
+            return;
           }
+        } catch {}
+        // fallback
+        try {
+          const LS_KEY = 'COMMUNITY_ACCOUNTS_V1';
+          const raw = localStorage.getItem(LS_KEY);
+          const meta = raw ? JSON.parse(raw) : { accounts: [], active: null };
+          const now = Date.now();
+          const idx = meta.accounts.findIndex(a => a.username === account.username);
+          const entry = {
+            username: account.username,
+            displayName: account.displayName || account.username,
+            profilePic: account.profilePic || '/img/default_profile.png',
+            addedAt: idx >= 0 ? meta.accounts[idx].addedAt : now,
+            lastUsedAt: now,
+            order: idx >= 0 ? meta.accounts[idx].order : (meta.accounts.length || 0)
+          };
+          if (idx >= 0) meta.accounts[idx] = Object.assign({}, meta.accounts[idx], entry);
+          else meta.accounts.push(entry);
+          meta.active = account.username;
+          localStorage.setItem(LS_KEY, JSON.stringify(meta));
+          localStorage.setItem(LS_KEY + ':updatedAt', String(Date.now()));
         } catch (e) {
-          // fallback: try to save without passphrase
-          try { await window.communityStore.saveAccountMeta(account); } catch (err) {}
+          // ignore
         }
       }
 
       document.getElementById('loginForm').onsubmit = async (e) => {
         e.preventDefault();
+        const msg = document.getElementById('msg');
+        msg.style.color = '#d00';
+        msg.innerText = '';
         const fd = new FormData(e.target);
         const body = Object.fromEntries(fd.entries());
-        const endpoint = isAdd ? '/api/add-account' : '/api/login';
-        const msgEl = document.getElementById('msg');
-        msgEl.style.color = '#d00';
-        msgEl.innerText = '';
         try {
+          const endpoint = isAdd ? '/api/add-account' : '/api/login';
           const res = await fetch(endpoint, {
             method: 'POST',
-            headers: {'Content-Type':'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
           });
           const data = await res.json();
           if (!data || !data.success) {
-            msgEl.innerText = data && data.msg ? data.msg : 'ไม่สำเร็จ ลองอีกครั้ง';
+            msg.innerText = data && data.msg ? data.msg : 'ไม่สำเร็จ ลองอีกครั้ง';
             return;
           }
-          // expect server to include non-sensitive account metadata
+          // Server should send account metadata in data.account { username, displayName, profilePic }
           if (data.account && data.account.username) {
-            await clientSave({ username: data.account.username, displayName: data.account.displayName, profilePic: data.account.profilePic });
+            clientSaveMeta({
+              username: data.account.username,
+              displayName: data.account.displayName,
+              profilePic: data.account.profilePic
+            });
           }
-          msgEl.style.color = '#080';
-          msgEl.innerText = isAdd ? 'เพิ่มบัญชีเรียบร้อย' : 'ล็อกอินสำเร็จ';
-          setTimeout(() => { location.href = isAdd ? '/accounts' : '/'; }, 600);
+          msg.style.color = '#080';
+          if (isAdd) {
+            msg.innerText = `เพิ่มบัญชี ${data.account && data.account.username ? data.account.username : ''} เรียบร้อย`;
+            window.dispatchEvent(new Event('accountsChanged'));
+            setTimeout(() => { location.href = '/accounts'; }, 700);
+          } else {
+            msg.innerText = 'ล็อกอินสำเร็จ';
+            setTimeout(() => { location.href = '/'; }, 500);
+          }
         } catch (err) {
-          msgEl.innerText = 'เกิดข้อผิดพลาดเครือข่าย';
+          msg.innerText = 'เกิดข้อผิดพลาดเครือข่าย';
         }
       };
     })();
