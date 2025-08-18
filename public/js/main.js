@@ -141,6 +141,26 @@ function hideDropdown() {
   hideOverlay();
 }
 
+/**
+ * Utility: determine whether a notification should be shown to the active user.
+ * We try common property names that might indicate the actor/author of the notification.
+ * The server may include fields like: username, author, actor, from, postAuthor.
+ */
+function isNotificationFromActive(n, activeUsername) {
+  if (!activeUsername) return true; // if no active username known, don't filter here
+  const a = String(activeUsername);
+  // check various possible properties
+  const props = ['username', 'author', 'actor', 'from', 'postAuthor', 'createdBy', 'user'];
+  for (let p of props) {
+    if (n[p] && String(n[p]) === a) return false;
+  }
+  // also if notification references an object with owner/postOwner
+  if (n.post && n.post.username && String(n.post.username) === a) return false;
+  if (n.item && n.item.owner && String(n.item.owner) === a) return false;
+  // otherwise allow
+  return true;
+}
+
 async function renderNav() {
   const nav = document.getElementById('navBar');
   if (!nav) return;
@@ -160,16 +180,40 @@ async function renderNav() {
   const accData = await fetchAccounts();
   const notifData = await fetchNotifications();
 
-  // notification bell (simple svg)
+  // notification bell
   const bell = document.createElement('div');
   bell.className = 'notify-bell';
   bell.style.position = 'relative';
   bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>`;
 
-  if (notifData && notifData.unread && notifData.unread > 0) {
+  // compute badge count but exclude notifications that are from the active account
+  let badgeCount = 0;
+  if (notifData && notifData.notifications) {
+    // use accData to know active user (we set globalActive below)
+    let activeName = null;
+    if (accData && accData.active) activeName = accData.active;
+    // filter notifications
+    const filtered = (notifData.notifications || []).filter(n => isNotificationFromActive(n, activeName));
+    // compute unread from per-notification read flag if available
+    if (filtered.length > 0) {
+      const hasReadFlag = filtered[0] && Object.prototype.hasOwnProperty.call(filtered[0], 'read');
+      if (hasReadFlag) {
+        badgeCount = filtered.filter(n => !n.read).length;
+      } else {
+        // fallback to server-provided unread if available but adjusted conservatively:
+        badgeCount = notifData.unread || 0;
+      }
+    } else {
+      badgeCount = 0;
+    }
+  } else if (notifData && notifData.unread) {
+    badgeCount = notifData.unread;
+  }
+
+  if (badgeCount && badgeCount > 0) {
     const badge = document.createElement('div');
     badge.className = 'notify-badge';
-    badge.innerText = notifData.unread > 99 ? '99+' : notifData.unread;
+    badge.innerText = badgeCount > 99 ? '99+' : badgeCount;
     bell.appendChild(badge);
   }
   accountArea.appendChild(bell);
@@ -290,20 +334,28 @@ async function renderNav() {
       dd.innerHTML = '';
       const header = document.createElement('div');
       header.style.padding = '8px';
-      header.innerHTML = `<strong>Notifications</strong> <span class="small" style="float:right">${nd ? (nd.unread || 0) : 0} unread</span>`;
+      // determine filtered list and unread count
+      let visibleNotifs = [];
+      if (nd && nd.notifications) {
+        visibleNotifs = (nd.notifications || []).filter(n => isNotificationFromActive(n, globalActive));
+      }
+      const unreadCount = visibleNotifs && visibleNotifs.length > 0 && Object.prototype.hasOwnProperty.call(visibleNotifs[0], 'read')
+        ? visibleNotifs.filter(n => !n.read).length
+        : (nd ? (nd.unread || 0) : 0);
+      header.innerHTML = `<strong>Notifications</strong> <span class="small" style="float:right">${unreadCount} unread</span>`;
       dd.appendChild(header);
 
       const list = document.createElement('div');
       list.style.maxHeight = '320px';
       list.style.overflow = 'auto';
       list.style.padding = '8px';
-      if (!nd || !nd.notifications || nd.notifications.length === 0) {
+      if (!visibleNotifs || visibleNotifs.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'dropdown-item';
         empty.innerHTML = `<div class="small">ยังไม่มีการแจ้งเตือน</div>`;
         list.appendChild(empty);
       } else {
-        for (let n of nd.notifications.slice(0, 30)) {
+        for (let n of visibleNotifs.slice(0, 30)) {
           const it = document.createElement('div');
           it.className = 'dropdown-item';
           it.style.padding = '.6rem';
