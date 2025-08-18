@@ -1,360 +1,166 @@
 // public/js/main.js
-// Header partial loader + account dropdown + secure IndexedDB metadata store
-// - Stores only non-sensitive metadata (username, displayName, profilePic, addedAt, lastUsedAt, order)
-// - Optional encryption of metadata with passphrase (PBKDF2 -> AES-GCM)
-// - Uses IndexedDB for persistent storage (better than localStorage)
-// - BroadcastChannel (with storage fallback) syncs tabs
-// - Dropdown opens immediately and uses pointerdown capture guard to prevent underlying activation
-
-/* ===========================
-   Config / constants
-   =========================== */
-const LS_MIGRATE_KEY = 'COMMUNITY_ACCOUNTS_V1'; // used only if migrating from old localStorage
-const IDB_NAME = 'community-store';
-const IDB_VERSION = 1;
-const IDB_STORE = 'meta';
-const BC_CHANNEL = 'community:accounts';
-const PROTECTION_META_KEY = 'protected'; // stored inside the meta object to indicate protection
-const PBKDF2_ITER = 150_000; // iteration count (reasonable - adjust by performance)
-const PBKDF2_SALT_BYTES = 16;
-const AES_KEY_LENGTH = 256; // bits
-const AES_IV_BYTES = 12;
-
-/* ===========================
-   IndexedDB helpers
-   =========================== */
-function openIDB() {
-  return new Promise((resolve, reject) => {
-    const r = indexedDB.open(IDB_NAME, IDB_VERSION);
-    r.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains(IDB_STORE)) {
-        db.createObjectStore(IDB_STORE);
-      }
-    };
-    r.onsuccess = () => resolve(r.result);
-    r.onerror = () => reject(r.error);
-  });
+// โหลด partial (header/footer) ด้วย fetch แล้วแทรก
+async function loadPartial(id, file) {
+  const resp = await fetch(file);
+  const html = await resp.text();
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
 }
 
-async function idbGet(key) {
-  const db = await openIDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(IDB_STORE, 'readonly');
-    const st = tx.objectStore(IDB_STORE);
-    const rq = st.get(key);
-    rq.onsuccess = () => resolve(rq.result);
-    rq.onerror = () => reject(rq.error);
-  });
-}
-
-async function idbSet(key, value) {
-  const db = await openIDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(IDB_STORE, 'readwrite');
-    const st = tx.objectStore(IDB_STORE);
-    const rq = st.put(value, key);
-    rq.onsuccess = () => resolve(true);
-    rq.onerror = () => reject(rq.error);
-  });
-}
-
-async function idbDelete(key) {
-  const db = await openIDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(IDB_STORE, 'readwrite');
-    const st = tx.objectStore(IDB_STORE);
-    const rq = st.delete(key);
-    rq.onsuccess = () => resolve(true);
-    rq.onerror = () => reject(rq.error);
-  });
-}
-
-/* ===========================
-   Crypto helpers (PBKDF2 + AES-GCM)
-   =========================== */
-function bufToBase64(b) {
-  return btoa(String.fromCharCode(...new Uint8Array(b)));
-}
-function base64ToBuf(s) {
-  const bin = atob(s);
-  const arr = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-  return arr.buffer;
-}
-function strToBuf(s) {
-  return new TextEncoder().encode(s);
-}
-function bufToStr(b) {
-  return new TextDecoder().decode(b);
-}
-
-async function deriveKeyFromPassword(passphrase, saltBase64) {
-  const salt = base64ToBuf(saltBase64);
-  const passKey = await crypto.subtle.importKey(
-    'raw',
-    strToBuf(passphrase),
-    { name: 'PBKDF2' },
-    false,
-    ['deriveKey']
-  );
-  const derived = await crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITER, hash: 'SHA-256' },
-    passKey,
-    { name: 'AES-GCM', length: AES_KEY_LENGTH },
-    false,
-    ['encrypt', 'decrypt']
-  );
-  return derived;
-}
-
-async function genSaltBase64() {
-  const buf = crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES));
-  return bufToBase64(buf.buffer);
-}
-
-async function encryptJSONWithKey(obj, key) {
-  const iv = crypto.getRandomValues(new Uint8Array(AES_IV_BYTES));
-  const plaintext = strToBuf(JSON.stringify(obj));
-  const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext);
-  return { iv: bufToBase64(iv.buffer), cipher: bufToBase64(cipher) };
-}
-
-async function decryptJSONWithKey({ iv, cipher }, key) {
-  try {
-    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64ToBuf(iv) }, key, base64ToBuf(cipher));
-    return JSON.parse(bufToStr(pt));
-  } catch (e) {
-    throw new Error('decrypt_failed');
-  }
-}
-
-/* ===========================
-   Storage API: encrypted or plaintext in IndexedDB
-   - meta record shape:
-     { protected: boolean, salt?: string, data?: { iv, cipher } }  // encrypted
-     or
-     { protected: false, accounts: [...], active: 'username' }    // plaintext
-   =========================== */
-
-async function loadLocalMeta() {
-  // Try to read from IDB
-  try {
-    const rec = await idbGet('meta');
-    if (!rec) {
-      // migration: check localStorage old key and migrate
-      const raw = localStorage.getItem(LS_MIGRATE_KEY);
-      if (raw) {
-        try {
-          const fallback = JSON.parse(raw);
-          // store plaintext in IDB (no protection)
-          const newRec = { protected: false, accounts: fallback.accounts || [], active: fallback.active || null };
-          await idbSet('meta', newRec);
-          localStorage.removeItem(LS_MIGRATE_KEY);
-          return newRec;
-        } catch (e) {
-          // ignore
-        }
-      }
-      return { protected: false, accounts: [], active: null };
-    }
-    if (rec.protected) {
-      // encrypted: we cannot decrypt here without passphrase
-      return rec; // caller should call unlockProtectedMeta(passphrase) to get decrypted data
-    } else {
-      return rec;
-    }
-  } catch (e) {
-    return { protected: false, accounts: [], active: null };
-  }
-}
-
-// unlock encrypted meta with passphrase (returns decrypted meta)
-async function unlockProtectedMeta(passphrase) {
-  const rec = await idbGet('meta');
-  if (!rec || !rec.protected) throw new Error('no_protected_data');
-  const salt = rec.salt;
-  const key = await deriveKeyFromPassword(passphrase, salt);
-  const decrypted = await decryptJSONWithKey(rec.data, key);
-  // decrypted should be { accounts: [...], active: 'username' }
-  return decrypted;
-}
-
-// enable protection (encrypt current plaintext meta with a passphrase)
-async function enableProtectionWithPassphrase(passphrase) {
-  const rec = await loadLocalMeta();
-  if (!rec) return false;
-  const salt = await genSaltBase64();
-  const key = await deriveKeyFromPassword(passphrase, salt);
-  const toEnc = { accounts: rec.accounts || [], active: rec.active || null };
-  const enc = await encryptJSONWithKey(toEnc, key);
-  const storeRec = { protected: true, salt, data: enc };
-  await idbSet('meta', storeRec);
-  // broadcast
-  broadcastMetaUpdated();
-  return true;
-}
-
-// disable protection: decrypt with passphrase then store plaintext
-async function disableProtectionWithPassphrase(passphrase) {
-  const dec = await unlockProtectedMeta(passphrase);
-  const storeRec = { protected: false, accounts: dec.accounts || [], active: dec.active || null };
-  await idbSet('meta', storeRec);
-  broadcastMetaUpdated();
-  return true;
-}
-
-// write plaintext meta (only used when not protected)
-async function writePlainMeta(meta) {
-  const rec = { protected: false, accounts: meta.accounts || [], active: meta.active || null };
-  await idbSet('meta', rec);
-  broadcastMetaUpdated();
-}
-
-async function writeEncryptedMetaUsingPassphrase(meta, passphrase) {
-  const salt = await genSaltBase64();
-  const key = await deriveKeyFromPassword(passphrase, salt);
-  const enc = await encryptJSONWithKey({ accounts: meta.accounts || [], active: meta.active || null }, key);
-  const rec = { protected: true, salt, data: enc };
-  await idbSet('meta', rec);
-  broadcastMetaUpdated();
-}
-
-/* ===========================
-   High-level helpers for account metadata (used by UI)
-   - saveAccountMeta(account, options)
-     options: { protectWithPassphrase?: string } (optional)
-   - removeAccountMeta(username)
-   - setActiveAccountMeta(username)
-   - loadMetaForUI(): returns decrypted meta if protected=false, or object { protected: true } indicating locked
-   =========================== */
-
-async function loadMetaForUI() {
-  const rec = await loadLocalMeta();
-  if (!rec) return { accounts: [], active: null, protected: false };
-  if (!rec.protected) return { accounts: rec.accounts || [], active: rec.active || null, protected: false };
-  // protected: return locked marker
-  return { protected: true };
-}
-
-async function saveAccountMeta(account, options = {}) {
-  if (!account || !account.username) return;
-  const rec = await loadLocalMeta();
-  if (rec.protected) {
-    // encrypted store — require passphrase in options to update securely
-    if (!options.passphrase) {
-      // cannot update encrypted store without passphrase - fallback: do nothing
-      console.warn('Protected meta: saveAccountMeta requires passphrase to update encrypted store.');
-      return;
-    }
-    // unlock, update, re-encrypt (we do full rewrite)
-    const dec = await unlockProtectedMeta(options.passphrase);
-    const now = Date.now();
-    const existingIndex = (dec.accounts || []).findIndex(a => a.username === account.username);
-    const entry = {
-      username: account.username,
-      displayName: account.displayName || account.username,
-      profilePic: account.profilePic || '/img/default_profile.png',
-      addedAt: existingIndex >= 0 ? dec.accounts[existingIndex].addedAt : now,
-      lastUsedAt: now,
-      order: existingIndex >= 0 ? dec.accounts[existingIndex].order : (dec.accounts.length || 0)
-    };
-    if (existingIndex >= 0) dec.accounts[existingIndex] = Object.assign({}, dec.accounts[existingIndex], entry);
-    else dec.accounts.push(entry);
-    dec.active = account.username;
-    await writeEncryptedMetaUsingPassphrase(dec, options.passphrase);
-    return;
-  } else {
-    // plaintext store: update and save
-    const now = Date.now();
-    rec.accounts = rec.accounts || [];
-    const existingIndex = rec.accounts.findIndex(a => a.username === account.username);
-    const entry = {
-      username: account.username,
-      displayName: account.displayName || account.username,
-      profilePic: account.profilePic || '/img/default_profile.png',
-      addedAt: existingIndex >= 0 ? rec.accounts[existingIndex].addedAt : now,
-      lastUsedAt: now,
-      order: existingIndex >= 0 ? rec.accounts[existingIndex].order : (rec.accounts.length || 0)
-    };
-    if (existingIndex >= 0) rec.accounts[existingIndex] = Object.assign({}, rec.accounts[existingIndex], entry);
-    else rec.accounts.push(entry);
-    rec.active = account.username;
-    await writePlainMeta(rec);
-    return;
-  }
-}
-
-async function removeAccountMeta(username, options = {}) {
-  const rec = await loadLocalMeta();
-  if (rec.protected) {
-    if (!options.passphrase) {
-      console.warn('Protected meta: removeAccountMeta requires passphrase.');
-      return;
-    }
-    const dec = await unlockProtectedMeta(options.passphrase);
-    dec.accounts = (dec.accounts || []).filter(a => a.username !== username);
-    if (dec.active === username) dec.active = dec.accounts.length ? dec.accounts[0].username : null;
-    await writeEncryptedMetaUsingPassphrase(dec, options.passphrase);
-  } else {
-    rec.accounts = (rec.accounts || []).filter(a => a.username !== username);
-    if (rec.active === username) rec.active = rec.accounts.length ? rec.accounts[0].username : null;
-    await writePlainMeta(rec);
-  }
-}
-
-async function setActiveAccountMeta(username, options = {}) {
-  const rec = await loadLocalMeta();
-  if (rec.protected) {
-    if (!options.passphrase) {
-      console.warn('Protected meta: setActiveAccountMeta requires passphrase.');
-      return;
-    }
-    const dec = await unlockProtectedMeta(options.passphrase);
-    const idx = (dec.accounts || []).findIndex(a => a.username === username);
-    const now = Date.now();
-    if (idx >= 0) dec.accounts[idx].lastUsedAt = now;
-    dec.active = username;
-    await writeEncryptedMetaUsingPassphrase(dec, options.passphrase);
-  } else {
-    rec.accounts = rec.accounts || [];
-    const idx = rec.accounts.findIndex(a => a.username === username);
-    const now = Date.now();
-    if (idx >= 0) rec.accounts[idx].lastUsedAt = now;
-    rec.active = username;
-    await writePlainMeta(rec);
-  }
-}
-
-/* Broadcast helper */
-function broadcastMetaUpdated() {
-  try {
-    if (window.BroadcastChannel) {
-      const bc = new BroadcastChannel(BC_CHANNEL);
-      bc.postMessage({ type: 'meta:updated' });
-      bc.close();
-    } else {
-      localStorage.setItem(IDB_NAME + ':metaUpdatedAt', String(Date.now()));
-    }
-  } catch (e) {}
-}
-
-/* ===========================
-   UI integration: dropdown, guards, render
-   (the rest of UI code uses loadMetaForUI(), saveAccountMeta(), removeAccountMeta(), setActiveAccountMeta())
-   =========================== */
-
+// helper to create element from HTML string
 function elFrom(html) {
   const div = document.createElement('div');
   div.innerHTML = html.trim();
   return div.firstChild;
 }
 
+/* --------------------
+   Local metadata store
+   --------------------
+   Schema stored at localStorage key: COMMUNITY_ACCOUNTS_V1
+   {
+     accounts: [
+       { username, displayName, profilePic, addedAt, lastUsedAt, order }
+     ],
+     active: 'username'
+   }
+   We only store non-sensitive metadata. NEVER store tokens/passwords/session ids here.
+*/
+const LS_KEY = 'COMMUNITY_ACCOUNTS_V1';
+const BC_CHANNEL = 'community:accounts';
+
+function loadLocalMeta() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return { accounts: [], active: null };
+    return JSON.parse(raw);
+  } catch {
+    return { accounts: [], active: null };
+  }
+}
+
+function saveLocalMeta(obj) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(obj));
+    // broadcast to other tabs
+    try {
+      if (window.BroadcastChannel) {
+        const bc = new BroadcastChannel(BC_CHANNEL);
+        bc.postMessage({ type: 'meta:updated', payload: obj });
+        bc.close();
+      } else {
+        // fallback: write to a dedicated storage key (storage event)
+        localStorage.setItem(LS_KEY + ':updatedAt', String(Date.now()));
+      }
+    } catch (e) {
+      // ignore
+    }
+  } catch (e) {
+    // ignore quota issues
+  }
+}
+
+function saveAccountMeta(account) {
+  if (!account || !account.username) return;
+  const meta = loadLocalMeta();
+  const now = Date.now();
+  const existingIndex = meta.accounts.findIndex(a => a.username === account.username);
+  const entry = {
+    username: account.username,
+    displayName: account.displayName || account.username,
+    profilePic: account.profilePic || '/img/default_profile.png',
+    addedAt: existingIndex >= 0 ? meta.accounts[existingIndex].addedAt : now,
+    lastUsedAt: now,
+    order: existingIndex >= 0 ? meta.accounts[existingIndex].order : (meta.accounts.length || 0)
+  };
+  if (existingIndex >= 0) meta.accounts[existingIndex] = Object.assign({}, meta.accounts[existingIndex], entry);
+  else meta.accounts.push(entry);
+
+  meta.active = account.username;
+  saveLocalMeta(meta);
+}
+
+function removeAccountMeta(username) {
+  if (!username) return;
+  const meta = loadLocalMeta();
+  meta.accounts = meta.accounts.filter(a => a.username !== username);
+  if (meta.active === username) meta.active = meta.accounts.length ? meta.accounts[0].username : null;
+  saveLocalMeta(meta);
+}
+
+function setActiveAccountMeta(username) {
+  if (!username) return;
+  const meta = loadLocalMeta();
+  const now = Date.now();
+  const idx = meta.accounts.findIndex(a => a.username === username);
+  if (idx >= 0) {
+    meta.accounts[idx].lastUsedAt = now;
+    meta.active = username;
+    saveLocalMeta(meta);
+  } else {
+    // if not exist, add minimal entry so UI can show it (but prefer server to return metadata on login)
+    meta.accounts.push({ username, displayName: username, profilePic: '/img/default_profile.png', addedAt: now, lastUsedAt: now, order: meta.accounts.length });
+    meta.active = username;
+    saveLocalMeta(meta);
+  }
+}
+
+/* Sync: listen for other tabs */
+if (window.BroadcastChannel) {
+  const bc = new BroadcastChannel(BC_CHANNEL);
+  bc.onmessage = (ev) => {
+    if (!ev.data) return;
+    if (ev.data.type === 'meta:updated') {
+      // re-render nav to pick up changes
+      try { renderNav(); } catch (e) {}
+    }
+  };
+} else {
+  // fallback to storage event
+  window.addEventListener('storage', (e) => {
+    if (e.key === LS_KEY + ':updatedAt') {
+      try { renderNav(); } catch (err) {}
+    }
+  });
+}
+
+/* --------------------
+   Fetch helpers
+   -------------------- */
+let globalAccounts = [];
+let globalActive = null;
 let dropdownEl = null;
 let dropdownVisible = false;
 let outsidePointerGuard = null;
 let outsideKeyGuard = null;
 
+async function fetchAccounts() {
+  try {
+    const r = await fetch('/api/accounts');
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (data && data.success) return data;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchNotifications() {
+  try {
+    const r = await fetch('/api/notifications');
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (data && data.success) return data;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/* --------------------
+   Dropdown guards (prevent underlying activation)
+   -------------------- */
 function ensureDropdown() {
   if (dropdownEl && document.body.contains(dropdownEl)) return dropdownEl;
   dropdownEl = document.createElement('div');
@@ -373,6 +179,7 @@ function addOutsideGuards() {
   outsidePointerGuard = function (ev) {
     if (!dropdownVisible || !dropdownEl) return;
     if (dropdownEl.contains(ev.target)) return;
+    // Prevent underlying element activation — close dropdown only
     ev.preventDefault();
     ev.stopPropagation();
     hideDropdown();
@@ -412,31 +219,111 @@ function hideDropdown() {
   removeOutsideGuards();
 }
 
-/* Basic server fetch helpers (unchanged) */
-async function fetchAccounts() {
-  try {
-    const r = await fetch('/api/accounts');
-    if (!r.ok) return null;
-    const data = await r.json();
-    if (data && data.success) return data;
-    return null;
-  } catch {
-    return null;
+/* --------------------
+   Render nav / accounts dropdown
+   -------------------- */
+function renderAccountListInto(dd, accountsList, activeUsername) {
+  dd.innerHTML = '';
+  const header = document.createElement('div');
+  header.className = 'dropdown-header';
+  header.style.padding = '12px';
+  header.style.borderBottom = '1px solid #eee';
+  const active = accountsList.find(a => a.username === activeUsername) || accountsList[0] || null;
+  if (active) {
+    header.innerHTML = `<img src="${active.profilePic||'/img/default_profile.png'}" class="avatar-img" style="width:40px;height:40px;margin-right:.5em"><div><div><strong>${active.displayName || active.username}</strong></div><div class="small">${active.username}</div></div>`;
+  } else {
+    header.innerHTML = `<div style="padding:8px;">ยังไม่มีบัญชี</div>`;
   }
-}
-async function fetchNotifications() {
-  try {
-    const r = await fetch('/api/notifications');
-    if (!r.ok) return null;
-    const data = await r.json();
-    if (data && data.success) return data;
-    return null;
-  } catch {
-    return null;
+  dd.appendChild(header);
+
+  const list = document.createElement('div');
+  list.className = 'dropdown-list';
+  list.style.maxHeight = '320px';
+  list.style.overflow = 'auto';
+  dd.appendChild(list);
+
+  // show accounts EXCEPT active (per your request)
+  for (let acc of accountsList) {
+    if (acc.username === activeUsername) continue;
+    const item = document.createElement('div');
+    item.className = 'dropdown-item';
+    item.style.display = 'flex';
+    item.style.alignItems = 'center';
+    item.style.padding = '10px 12px';
+    item.style.gap = '0.6rem';
+    item.innerHTML = `<img src="${acc.profilePic||'/img/default_profile.png'}" class="avatar-img" style="width:32px;height:32px">
+      <div style="flex:1">
+        <div><strong>${acc.displayName || acc.username}</strong></div>
+        <div class="small">${acc.username}</div>
+      </div>
+      <div style="min-width:80px; text-align:right;"><button class="btn-remove small" data-username="${acc.username}">Remove</button></div>`;
+    item.style.cursor = 'pointer';
+
+    item.onclick = async (e) => {
+      if (e.target && e.target.tagName && (e.target.tagName.toLowerCase() === 'button')) return;
+      if (!confirm(`สลับไปใช้บัญชี ${acc.username} ?`)) return;
+      const r = await fetch('/api/accounts/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: acc.username })
+      });
+      const d = await r.json();
+      if (d.success) {
+        // server should set session cookie; client updates metadata locally
+        setActiveAccountMeta(acc.username);
+        await renderNav();
+        hideDropdown();
+        window.dispatchEvent(new Event('accountsChanged'));
+      } else {
+        alert(d.msg || 'ไม่สามารถสลับบัญชีได้');
+      }
+    };
+
+    list.appendChild(item);
+  }
+
+  // footer
+  const footer = document.createElement('div');
+  footer.style.padding = '8px';
+  footer.style.borderTop = '1px solid #eee';
+  footer.style.display = 'flex';
+  footer.style.justifyContent = 'space-between';
+  footer.innerHTML = `<div><a href="/accounts" style="text-decoration:none">Manage accounts</a></div><div><button id="dropdownAddBtn">Add account</button></div>`;
+  dd.appendChild(footer);
+
+  // attach remove handlers
+  dd.querySelectorAll('.btn-remove').forEach(btn => {
+    btn.onclick = async (ev) => {
+      ev.stopPropagation();
+      const username = btn.getAttribute('data-username');
+      if (!confirm(`ลบบัญชี ${username} จากรายการหรือไม่?`)) return;
+      const r = await fetch('/api/accounts/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username })
+      });
+      const d = await r.json();
+      if (d.success) {
+        removeAccountMeta(username);
+        await renderNav();
+        hideDropdown();
+        window.dispatchEvent(new Event('accountsChanged'));
+      } else {
+        alert(d.msg || 'ลบไม่สำเร็จ');
+      }
+    };
+  });
+
+  const addBtn = document.getElementById('dropdownAddBtn');
+  if (addBtn) {
+    addBtn.onclick = (e) => {
+      e.preventDefault();
+      // navigate to login page in "add account" mode
+      location.href = '/login?add=1';
+    };
   }
 }
 
-/* Render nav using loadMetaForUI and server fallback */
 async function renderNav() {
   const nav = document.getElementById('navBar');
   if (!nav) return;
@@ -451,30 +338,22 @@ async function renderNav() {
   const accountArea = document.createElement('div');
   accountArea.className = 'account-area';
 
-  // prefer server authoritative data; fallback to local meta
-  const accData = await fetchAccounts();
-  const localMetaUI = await loadMetaForUI();
+  // Prefer server authoritative data; fallback to local meta when server not available
+  let accData = await fetchAccounts();
+  let localMeta = loadLocalMeta();
 
   let accountsToShow = [];
   let activeUsername = null;
   if (accData && accData.accounts) {
     accountsToShow = accData.accounts.map(a => ({ username: a.username, displayName: a.displayName, profilePic: a.profilePic }));
     activeUsername = accData.active;
-    // sync server info to local plaintext for UX if meta not protected
-    const rec = await loadLocalMeta();
-    if (!rec.protected) {
-      // update local meta (no secret)
-      await writePlainMeta({ accounts: accountsToShow, active: activeUsername });
-    }
-  } else if (!localMetaUI.protected) {
-    accountsToShow = localMetaUI.accounts;
-    activeUsername = localMetaUI.active;
+    // also sync this server info into local store for UX
+    // only save non-sensitive metadata
+    for (let a of accountsToShow) saveAccountMeta({ username: a.username, displayName: a.displayName, profilePic: a.profilePic });
   } else {
-    // locked protected meta: show limited UI
-    accountArea.appendChild(elFrom('<a href="/login">เข้าสู่ระบบ</a>'));
-    accountArea.appendChild(elFrom('<a href="/register">สมัครสมาชิก</a>'));
-    nav.appendChild(accountArea);
-    return;
+    // fallback: use local meta
+    accountsToShow = (localMeta.accounts || []).map(a => ({ username: a.username, displayName: a.displayName, profilePic: a.profilePic }));
+    activeUsername = localMeta.active;
   }
 
   // notification bell
@@ -506,36 +385,16 @@ async function renderNav() {
     const dd = ensureDropdown();
     dd.innerHTML = '';
 
+    // clicking avatar toggles dropdown - open immediately (no delay)
     avatarBtn.addEventListener('click', async (ev) => {
       ev.stopPropagation();
       if (dropdownVisible) { hideDropdown(); return; }
-      // if local meta is protected and locked, prompt to unlock
-      const localRec = await loadLocalMeta();
-      if (localRec && localRec.protected) {
-        // show locked UI with "Unlock" action
-        dd.innerHTML = `<div style="padding:12px;"><strong>ข้อมูลบัญชีถูกป้องกัน</strong><div class="small">กรุณาป้อน passphrase เพื่อดูรายการบัญชี</div><div style="margin-top:.6rem;"><button id="unlockBtn">ปลดล็อค</button></div></div>`;
-        const unlockBtn = dd.querySelector('#unlockBtn');
-        unlockBtn.onclick = async () => {
-          const pass = prompt('กรุณาป้อน passphrase เพื่อปลดล็อค (จะไม่ถูกส่งออกไปที่ server):');
-          if (!pass) return;
-          try {
-            const dec = await unlockProtectedMeta(pass);
-            // render unlocked list
-            renderAccountListInto(dd, dec.accounts || [], dec.active || null, pass);
-          } catch (e) {
-            alert('ไม่สามารถปลดล็อคได้ (passphrase ผิดหรือข้อมูลเสียหาย)');
-          }
-        };
-        showDropdown();
-        return;
-      }
-
-      // normal rendering
+      // populate from accountsToShow and activeUsername
       renderAccountListInto(dd, accountsToShow, activeUsername);
       showDropdown();
     });
 
-    // bell -> notifications (same as earlier)
+    // bell click: show notifications in dropdown
     bell.onclick = async (ev) => {
       ev.stopPropagation();
       const dd = ensureDropdown();
@@ -596,130 +455,15 @@ async function renderNav() {
   nav.appendChild(accountArea);
 }
 
-/* Render accounts list into dropdown; if passphrasePresent, include it in remove/setActive calls */
-function renderAccountListInto(dd, accountsList, activeUsername, passphraseForProtected = null) {
-  dd.innerHTML = '';
-  const header = document.createElement('div');
-  header.className = 'dropdown-header';
-  header.style.padding = '12px';
-  header.style.borderBottom = '1px solid #eee';
-  const active = accountsList.find(a => a.username === activeUsername) || accountsList[0] || null;
-  if (active) {
-    header.innerHTML = `<img src="${active.profilePic||'/img/default_profile.png'}" class="avatar-img" style="width:40px;height:40px;margin-right:.5em"><div><div><strong>${active.displayName || active.username}</strong></div><div class="small">${active.username}</div></div>`;
-  } else {
-    header.innerHTML = `<div style="padding:8px;">ยังไม่มีบัญชี</div>`;
-  }
-  dd.appendChild(header);
-
-  const list = document.createElement('div');
-  list.className = 'dropdown-list';
-  list.style.maxHeight = '320px';
-  list.style.overflow = 'auto';
-  dd.appendChild(list);
-
-  for (let acc of accountsList) {
-    if (acc.username === activeUsername) continue;
-    const item = document.createElement('div');
-    item.className = 'dropdown-item';
-    item.style.display = 'flex';
-    item.style.alignItems = 'center';
-    item.style.padding = '10px 12px';
-    item.style.gap = '0.6rem';
-    item.innerHTML = `<img src="${acc.profilePic||'/img/default_profile.png'}" class="avatar-img" style="width:32px;height:32px">
-      <div style="flex:1">
-        <div><strong>${acc.displayName || acc.username}</strong></div>
-        <div class="small">${acc.username}</div>
-      </div>
-      <div style="min-width:80px; text-align:right;"><button class="btn-remove small" data-username="${acc.username}">Remove</button></div>`;
-    item.style.cursor = 'pointer';
-
-    item.onclick = async (e) => {
-      if (e.target && e.target.tagName && (e.target.tagName.toLowerCase() === 'button')) return;
-      if (!confirm(`สลับไปใช้บัญชี ${acc.username} ?`)) return;
-      const r = await fetch('/api/accounts/switch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: acc.username })
-      });
-      const d = await r.json();
-      if (d.success) {
-        // update local meta
-        await setActiveAccountMeta(acc.username, passphraseForProtected ? { passphrase: passphraseForProtected } : {});
-        await renderNav();
-        hideDropdown();
-        window.dispatchEvent(new Event('accountsChanged'));
-      } else {
-        alert(d.msg || 'ไม่สามารถสลับบัญชีได้');
-      }
-    };
-
-    list.appendChild(item);
-  }
-
-  // footer
-  const footer = document.createElement('div');
-  footer.style.padding = '8px';
-  footer.style.borderTop = '1px solid #eee';
-  footer.style.display = 'flex';
-  footer.style.justifyContent = 'space-between';
-  footer.innerHTML = `<div><a href="/accounts" style="text-decoration:none">Manage accounts</a></div><div><button id="dropdownAddBtn">Add account</button></div>`;
-  dd.appendChild(footer);
-
-  // remove handlers
-  dd.querySelectorAll('.btn-remove').forEach(btn => {
-    btn.onclick = async (ev) => {
-      ev.stopPropagation();
-      const username = btn.getAttribute('data-username');
-      if (!confirm(`ลบบัญชี ${username} จากรายการหรือไม่?`)) return;
-      await removeAccountMeta(username, passphraseForProtected ? { passphrase: passphraseForProtected } : {});
-      await renderNav();
-      hideDropdown();
-      window.dispatchEvent(new Event('accountsChanged'));
-    };
-  });
-
-  const addBtn = document.getElementById('dropdownAddBtn');
-  if (addBtn) {
-    addBtn.onclick = (e) => {
-      e.preventDefault();
-      location.href = '/login?add=1';
-    };
-  }
+/* listen for local accountsChanged */
+function setupGlobalRefreshOnMessage() {
+  window.addEventListener('accountsChanged', async () => { await renderNav(); });
 }
+setupGlobalRefreshOnMessage();
 
-/* Initialization & listeners */
-if (window.BroadcastChannel) {
-  try {
-    const bc = new BroadcastChannel(BC_CHANNEL);
-    bc.onmessage = (ev) => {
-      if (ev.data && ev.data.type === 'meta:updated') renderNav().catch(()=>{});
-    };
-  } catch (e) {}
-} else {
-  window.addEventListener('storage', (e) => {
-    if (e.key === IDB_NAME + ':metaUpdatedAt') renderNav().catch(()=>{});
-  });
-}
-
+/* initialize */
 window.addEventListener('load', async () => {
   await loadPartial('headerSlot', '/partial/header.html');
   await loadPartial('footerSlot', '/partial/footer.html');
   await renderNav();
 });
-
-/* expose a few helpers to global (for login page integration / settings)
-   - saveAccountMeta(account, { passphrase })
-   - enableProtectionWithPassphrase(passphrase)
-   - disableProtectionWithPassphrase(passphrase)
-   - unlockProtectedMeta(passphrase)  // returns decrypted meta
-*/
-window.communityStore = {
-  saveAccountMeta,
-  removeAccountMeta,
-  setActiveAccountMeta,
-  loadLocalMeta,
-  loadMetaForUI,
-  enableProtectionWithPassphrase,
-  disableProtectionWithPassphrase,
-  unlockProtectedMeta
-};
