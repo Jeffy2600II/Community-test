@@ -141,7 +141,7 @@
         if (active) {
           document.getElementById('activeAccountPanel').style.display = '';
           const act = accounts.find(a => a.username === active) || accounts[0];
-          document.getElementById('activeAccountInfo').innerHTML = `<img src="${act.profilePic||'/img/default_profile.png'}" class="profile-pic" width="48"> <strong>${act.displayName||act.username}</strong> <div class="small">${act.username}</div>`;
+          document.getElementById('activeAccountInfo').innerHTML = `<img src="${act.profilePic||'/img/default_profile.png'}" class="profile-pic" width="48"> <strong>${act.displayName||act.username}</strong><div class="small">${act.email||''}</div>`;
         } else {
           document.getElementById('activeAccountPanel').style.display = 'none';
         }
@@ -153,17 +153,48 @@
 
     async function loadNotifications() {
       try {
+        // get notifications data
         const res = await fetch('/api/notifications');
         if (!res.ok) throw new Error('no');
         const data = await res.json();
+
+        // determine active username (use /api/accounts if global var not available)
+        let active = null;
+        if (window && window.globalActive) active = window.globalActive;
+        else {
+          try {
+            const ar = await fetch('/api/accounts');
+            if (ar.ok) {
+              const ad = await ar.json();
+              active = ad.active;
+            }
+          } catch {}
+        }
+
         const panel = document.getElementById('notificationsPanel');
         const list = document.getElementById('notificationsList');
         panel.style.display = '';
-        if (!data.notifications || data.notifications.length === 0) {
+        let notifications = data.notifications || [];
+
+        // filter out notifications that are from the active user (self-posts etc.)
+        if (active) {
+          notifications = notifications.filter(n => {
+            const a = String(active);
+            const props = ['username','author','actor','from','postAuthor','createdBy','user'];
+            for (let p of props) {
+              if (n[p] && String(n[p]) === a) return false;
+            }
+            if (n.post && n.post.username && String(n.post.username) === a) return false;
+            if (n.item && n.item.owner && String(n.item.owner) === a) return false;
+            return true;
+          });
+        }
+
+        if (!notifications || notifications.length === 0) {
           list.innerHTML = '<i>ยังไม่มีการแจ้งเตือน</i>';
         } else {
           list.innerHTML = '<div style="display:flex;flex-direction:column;gap:.6rem;"></div>';
-          for (let n of data.notifications.slice(0,50)) {
+          for (let n of notifications.slice(0,50)) {
             const it = document.createElement('div');
             it.style.padding = '.6rem';
             it.style.border = '1px solid #eee';
