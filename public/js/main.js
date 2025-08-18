@@ -160,11 +160,12 @@ async function renderNav() {
   const accData = await fetchAccounts();
   const notifData = await fetchNotifications();
 
-  // notification bell
+  // notification bell (simple svg)
   const bell = document.createElement('div');
   bell.className = 'notify-bell';
   bell.style.position = 'relative';
-  bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 01-3.46 0"></path></svg>`;
+  bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>`;
+
   if (notifData && notifData.unread && notifData.unread > 0) {
     const badge = document.createElement('div');
     badge.className = 'notify-badge';
@@ -204,7 +205,7 @@ async function renderNav() {
       header.className = 'dropdown-header';
       header.style.padding = '12px';
       header.style.borderBottom = '1px solid #eee';
-      header.innerHTML = `<img src="${avatarUrl}" class="avatar-img" style="width:40px;height:40px;margin-right:.5em"><div><div><strong>${activeAcc.displayName || activeAcc.username}</strong></div><div class="small">${activeAcc.username}</div></div>`;
+      header.innerHTML = `<div style="display:flex;align-items:center;gap:.5em;"><img src="${avatarUrl}" class="avatar-img" style="width:40px;height:40px;border-radius:50%"><div><div><strong>${activeAcc.displayName || activeAcc.username}</strong></div><div class="small">${activeAcc.username}</div></div></div>`;
       dd.appendChild(header);
 
       const list = document.createElement('div');
@@ -224,41 +225,42 @@ async function renderNav() {
         item.style.alignItems = 'center';
         item.style.padding = '10px 12px';
         item.style.gap = '0.6rem';
-        item.innerHTML = `<img src="${acc.profilePic||'/img/default_profile.png'}" class="avatar-img" style="width:32px;height:32px">
+        item.innerHTML = `<img src="${acc.profilePic || '/img/default_profile.png'}" class="avatar-img" style="width:32px;height:32px;border-radius:50%">
           <div style="flex:1">
             <div><strong>${acc.displayName || acc.username}</strong></div>
             <div class="small">${acc.username}</div>
-          </div>
-          <div style="min-width:80px; text-align:right;"><button class="btn-remove small" data-username="${acc.username}">Remove</button></div>`;
+          </div>`;
 
         // clicking the item (row) will switch account
         item.style.cursor = 'pointer';
         item.onclick = async (e) => {
-          // prevent remove button click bubbling
-          if (e.target && e.target.tagName && (e.target.tagName.toLowerCase() === 'button')) return;
           const confirmSwitch = confirm(`สลับไปใช้บัญชี ${acc.username} ?`);
           if (!confirmSwitch) return;
-          const r = await fetch('/api/accounts/switch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: acc.username })
-          });
-          const d = await r.json();
-          if (d.success) {
-            // refresh UI state: re-fetch accounts and notifications and re-render navbar
-            await renderNav();
-            hideDropdown();
-            // notify other parts of the app (optional)
-            window.dispatchEvent(new Event('accountsChanged'));
-          } else {
-            alert(d.msg || 'ไม่สามารถสลับบัญชีได้');
+          try {
+            const r = await fetch('/api/accounts/switch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username: acc.username })
+            });
+            const d = await r.json();
+            if (d.success) {
+              // refresh UI state: re-fetch accounts and notifications and re-render navbar
+              await renderNav();
+              hideDropdown();
+              // notify other parts of the app (optional)
+              window.dispatchEvent(new Event('accountsChanged'));
+            } else {
+              alert(d.msg || 'ไม่สามารถสลับบัญชีได้');
+            }
+          } catch (err) {
+            alert('เกิดข้อผิดพลาดขณะสลับบัญชี');
           }
         };
 
         list.appendChild(item);
       }
 
-      // "Add account" control at bottom -> นำไปที่หน้า login?add=1
+      // "Add account" control at bottom -> นำไปที่หน้า /login?add=1
       const footer = document.createElement('div');
       footer.style.padding = '8px';
       footer.style.borderTop = '1px solid #eee';
@@ -266,29 +268,6 @@ async function renderNav() {
       footer.style.justifyContent = 'space-between';
       footer.innerHTML = `<div><a href="/accounts" style="text-decoration:none">Manage accounts</a></div><div><button id="dropdownAddBtn">Add account</button></div>`;
       dd.appendChild(footer);
-
-      // attach remove handlers (delegated)
-      list.querySelectorAll('.btn-remove').forEach(btn => {
-        btn.onclick = async (ev) => {
-          ev.stopPropagation();
-          const username = btn.getAttribute('data-username');
-          if (!confirm(`ลบบัญชี ${username} จากรายการหรือไม่?`)) return;
-          const r = await fetch('/api/accounts/remove', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username })
-          });
-          const d = await r.json();
-          if (d.success) {
-            // refresh
-            await renderNav();
-            hideDropdown();
-            window.dispatchEvent(new Event('accountsChanged'));
-          } else {
-            alert(d.msg || 'ลบไม่สำเร็จ');
-          }
-        };
-      });
 
       // add account button -> ไปหน้า /login?add=1
       const addBtn = document.getElementById('dropdownAddBtn');
@@ -311,7 +290,7 @@ async function renderNav() {
       dd.innerHTML = '';
       const header = document.createElement('div');
       header.style.padding = '8px';
-      header.innerHTML = `<strong>Notifications</strong> <span class="small" style="float:right">${nd ? (nd.unread||0) : 0} unread</span>`;
+      header.innerHTML = `<strong>Notifications</strong> <span class="small" style="float:right">${nd ? (nd.unread || 0) : 0} unread</span>`;
       dd.appendChild(header);
 
       const list = document.createElement('div');
