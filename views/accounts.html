@@ -26,7 +26,7 @@
         <div class="small">คุณสามารถเพิ่ม, สลับ หรือเอาบัญชีออกจากรายการได้ที่นี่</div>
       </div>
       <div style="display:flex;gap:0.6rem;align-items:center;">
-        <!-- "เพิ่มบัญชี" พาไปที่ /login?add=1 -->
+        <!-- เปลี่ยนพฤติกรรม: ไปที่หน้า /login?add=1 เพื่อเพิ่มบัญชี -->
         <button id="btnAddAccount">เพิ่มบัญชี</button>
         <button id="btnSignOutAll" class="btn-muted">ออกจากระบบ (active)</button>
       </div>
@@ -55,7 +55,10 @@
 
   <script src="/js/main.js"></script>
   <script>
-    document.getElementById('btnAddAccount').onclick = (e) => { location.href = '/login?add=1'; };
+    // ปรับให้ปุ่ม Add account พาไปที่ /login?add=1
+    document.getElementById('btnAddAccount').onclick = (e) => {
+      location.href = '/login?add=1';
+    };
 
     async function loadAccounts() {
       const container = document.getElementById('accountsList');
@@ -64,7 +67,7 @@
         const res = await fetch('/api/accounts');
         if (!res.ok) throw new Error('fetch failed');
         const data = await res.json();
-        const { accounts = [], active } = data;
+        const { accounts, active } = data;
         container.innerHTML = '';
         if (!accounts || accounts.length === 0) {
           container.innerHTML = '<i>ยังไม่มีบัญชีบันทึกไว้</i>';
@@ -90,6 +93,7 @@
             `;
             container.appendChild(row);
           }
+          // attach handlers
           container.querySelectorAll('button[data-action="use"]').forEach(b => {
             b.onclick = async (e) => {
               const un = b.getAttribute('data-username');
@@ -101,8 +105,7 @@
               });
               const d = await r.json();
               if (d.success) {
-                // server sets session cookie; update client metadata
-                if (typeof setActiveAccountMeta === 'function') setActiveAccountMeta(un);
+                // รีเฟรช header ทันทีโดยไม่ต้อง reload หน้า
                 window.dispatchEvent(new Event('accountsChanged'));
                 await loadAccounts();
               } else alert(d.msg || 'ไม่สำเร็จ');
@@ -119,7 +122,6 @@
               });
               const d = await r.json();
               if (d.success) {
-                if (typeof removeAccountMeta === 'function') removeAccountMeta(un);
                 window.dispatchEvent(new Event('accountsChanged'));
                 await loadAccounts();
               } else alert(d.msg || 'ไม่สำเร็จ');
@@ -160,7 +162,7 @@
         if (!data.notifications || data.notifications.length === 0) {
           list.innerHTML = '<i>ยังไม่มีการแจ้งเตือน</i>';
         } else {
-          list.innerHTML = '';
+          list.innerHTML = '<div style="display:flex;flex-direction:column;gap:.6rem;"></div>';
           for (let n of data.notifications.slice(0,50)) {
             const it = document.createElement('div');
             it.style.padding = '.6rem';
@@ -200,6 +202,7 @@
       }
     };
 
+    // init
     (async ()=> {
       await loadAccounts();
       await loadNotifications();
