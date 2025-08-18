@@ -17,9 +17,11 @@ let globalAccounts = [];
 let globalActive = null;
 let dropdownEl = null;
 let dropdownVisible = false;
-// reference to the outside click guard so we can remove it
-let outsideClickGuard = null;
-let outsideKeyGuard = null;
+
+// overlay element that sits above the page but under the dropdown to swallow clicks
+let overlayEl = null;
+// escape key listener reference
+let escapeKeyListener = null;
 
 async function fetchAccounts() {
   try {
@@ -55,63 +57,88 @@ function ensureDropdown() {
   dropdownEl.style.position = 'absolute';
   dropdownEl.style.right = '1rem';
   dropdownEl.style.top = '64px';
-  dropdownEl.style.zIndex = '999';
+  dropdownEl.style.zIndex = '1001'; // above overlay
   document.body.appendChild(dropdownEl);
-
   return dropdownEl;
 }
 
-function addOutsideGuards() {
-  // Use capture-phase click listener so we can intercept clicks before they reach other handlers
-  outsideClickGuard = function (ev) {
-    if (!dropdownVisible || !dropdownEl) return;
-    // If click is inside dropdown, allow it (do nothing)
-    if (dropdownEl.contains(ev.target)) {
-      return;
-    }
-    // Click is outside dropdown: prevent the click from activating underlying elements,
-    // stop propagation, then hide dropdown. We do this on the capture phase so the
-    // underlying element never receives the event.
-    ev.preventDefault();
-    ev.stopImmediatePropagation();
-    hideDropdown();
-  };
-  document.addEventListener('click', outsideClickGuard, true);
+function createOverlay() {
+  if (overlayEl && document.body.contains(overlayEl)) return overlayEl;
+  overlayEl = document.createElement('div');
+  overlayEl.id = 'dropdownOverlay';
+  // full screen invisible overlay
+  overlayEl.style.position = 'fixed';
+  overlayEl.style.inset = '0';
+  overlayEl.style.background = 'transparent';
+  // put overlay under the dropdown (dropdown zIndex is 1001)
+  overlayEl.style.zIndex = '1000';
+  // ensure it captures pointer events
+  overlayEl.style.pointerEvents = 'auto';
 
-  // Also add key guard for Escape to close dropdown
-  outsideKeyGuard = function (ev) {
+  // clicking the overlay only closes dropdown and prevents any other action
+  overlayEl.addEventListener('click', function (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    // hide dropdown (which will remove overlay)
+    hideDropdown();
+  }, { passive: false });
+
+  // also prevent contextmenu / auxiliary clicks from propagating to underlying elements
+  overlayEl.addEventListener('auxclick', function (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+  }, { passive: false });
+
+  overlayEl.addEventListener('contextmenu', function (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+  }, { passive: false });
+
+  return overlayEl;
+}
+
+function showOverlay() {
+  const ov = createOverlay();
+  // append overlay to body if not present
+  if (!document.body.contains(ov)) document.body.appendChild(ov);
+  // ensure dropdown is after overlay in DOM so it appears above
+  if (dropdownEl && document.body.contains(dropdownEl)) {
+    document.body.appendChild(dropdownEl);
+  }
+  // attach escape key listener
+  escapeKeyListener = function (ev) {
     if (ev.key === 'Escape' && dropdownVisible) {
       ev.preventDefault();
       hideDropdown();
     }
   };
-  document.addEventListener('keydown', outsideKeyGuard, true);
+  document.addEventListener('keydown', escapeKeyListener, true);
 }
 
-function removeOutsideGuards() {
-  if (outsideClickGuard) {
-    document.removeEventListener('click', outsideClickGuard, true);
-    outsideClickGuard = null;
+function hideOverlay() {
+  if (overlayEl && document.body.contains(overlayEl)) {
+    // remove overlay so clicks go through again
+    overlayEl.remove();
   }
-  if (outsideKeyGuard) {
-    document.removeEventListener('keydown', outsideKeyGuard, true);
-    outsideKeyGuard = null;
+  if (escapeKeyListener) {
+    document.removeEventListener('keydown', escapeKeyListener, true);
+    escapeKeyListener = null;
   }
 }
 
 function showDropdown() {
   const d = ensureDropdown();
+  // show overlay first so it captures clicks; dropdown appended above overlay
+  showOverlay();
   d.style.display = 'block';
   dropdownVisible = true;
-  // attach guards so the next click anywhere outside will only close the dropdown and NOT trigger the underlying action
-  addOutsideGuards();
 }
+
 function hideDropdown() {
   if (!dropdownEl) return;
   dropdownEl.style.display = 'none';
   dropdownVisible = false;
-  // remove guards when closed
-  removeOutsideGuards();
+  hideOverlay();
 }
 
 async function renderNav() {
