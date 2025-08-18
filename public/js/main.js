@@ -17,6 +17,9 @@ let globalAccounts = [];
 let globalActive = null;
 let dropdownEl = null;
 let dropdownVisible = false;
+// reference to the outside click guard so we can remove it
+let outsidePointerGuard = null;
+let outsideKeyGuard = null;
 
 async function fetchAccounts() {
   try {
@@ -55,30 +58,59 @@ function ensureDropdown() {
   dropdownEl.style.zIndex = '999';
   document.body.appendChild(dropdownEl);
 
-  // click outside -> hide
-  document.addEventListener('click', (ev) => {
-    if (!dropdownEl) return;
-    if (dropdownVisible) {
-      const rect = dropdownEl.getBoundingClientRect();
-      const x = ev.clientX, y = ev.clientY;
-      if (!(x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom)) {
-        hideDropdown();
-      }
-    }
-  });
-
   return dropdownEl;
+}
+
+function addOutsideGuards() {
+  // Guard pointerdown (captures before target) so we can prevent underlying element activation.
+  outsidePointerGuard = function (ev) {
+    if (!dropdownVisible || !dropdownEl) return;
+    // If pointer event occurred inside dropdown, allow it
+    if (dropdownEl.contains(ev.target)) {
+      return;
+    }
+    // Otherwise: hide dropdown AND prevent the click from activating other elements
+    ev.preventDefault();
+    ev.stopPropagation();
+    hideDropdown();
+  };
+  // Use capture phase to run before other handlers and before the browser applies :active/focus to the target
+  document.addEventListener('pointerdown', outsidePointerGuard, true);
+
+  // Also add key guard for Escape to close dropdown
+  outsideKeyGuard = function (ev) {
+    if (ev.key === 'Escape' && dropdownVisible) {
+      ev.preventDefault();
+      hideDropdown();
+    }
+  };
+  document.addEventListener('keydown', outsideKeyGuard, true);
+}
+
+function removeOutsideGuards() {
+  if (outsidePointerGuard) {
+    document.removeEventListener('pointerdown', outsidePointerGuard, true);
+    outsidePointerGuard = null;
+  }
+  if (outsideKeyGuard) {
+    document.removeEventListener('keydown', outsideKeyGuard, true);
+    outsideKeyGuard = null;
+  }
 }
 
 function showDropdown() {
   const d = ensureDropdown();
   d.style.display = 'block';
   dropdownVisible = true;
+  // attach guards so the *next* click anywhere outside will only close the dropdown and NOT trigger the underlying action
+  addOutsideGuards();
 }
 function hideDropdown() {
   if (!dropdownEl) return;
   dropdownEl.style.display = 'none';
   dropdownVisible = false;
+  // remove guards when closed
+  removeOutsideGuards();
 }
 
 async function renderNav() {
@@ -135,6 +167,7 @@ async function renderNav() {
 
     // clicking avatar toggles dropdown and populates
     avatarBtn.onclick = async (ev) => {
+      // stopPropagation so our own handlers don't immediately close it
       ev.stopPropagation();
       if (dropdownVisible) { hideDropdown(); return; }
       // populate dropdown
