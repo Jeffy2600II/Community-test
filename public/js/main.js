@@ -23,6 +23,10 @@ let overlayEl = null;
 // escape key listener reference
 let escapeKeyListener = null;
 
+// history state handling so back button can close dropdown
+let historyPushed = false;
+let suppressPopstate = false;
+
 async function fetchAccounts() {
   try {
     const r = await fetch('/api/accounts');
@@ -45,6 +49,33 @@ async function fetchNotifications() {
   } catch {
     return null;
   }
+}
+
+// Helper to attach a "fast" click handler: use pointerup (faster on touch) but
+// fall back to click for keyboard activation. This avoids the perceived click
+// delay on some devices while still only reacting after the user completes a click
+// (not on pointerdown).
+function addImmediateClick(el, handler) {
+  if (!el) return;
+  // per-element flag to avoid handling both pointerup and click
+  let handled = false;
+  el.addEventListener('pointerup', function (ev) {
+    // only primary button
+    if (ev.button && ev.button !== 0) return;
+    handled = true;
+    try { handler(ev); } catch (e) { console.error(e); }
+  }, { passive: false });
+
+  el.addEventListener('click', function (ev) {
+    if (handled) {
+      // clear flag for next interaction and swallow duplicate click
+      handled = false;
+      ev.preventDefault();
+      ev.stopPropagation();
+      return;
+    }
+    try { handler(ev); } catch (e) { console.error(e); }
+  }, { passive: false });
 }
 
 function ensureDropdown() {
@@ -76,12 +107,12 @@ function createOverlay() {
   overlayEl.style.pointerEvents = 'auto';
 
   // clicking the overlay only closes dropdown and prevents any other action
-  overlayEl.addEventListener('click', function (ev) {
+  addImmediateClick(overlayEl, function (ev) {
     ev.preventDefault();
     ev.stopPropagation();
     // hide dropdown (which will remove overlay)
     hideDropdown();
-  }, { passive: false });
+  });
 
   // also prevent contextmenu / auxiliary clicks from propagating to underlying elements
   overlayEl.addEventListener('auxclick', function (ev) {
@@ -132,14 +163,47 @@ function showDropdown() {
   showOverlay();
   d.style.display = 'block';
   dropdownVisible = true;
+
+  // push a history entry so browser back button can close the dropdown immediately
+  if (!historyPushed) {
+    try {
+      history.pushState({ dropdown: true }, '');
+      historyPushed = true;
+    } catch (e) {
+      // some environments may block pushState; ignore
+      console.warn('history.pushState failed', e);
+    }
+  }
 }
 
-function hideDropdown() {
+function hideDropdown(fromPopstate = false) {
   if (!dropdownEl) return;
+  if (!dropdownVisible) return;
   dropdownEl.style.display = 'none';
   dropdownVisible = false;
   hideOverlay();
+
+  // if we pushed a history entry when opening, pop it now unless this hide
+  // call comes from the popstate handler itself (to avoid loops)
+  if (historyPushed && !fromPopstate) {
+    suppressPopstate = true;
+    try { history.back(); } catch (e) { /* ignore */ }
+  } else {
+    historyPushed = false;
+  }
 }
+
+// popstate: close dropdown if open, but ignore popstates we intentionally caused
+window.addEventListener('popstate', (ev) => {
+  if (suppressPopstate) {
+    suppressPopstate = false;
+    historyPushed = false;
+    return;
+  }
+  if (dropdownVisible) {
+    hideDropdown(true);
+  }
+});
 
 async function renderNav() {
   const nav = document.getElementById('navBar');
@@ -164,7 +228,7 @@ async function renderNav() {
   const bell = document.createElement('div');
   bell.className = 'notify-bell';
   bell.style.position = 'relative';
-  bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 01-3.46 0"></path></svg>`;
+  bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h1[...]`;
   if (notifData && notifData.unread && notifData.unread > 0) {
     const badge = document.createElement('div');
     badge.className = 'notify-badge';
@@ -194,7 +258,7 @@ async function renderNav() {
     dd.innerHTML = ''; // will populate when opened
 
     // clicking avatar toggles dropdown and populates
-    avatarBtn.onclick = async (ev) => {
+    addImmediateClick(avatarBtn, async (ev) => {
       // stopPropagation so our own handlers don't immediately close it
       ev.stopPropagation();
       if (dropdownVisible) { hideDropdown(); return; }
@@ -204,7 +268,7 @@ async function renderNav() {
       header.className = 'dropdown-header';
       header.style.padding = '12px';
       header.style.borderBottom = '1px solid #eee';
-      header.innerHTML = `<img src="${avatarUrl}" class="avatar-img" style="width:40px;height:40px;margin-right:.5em"><div><div><strong>${activeAcc.displayName || activeAcc.username}</strong></div><div class="small">${activeAcc.username}</div></div>`;
+      header.innerHTML = `<img src="${avatarUrl}" class="avatar-img" style="width:40px;height:40px;margin-right:.5em"><div><div><strong>${activeAcc.displayName || activeAcc.username}</strong></div><di[...]`;
       dd.appendChild(header);
 
       const list = document.createElement('div');
@@ -233,7 +297,7 @@ async function renderNav() {
 
         // clicking the item (row) will switch account
         item.style.cursor = 'pointer';
-        item.onclick = async (e) => {
+        addImmediateClick(item, async (e) => {
           // prevent remove button click bubbling
           if (e.target && e.target.tagName && (e.target.tagName.toLowerCase() === 'button')) return;
           const confirmSwitch = confirm(`สลับไปใช้บัญชี ${acc.username} ?`);
@@ -253,7 +317,7 @@ async function renderNav() {
           } else {
             alert(d.msg || 'ไม่สามารถสลับบัญชีได้');
           }
-        };
+        });
 
         list.appendChild(item);
       }
@@ -269,7 +333,7 @@ async function renderNav() {
 
       // attach remove handlers (delegated)
       list.querySelectorAll('.btn-remove').forEach(btn => {
-        btn.onclick = async (ev) => {
+        addImmediateClick(btn, async (ev) => {
           ev.stopPropagation();
           const username = btn.getAttribute('data-username');
           if (!confirm(`ลบบัญชี ${username} จากรายการหรือไม่?`)) return;
@@ -287,23 +351,23 @@ async function renderNav() {
           } else {
             alert(d.msg || 'ลบไม่สำเร็จ');
           }
-        };
+        });
       });
 
       // add account button -> ไปหน้า /login?add=1
       const addBtn = document.getElementById('dropdownAddBtn');
       if (addBtn) {
-        addBtn.onclick = (e) => {
+        addImmediateClick(addBtn, (e) => {
           e.preventDefault();
           location.href = '/login?add=1';
-        };
+        });
       }
 
       showDropdown();
-    };
+    });
 
     // bell click: open notifications list within dropdown
-    bell.onclick = async (ev) => {
+    addImmediateClick(bell, async (ev) => {
       ev.stopPropagation();
       const dd = ensureDropdown();
       // fetch notifications
@@ -346,7 +410,7 @@ async function renderNav() {
       // attach mark all read
       const mar = dd.querySelector('#markAllRead');
       if (mar) {
-        mar.onclick = async (ev) => {
+        addImmediateClick(mar, async (ev) => {
           ev.preventDefault();
           await fetch('/api/notifications/mark-read', {
             method: 'POST',
@@ -356,11 +420,11 @@ async function renderNav() {
           hideDropdown();
           // refresh nav to update badge
           await renderNav();
-        };
+        });
       }
 
       showDropdown();
-    };
+    });
 
   } else {
     // show auth links if no accounts saved
