@@ -152,45 +152,47 @@ async function renderNav() {
       list.style.overflow = 'auto';
       dd.appendChild(list);
 
-      // Build account items: clicking the row switches to that account (unless it's active)
+      // Build account items: DO NOT show the active account as selectable
       for (let acc of globalAccounts) {
+        // SKIP active account so it's not shown as selectable
+        if (acc.username === globalActive) continue;
+
         const item = document.createElement('div');
         item.className = 'dropdown-item';
         item.style.display = 'flex';
         item.style.alignItems = 'center';
         item.style.padding = '10px 12px';
         item.style.gap = '0.6rem';
-        // show active visually and disable click
-        const isActive = (acc.username === globalActive);
         item.innerHTML = `<img src="${acc.profilePic||'/img/default_profile.png'}" class="avatar-img" style="width:32px;height:32px">
           <div style="flex:1">
             <div><strong>${acc.displayName || acc.username}</strong></div>
             <div class="small">${acc.username}</div>
           </div>
-          <div style="min-width:80px; text-align:right;">${isActive ? '<span class="account-active">Active</span>' : '<button class="btn-remove small" data-username="'+acc.username+'">Remove</button>'}</div>`;
-        // if not active, clicking the item (row) will switch account
-        if (!isActive) {
-          item.style.cursor = 'pointer';
-          item.onclick = async (e) => {
-            // prevent remove button click bubbling
-            if (e.target && e.target.tagName && (e.target.tagName.toLowerCase() === 'button')) return;
-            const confirmSwitch = confirm(`สลับไปใช้บัญชี ${acc.username} ?`);
-            if (!confirmSwitch) return;
-            const r = await fetch('/api/accounts/switch', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ username: acc.username })
-            });
-            const d = await r.json();
-            if (d.success) {
-              // refresh UI state: re-fetch accounts and notifications and re-render navbar
-              await renderNav();
-              hideDropdown();
-            } else {
-              alert(d.msg || 'ไม่สามารถสลับบัญชีได้');
-            }
-          };
-        }
+          <div style="min-width:80px; text-align:right;"><button class="btn-remove small" data-username="${acc.username}">Remove</button></div>`;
+
+        // clicking the item (row) will switch account
+        item.style.cursor = 'pointer';
+        item.onclick = async (e) => {
+          // prevent remove button click bubbling
+          if (e.target && e.target.tagName && (e.target.tagName.toLowerCase() === 'button')) return;
+          const confirmSwitch = confirm(`สลับไปใช้บัญชี ${acc.username} ?`);
+          if (!confirmSwitch) return;
+          const r = await fetch('/api/accounts/switch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: acc.username })
+          });
+          const d = await r.json();
+          if (d.success) {
+            // refresh UI state: re-fetch accounts and notifications and re-render navbar
+            await renderNav();
+            hideDropdown();
+            // notify other parts of the app (optional)
+            window.dispatchEvent(new Event('accountsChanged'));
+          } else {
+            alert(d.msg || 'ไม่สามารถสลับบัญชีได้');
+          }
+        };
 
         list.appendChild(item);
       }
@@ -220,6 +222,7 @@ async function renderNav() {
             // refresh
             await renderNav();
             hideDropdown();
+            window.dispatchEvent(new Event('accountsChanged'));
           } else {
             alert(d.msg || 'ลบไม่สำเร็จ');
           }
