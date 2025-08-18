@@ -26,7 +26,7 @@
         <div class="small">คุณสามารถเพิ่ม, สลับ หรือเอาบัญชีออกจากรายการได้ที่นี่</div>
       </div>
       <div style="display:flex;gap:0.6rem;align-items:center;">
-        <!-- เปลี่ยนพฤติกรรม: ไปที่หน้า /login?add=1 เพื่อเพิ่มบัญชี -->
+        <!-- ปรับให้ไปที่ /login?add=1&next=<current-page> -->
         <button id="btnAddAccount">เพิ่มบัญชี</button>
         <button id="btnSignOutAll" class="btn-muted">ออกจากระบบ (active)</button>
       </div>
@@ -55,9 +55,10 @@
 
   <script src="/js/main.js"></script>
   <script>
-    // ปรับให้ปุ่ม Add account พาไปที่ /login?add=1
+    // ปรับให้ปุ่ม Add account พาไปที่ /login?add=1&next=<current page>
     document.getElementById('btnAddAccount').onclick = (e) => {
-      location.href = '/login?add=1';
+      const next = encodeURIComponent(location.pathname + location.search + location.hash);
+      location.href = '/login?add=1&next=' + next;
     };
 
     async function loadAccounts() {
@@ -105,7 +106,6 @@
               });
               const d = await r.json();
               if (d.success) {
-                // รีเฟรช header ทันทีโดยไม่ต้อง reload หน้า
                 window.dispatchEvent(new Event('accountsChanged'));
                 await loadAccounts();
               } else alert(d.msg || 'ไม่สำเร็จ');
@@ -202,7 +202,6 @@
       }
     };
 
-    // init
     (async ()=> {
       await loadAccounts();
       await loadNotifications();
