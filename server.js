@@ -98,20 +98,51 @@ function ensureUserNotificationsFile(userId) {
     if (!fs.existsSync(p)) fs.writeFileSync(p, '[]', 'utf8');
     return p;
 }
+/**
+ * Add notification to a user's notifications.json
+ * If meta contains actorId or actorUsername and that actor matches the recipient, skip creating the notification.
+ * Returns the created notification object, or null if skipped.
+ */
 function addNotificationToUser(userId, type, message, meta = {}) {
-    const p = ensureUserNotificationsFile(userId);
-    const arr = JSON.parse(fs.readFileSync(p, 'utf8'));
-    const n = {
-        id: uuidv4(),
-        type,
-        message,
-        meta,
-        createdAt: new Date().toISOString(),
-        read: false
-    };
-    arr.unshift(n);
-    fs.writeFileSync(p, JSON.stringify(arr, null, 2), 'utf8');
-    return n;
+    try {
+        // determine recipient username (if profile exists)
+        let recipientUsername = null;
+        const profilePath = getUserProfilePath(userId);
+        if (fs.existsSync(profilePath)) {
+            try {
+                const p = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+                recipientUsername = p.username;
+            } catch {}
+        }
+
+        // If meta indicates actor and actor === recipient, skip (do not notify self)
+        if (meta) {
+            if (meta.actorId && String(meta.actorId) === String(userId)) {
+                return null;
+            }
+            if (meta.actorUsername && recipientUsername && String(meta.actorUsername) === String(recipientUsername)) {
+                return null;
+            }
+        }
+
+        const p = ensureUserNotificationsFile(userId);
+        const arr = JSON.parse(fs.readFileSync(p, 'utf8'));
+        const n = {
+            id: uuidv4(),
+            type,
+            message,
+            meta,
+            createdAt: new Date().toISOString(),
+            read: false
+        };
+        arr.unshift(n);
+        fs.writeFileSync(p, JSON.stringify(arr, null, 2), 'utf8');
+        return n;
+    } catch (err) {
+        // fail-safe: do not crash on notification errors
+        console.error('addNotificationToUser error:', err && err.message);
+        return null;
+    }
 }
 function getNotificationsForUser(userId) {
     const p = ensureUserNotificationsFile(userId);
@@ -493,8 +524,9 @@ app.post('/api/post/create', authMiddleware, upload.single('postImage'), (req, r
     userPosts.unshift(postId);
     fs.writeFileSync(userPostsPath, JSON.stringify(userPosts, null, 2), 'utf8');
 
-    // create a notification to self (example)
-    addNotificationToUser(userId, 'post_created', `คุณได้สร้างโพสต์ "${title}"`, { postId });
+    // NOTE: do NOT create a notification to the user about their own post.
+    // If in the future you want to notify followers or other users, create notifications
+    // for those recipients and ensure meta.actorId/actorUsername is set so addNotificationToUser can skip self-notify.
 
     res.json({ success: true, postId });
 });
@@ -618,10 +650,13 @@ app.post('/api/post/:id/comment', authMiddleware, (req, res) => {
         if (post && post.username && post.username !== username) {
             const ownerObj = findUserByUsername(post.username);
             if (ownerObj) {
-                addNotificationToUser(ownerObj._userId, 'comment', `${username} แสดงความคิดเห็นในโพสต์ของคุณ`, { postId, commentId: comment.id });
+                // Include actor info so notification helper can avoid notifying actor == recipient
+                addNotificationToUser(ownerObj._userId, 'comment', `${username} แสดงความคิดเห็นในโพสต์ของคุณ`, { postId, commentId: comment.id, actorId: userObj && userObj._userId, actorUsername: username });
             }
         }
-    } catch {}
+    } catch (e) {
+        // ignore
+    }
     res.json({ success: true });
 });
 app.delete('/api/post/:postId/comment/:commentId', authMiddleware, (req, res) => {
