@@ -3,81 +3,53 @@
 <head>
     <meta charset="utf-8">
     <title>โปรไฟล์ของฉัน</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
-    <style>
-      /* เพิ่มเล็กน้อยเพื่อให้โปรไฟล์เป็น full-width ดูเป็นโปร */
-      main { max-width: 1100px; margin: 1.2em auto; padding: 1.6em; display: grid; grid-template-columns: 320px 1fr; gap: 1.2em; }
-      .profile-hero { background: linear-gradient(180deg,#fff,#fafafa); padding:1.2em; border-radius:8px; display:flex; flex-direction:column; align-items:center; gap:0.8rem; }
-      .profile-hero img { width:140px;height:140px;border-radius:12px;object-fit:cover;border:3px solid #eee; }
-      .profile-main { background:#fff;padding:1.2em;border-radius:8px; }
-      .username-line { color:#666; font-size:0.95rem; margin-top: -2px; }
-      .actions { margin-top:0.6rem; display:flex; gap:.6rem; }
-      @media (max-width:900px) {
-        main { grid-template-columns: 1fr; }
-      }
-    </style>
 </head>
 <body>
   <div id="headerSlot"></div>
   <main>
-    <aside class="profile-hero" id="hero">
-      <img id="heroPic" src="/img/default_profile.png" alt="profile">
-      <div style="text-align:center;">
-        <div id="displayName" style="font-size:1.2rem;font-weight:700"></div>
-        <div id="usernameLine" class="username-line"></div>
-      </div>
-      <div class="actions">
-        <a href="/profile/edit"><button>แก้ไขโปรไฟล์</button></a>
-        <a href="/post/create"><button class="btn-muted">สร้างโพสต์</button></a>
-      </div>
-      <div class="small" id="counts" style="margin-top:.6rem"></div>
-    </aside>
+    <div class="container">
+      <div class="grid-2">
+        <aside class="profile-hero card" id="hero">
+          <img id="heroPic" src="/img/default_profile.png" alt="profile" class="profile-hero avatar">
+          <div style="text-align:center;">
+            <div id="displayName" style="font-size:1.2rem;font-weight:700"></div>
+            <div id="usernameLine" class="small" style="margin-top:4px"></div>
+          </div>
+          <div class="actions" style="margin-top:8px;">
+            <a href="/profile/edit"><button class="btn btn-primary">แก้ไขโปรไฟล์</button></a>
+            <a href="/post/create"><button class="btn btn-ghost">สร้างโพสต์</button></a>
+          </div>
+          <div class="small" id="counts" style="margin-top:8px"></div>
+        </aside>
 
-    <section class="profile-main">
-      <div id="aboutArea"></div>
-      <div id="myPosts" style="margin-top:1.2rem"></div>
-    </section>
+        <section class="profile-main">
+          <div class="card" id="aboutArea"></div>
+          <div class="card" id="myPosts" style="margin-top:12px"></div>
+        </section>
+      </div>
+    </div>
   </main>
   <div id="footerSlot"></div>
 
 <script src="/js/main.js"></script>
 <script>
 (async ()=>{
-    // owner profile page uses /api/profile which requires auth
     const pr = await fetch('/api/profile');
-    if (!pr.ok) {
-        // if not authenticated, redirect to login
-        location.href = '/login';
-        return;
-    }
+    if (!pr.ok) { location.href = '/login'; return; }
     const data = await pr.json();
-    if (!data.success) {
-        document.getElementById('aboutArea').innerText = 'ไม่สามารถโหลดโปรไฟล์';
-        return;
-    }
+    if (!data.success) { document.getElementById('aboutArea').innerText = 'ไม่สามารถโหลดโปรไฟล์'; return; }
     const { profile, followersCount, followingCount } = data;
 
     document.getElementById('heroPic').src = profile.profilePic || '/img/default_profile.png';
     document.getElementById('displayName').innerText = profile.displayName || profile.username;
-    // show username under displayName (no label)
     document.getElementById('usernameLine').innerText = '@' + profile.username;
-
     document.getElementById('counts').innerHTML = `ติดตาม: ${followingCount} • ผู้ติดตาม: ${followersCount}`;
 
-    // About area - full width, professional layout
     let aboutHtml = `<h3>เกี่ยวกับ</h3>
-        <div style="display:flex;gap:1rem;align-items:flex-start;">
-          <div style="flex:1">
-            <p>${profile.bio ? profile.bio : '<i>ยังไม่มีข้อมูล</i>'}</p>
-            <p class="small">เข้าร่วมเมื่อ: ${new Date(profile.createdAt).toLocaleDateString()}</p>
-          </div>
-          <div style="width:220px;">
-            <div class="small"><strong>อีเมล</strong></div>
-            <div>${profile.email || '<i>ไม่มี</i>'}</div>
-            <div class="small" style="margin-top:.6rem">การตั้งค่า: <span class="small">${profile.showEmail ? 'แสดงให้ผู้อื่นเห็น' : 'ไม่แสดง'}</span></div>
-          </div>
-        </div>`;
+      <div class="small" style="margin-top:8px">${profile.bio ? profile.bio : '<i>ยังไม่มีข้อมูล</i>'}</div>
+      <div class="small" style="margin-top:10px">เข้าร่วมเมื่อ: ${new Date(profile.createdAt).toLocaleDateString()}</div>
+      <div style="margin-top:8px" class="small"><strong>อีเมล:</strong> ${profile.showEmail ? (profile.email || '<i>ไม่มี</i>') : '<i>ซ่อน</i>'}</div>`;
     document.getElementById('aboutArea').innerHTML = aboutHtml;
 
     // posts
@@ -86,7 +58,7 @@
       const postsData = await pr2.json();
       const posts = postsData.posts || [];
       let postlist = '<div class="section-title"><span>โพสต์ของฉัน</span></div>';
-      postlist += posts.length ? posts.map(p=>`<div class="post"><h4><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div><p>${p.content.slice(0,200)}${p.content.length>200?'...':''}</p></div>`).join('') : '<i>ยังไม่มีโพสต์</i>';
+      postlist += posts.length ? posts.map(p=>`<div class="post" style="padding:10px 12px;margin-bottom:8px;"><div style="flex:1"><h4 style="margin:0"><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div><div style="margin-top:6px">${p.content.slice(0,160)}${p.content.length>160?'...':''}</div></div></div>`).join('') : '<i class="small">ยังไม่มีโพสต์</i>';
       document.getElementById('myPosts').innerHTML = postlist;
     }
 })();
