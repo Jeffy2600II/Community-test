@@ -1,46 +1,191 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>การจัดการบัญชี — COMMUNITY</title>
-  <link rel="stylesheet" href="/css/site.css" />
+  <meta charset="utf-8">
+  <title>จัดการบัญชี — Community</title>
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <!-- ถ้าคุณใช้ partial header/footer ให้เรียกใช้ partial เหมือนระบบเดิม -->
   <div id="headerSlot"></div>
 
-  <main class="container" style="padding:24px;max-width:980px;margin:0 auto;">
-    <h1>การจัดการบัญชี</h1>
-
-    <section aria-labelledby="notif-heading" style="margin-top:18px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div>
-          <h2 id="notif-heading" style="margin:0 0 8px 0;">การแจ้งเตือนของฉัน</h2>
-          <p class="small" style="margin:0;color:#6b7280;">รายการแจ้งเตือนล่าสุด ทั้งอ่านและยังไม่อ่าน — คลิกที่รายการเพื่อไปยังเนื้อหา</p>
+  <main>
+    <div class="container">
+      <div class="card">
+        <div class="section-title"><span>จัดการบัญชี</span></div>
+        <div class="accounts-header" style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <h2>บัญชีที่บันทึกไว้</h2>
+            <div class="small">คุณสามารถเพิ่ม, สลับ หรือเอาบัญชีออกจากรายการได้ที่นี่</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <a href="/login?add=1"><button class="btn btn-primary">เพิ่มบัญชี</button></a>
+            <button id="btnSignOutAll" class="btn btn-ghost">ออกจากระบบ (active)</button>
+          </div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <button id="refreshNotifs" class="btn btn-ghost">รีเฟรช</button>
-          <button id="markAllReadBtn" class="btn btn-primary">ทำเครื่องหมายว่าอ่านทั้งหมด</button>
+
+        <div id="accountsList" class="accounts-list" style="margin-top:12px;">
+          <i class="small">กำลังโหลด...</i>
+        </div>
+
+        <div class="card" id="activeAccountPanel" style="display:none;margin-top:12px;">
+          <h3>บัญชีที่ใช้งานอยู่ (Active)</h3>
+          <div id="activeAccountInfo">...</div>
+          <div style="margin-top:.8rem;">
+            <a href="/profile">ไปที่โปรไฟล์</a> •
+            <a href="#" id="btnViewSettings">ดูการตั้งค่าบัญชี</a>
+          </div>
+        </div>
+
+        <div class="card" id="notificationsPanel" style="display:none;margin-top:12px;">
+          <h3>การแจ้งเตือน</h3>
+          <div id="notificationsList"><i class="small">กำลังโหลด...</i></div>
         </div>
       </div>
-
-      <div id="accountNotifications" style="margin-top:12px;">
-        <!-- List rendered by public/js/account-notifications.js -->
-        <div class="muted small">กำลังโหลดการแจ้งเตือน...</div>
-      </div>
-
-      <div id="notificationsPager" style="margin-top:12px;display:flex;justify-content:center;gap:8px;"></div>
-    </section>
-
-    <!-- คุณสามารถเพิ่มส่วนการตั้งค่าอื่น ๆ ที่ต้องการได้ที่นี่ -->
-
+    </div>
   </main>
 
   <div id="footerSlot"></div>
 
-  <script src="/js/account-notifications.js"></script>
-  <!-- ถ้าคุณมี main.js สำหรับ header ให้โหลดไว้ด้วย (เพื่อให้ badge รีเฟรชทำงาน) -->
-  <script src="/js/main.js" defer></script>
+  <script src="/js/main.js"></script>
+  <script>
+    document.getElementById('btnAddAccount')?.addEventListener('click', ()=> location.href = '/login?add=1');
+
+    async function loadAccounts() {
+      const container = document.getElementById('accountsList');
+      container.innerHTML = '<i class="small">กำลังโหลด...</i>';
+      try {
+        const res = await fetch('/api/accounts');
+        const data = await res.json();
+        const { accounts, active } = data;
+        container.innerHTML = '';
+        if (!accounts || accounts.length === 0) {
+          container.innerHTML = '<i class="small">ยังไม่มีบัญชีบันทึกไว้</i>';
+        } else {
+          for (let acc of accounts) {
+            const row = document.createElement('div');
+            row.className = 'account-row';
+            row.style.display='flex';
+            row.style.alignItems='center';
+            row.style.gap='12px';
+            row.style.padding='12px';
+            row.style.border='1px solid rgba(15,23,42,0.04)';
+            row.style.borderRadius='8px';
+            row.style.marginBottom='8px';
+            row.innerHTML = `
+              <img src="${acc.profilePic||'/img/default_profile.png'}" class="profile-pic" width="48" height="48" style="width:48px;height:48px;">
+              <div style="flex:1">
+                <div style="display:flex;align-items:center;gap:8px;"><div><strong>${acc.displayName||acc.username}</strong></div>
+                ${active === acc.username ? '<div class="badge">Active</div>' : ''}</div>
+                <div class="small">${acc.username}</div>
+              </div>
+              <div style="display:flex;gap:8px;">
+                ${active === acc.username
+                  ? `<button class="btn btn-ghost" data-username="${acc.username}" data-action="signout">Sign out</button>`
+                  : `<button class="btn btn-primary" data-username="${acc.username}" data-action="use">Use</button>
+                     <button class="btn btn-ghost" data-username="${acc.username}" data-action="remove">Remove</button>`}
+              </div>
+            `;
+            container.appendChild(row);
+          }
+
+          container.querySelectorAll('button[data-action="use"]').forEach(b => {
+            b.onclick = async (e) => {
+              const un = b.getAttribute('data-username');
+              if (!confirm(`สลับไปใช้บัญชี ${un} ?`)) return;
+              const r = await fetch('/api/accounts/switch', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ username: un })
+              });
+              const d = await r.json();
+              if (d.success) {
+                window.dispatchEvent(new Event('accountsChanged'));
+                await loadAccounts();
+              } else alert(d.msg || 'ไม่สำเร็จ');
+            };
+          });
+          container.querySelectorAll('button[data-action="remove"]').forEach(b => {
+            b.onclick = async (e) => {
+              const un = b.getAttribute('data-username');
+              if (!confirm(`ลบบัญชี ${un} จากรายการ?`)) return;
+              const r = await fetch('/api/accounts/remove', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ username: un })
+              });
+              const d = await r.json();
+              if (d.success) {
+                window.dispatchEvent(new Event('accountsChanged'));
+                await loadAccounts();
+              } else alert(d.msg || 'ไม่สำเร็จ');
+            };
+          });
+          container.querySelectorAll('button[data-action="signout"]').forEach(b => {
+            b.onclick = async (e) => {
+              if (!confirm('ยืนยันออกจากระบบบัญชีปัจจุบัน?')) return;
+              await fetch('/api/logout', { method: 'POST' });
+              window.dispatchEvent(new Event('accountsChanged'));
+              await loadAccounts();
+            };
+          });
+        }
+
+        // active panel
+        if (active) {
+          document.getElementById('activeAccountPanel').style.display = '';
+          const act = accounts.find(a => a.username === active) || accounts[0];
+          document.getElementById('activeAccountInfo').innerHTML = `<img src="${act.profilePic||'/img/default_profile.png'}" class="profile-pic" width="48"> <strong style="margin-left:8px">${act.displayName||act.username}</strong>`;
+        } else {
+          document.getElementById('activeAccountPanel').style.display = 'none';
+        }
+
+      } catch (err) {
+        container.innerHTML = '<i class="small">ไม่สามารถโหลดรายการบัญชีได้</i>';
+      }
+    }
+
+    async function loadNotifications() {
+      try {
+        const res = await fetch('/api/notifications');
+        if (!res.ok) return;
+        const data = await res.json();
+        const panel = document.getElementById('notificationsPanel');
+        const list = document.getElementById('notificationsList');
+        panel.style.display = '';
+        let notifications = data.notifications || [];
+        if (!notifications || notifications.length === 0) {
+          list.innerHTML = '<i class="small">ยังไม่มีการแจ้งเตือน</i>';
+        } else {
+          list.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;"></div>';
+          for (let n of notifications.slice(0,50)) {
+            const it = document.createElement('div');
+            it.style.padding = '10px';
+            it.style.border = '1px solid rgba(15,23,42,0.04)';
+            it.style.borderRadius = '8px';
+            it.innerHTML = `<div style="display:flex;justify-content:space-between;"><div><strong>${n.type}</strong><div class="small">${n.message}</div></div><div class="small">${new Date(n.createdAt).toLocaleString()}</div></div>`;
+            if (!n.read) it.style.background = '#fffef6';
+            list.appendChild(it);
+          }
+        }
+      } catch {}
+    }
+
+    document.getElementById('btnSignOutAll').onclick = async (e) => {
+      if (!confirm('ยืนยันออกจากระบบบัญชีปัจจุบัน?')) return;
+      await fetch('/api/logout', { method: 'POST' });
+      window.dispatchEvent(new Event('accountsChanged'));
+      await loadAccounts();
+    };
+
+    document.getElementById('btnViewSettings').onclick = async (e) => {
+      e.preventDefault();
+      alert('ฟีเจอร์การตั้งค่าเพิ่มเติมจะตามมา');
+    };
+
+    (async ()=> {
+      await loadAccounts();
+      await loadNotifications();
+    })();
+  </script>
 </body>
 </html>
