@@ -2,98 +2,80 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>โปรไฟล์สมาชิก</title>
+    <title>แก้ไขโปรไฟล์</title>
     <link rel="stylesheet" href="/css/style.css">
     <style>
-      main { max-width: 1100px; margin: 1.2em auto; padding: 1.6em; display: grid; grid-template-columns: 320px 1fr; gap: 1.2em; }
-      .profile-hero { background:#fff;padding:1.2em;border-radius:8px; display:flex; flex-direction:column; align-items:center; gap:0.8rem; }
-      .profile-hero img { width:140px;height:140px;border-radius:12px;object-fit:cover;border:3px solid #eee; }
-      .profile-main { background:#fff;padding:1.2em;border-radius:8px; }
-      .username-line { color:#666; font-size:0.95rem; margin-top:-2px; }
-      @media (max-width:900px) { main { grid-template-columns:1fr; } }
+      main { max-width:720px; margin:1.2em auto; padding:1.2em; }
+      .form-row { margin-bottom:.8rem; }
     </style>
 </head>
 <body>
   <div id="headerSlot"></div>
   <main>
-    <aside class="profile-hero" id="hero">
-      <img id="heroPic" src="/img/default_profile.png" alt="profile">
-      <div style="text-align:center;">
-        <div id="displayName" style="font-size:1.2rem;font-weight:700"></div>
-        <div id="usernameLine" class="username-line"></div>
-      </div>
-      <div id="followArea"></div>
-      <div class="small" id="counts" style="margin-top:.6rem"></div>
-    </aside>
+      <div class="section-title"><span>แก้ไขโปรไฟล์</span></div>
+      <form id="editProfileForm">
+          <div class="form-row"><input type="text" name="displayName" placeholder="ชื่อที่แสดง"></div>
+          <div class="form-row"><input type="email" name="email" placeholder="อีเมล (จะเห็นเมื่อตั้งค่าแสดง)"></div>
+          <div class="form-row">
+            <label><input type="checkbox" name="showEmail" id="showEmail"> แสดงอีเมลในโปรไฟล์สาธารณะ</label>
+          </div>
+          <button type="submit">บันทึก</button>
+          <p id="msg"></p>
+      </form>
 
-    <section class="profile-main">
-      <div id="aboutArea"></div>
-      <div id="userPosts" style="margin-top:1.2rem"></div>
-    </section>
+      <form id="picForm" enctype="multipart/form-data">
+          <label>รูปโปรไฟล์: <input type="file" name="profilePic"></label>
+          <button type="submit">อัปโหลด</button>
+          <button id="removePicBtn" type="button">ลบรูป</button>
+      </form>
   </main>
   <div id="footerSlot"></div>
 
 <script src="/js/main.js"></script>
 <script>
-const username = decodeURIComponent(location.pathname.split('/')[2]);
+(async ()=>{
+    // load existing profile
+    const pr = await fetch('/api/profile');
+    if (!pr.ok) { location.href = '/login'; return; }
+    const data = await pr.json();
+    if (!data.success) return;
+    const { profile } = data;
+    document.querySelector('input[name=displayName]').value = profile.displayName || '';
+    document.querySelector('input[name=email]').value = profile.email || '';
+    document.getElementById('showEmail').checked = !!profile.showEmail;
+})();
 
-async function renderProfile() {
-    const pr = await fetch('/api/user/' + encodeURIComponent(username));
-    const resp = await pr.json();
-    if(!resp.success) return document.getElementById('aboutArea').innerHTML = '<b>ไม่พบผู้ใช้</b>';
-    const { profile, followersCount, followingCount, isFollowing, myUsername } = resp;
+document.getElementById('editProfileForm').onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const body = {
+        displayName: fd.get('displayName'),
+        email: fd.get('email'),
+        showEmail: document.getElementById('showEmail').checked
+    };
+    const res = await fetch('/api/profile/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    document.getElementById('msg').innerText = data.success ? 'บันทึกสำเร็จ' : (data.msg || 'ผิดพลาด');
+    if (data.success) setTimeout(() => location.replace('/profile'), 800);
+};
 
-    document.getElementById('heroPic').src = profile.profilePic || '/img/default_profile.png';
-    document.getElementById('displayName').innerText = profile.displayName || profile.username;
-    // show username under displayName (no label)
-    document.getElementById('usernameLine').innerText = '@' + profile.username;
+document.getElementById('picForm').onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const res = await fetch('/api/profile/upload-pic', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.success) alert('อัปโหลดสำเร็จ!'); else alert('ผิดพลาด');
+};
 
-    document.getElementById('counts').innerHTML = `ติดตาม: ${followingCount} • ผู้ติดตาม: ${followersCount}`;
-
-    // follow button (show only if logged-in and not viewing yourself)
-    const followArea = document.getElementById('followArea');
-    followArea.innerHTML = '';
-    if (myUsername && myUsername !== profile.username) {
-      const btn = document.createElement('button');
-      btn.innerText = isFollowing ? 'Unfollow' : 'Follow';
-      btn.onclick = async () => {
-        const url = isFollowing ? `/api/user/${encodeURIComponent(profile.username)}/unfollow` : `/api/user/${encodeURIComponent(profile.username)}/follow`;
-        const r = await fetch(url, { method: 'POST' });
-        const d = await r.json();
-        if (d && d.success) {
-          await renderProfile(); // reload
-        } else {
-          alert(d.msg || 'ไม่สำเร็จ');
-        }
-      };
-      followArea.appendChild(btn);
-    }
-
-    // About area
-    let aboutHtml = `<h3>เกี่ยวกับ</h3>
-      <div style="display:flex;gap:1rem;align-items:flex-start;">
-        <div style="flex:1">
-          <p>${profile.bio ? profile.bio : '<i>ยังไม่มีข้อมูล</i>'}</p>
-          <p class="small">เข้าร่วมเมื่อ: ${new Date(profile.createdAt).toLocaleDateString()}</p>
-        </div>
-        <div style="width:220px;">
-          ${profile.showEmail ? `<div class="small"><strong>อีเมล</strong></div><div>${profile.email}</div>` : `<div class="small"><strong>อีเมล</strong></div><div><i>ผู้ใช้ไม่ได้เปิดเผย</i></div>`}
-        </div>
-      </div>`;
-    document.getElementById('aboutArea').innerHTML = aboutHtml;
-
-    // posts
-    const pr2 = await fetch('/api/user/' + encodeURIComponent(username) + '/posts');
-    if (pr2.ok) {
-      const postsData = await pr2.json();
-      const posts = postsData.posts || [];
-      let postlist = '<div class="section-title"><span>โพสต์ของสมาชิกนี้</span></div>';
-      postlist += posts.length ? posts.map(p=>`<div class="post"><h4><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div><p>${p.content.slice(0,200)}${p.content.length>200?'...':''}</p></div>`).join('') : '<i>ยังไม่มีโพสต์</i>';
-      document.getElementById('userPosts').innerHTML = postlist;
-    }
-}
-
-renderProfile();
+document.getElementById('removePicBtn').onclick = async () => {
+    if (!confirm('ลบรูปโปรไฟล์?')) return;
+    await fetch('/api/profile/remove-pic', { method: 'POST' });
+    location.reload();
+};
 </script>
 </body>
 </html>
