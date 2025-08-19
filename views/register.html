@@ -1,23 +1,31 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
     <title>สมัครสมาชิก - Community</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <div id="headerSlot"></div>
   <main>
-      <div class="section-title"><span>สมัครสมาชิกใหม่</span></div>
-      <form id="registerForm">
-          <input type="text" name="username" placeholder="ชื่อผู้ใช้" required>
-          <input type="email" name="email" placeholder="อีเมล" required>
-          <input type="password" name="password" placeholder="รหัสผ่าน" required>
-          <button type="submit">สมัคร</button>
-          <p id="msg"></p>
-      </form>
-      <p><a href="/login">มีบัญชีอยู่แล้ว? เข้าสู่ระบบ</a></p>
+    <div class="container" style="max-width:480px;margin:2rem auto;">
+      <div class="card">
+        <div class="section-title"><span>สมัครสมาชิกใหม่</span></div>
+        <form id="registerForm">
+            <label class="small">ชื่อผู้ใช้</label>
+            <input type="text" name="username" placeholder="ชื่อผู้ใช้" required>
+            <label class="small">อีเมล</label>
+            <input type="email" name="email" placeholder="อีเมล" required>
+            <label class="small">รหัสผ่าน</label>
+            <input type="password" name="password" placeholder="รหัสผ่าน" required>
+            <div style="text-align:right;margin-top:8px">
+              <button type="submit" class="btn btn-primary">สมัคร</button>
+            </div>
+            <p id="msg" class="small" style="margin-top:8px"></p>
+        </form>
+        <p style="margin-top:12px;"><a href="/login">มีบัญชีอยู่แล้ว? เข้าสู่ระบบ</a></p>
+      </div>
+    </div>
   </main>
   <div id="footerSlot"></div>
 <script src="/js/main.js"></script>
