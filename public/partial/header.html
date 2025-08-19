@@ -1,13 +1,40 @@
 <header>
-  <h1><a href="/">COMMUNITY</a></h1>
-  <nav id="navBar"></nav>
+  <div class="header-inner">
+    <div class="header-left">
+      <a class="header-logo" href="/">
+        <!-- optional svg/logo image could go here -->
+        <img src="/img/logo.svg" alt="Community logo" onerror="this.style.display='none'">
+        <h1>COMMUNITY</h1>
+      </a>
+
+      <!-- small main nav (main.js will inject expanded nav into #navBar) -->
+      <nav id="navBar" aria-label="Primary"></nav>
+    </div>
+
+    <!-- search (visual only; you can wire up to a search API later) -->
+    <div class="header-search" role="search" aria-label="Search posts">
+      <form onsubmit="event.preventDefault();">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="opacity:.6;margin-right:6px">
+          <path d="M21 21l-4.35-4.35" stroke="#333" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+          <circle cx="11" cy="11" r="6" stroke="#333" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></circle>
+        </svg>
+        <input type="search" placeholder="ค้นหาโพสต์หรือผู้ใช้..." aria-label="Search">
+      </form>
+    </div>
+
+    <!-- account area will be populated by main.js into navBar (but keep a placeholder for layout) -->
+    <div style="display:flex;align-items:center;gap:.6rem;">
+      <div class="account-area" aria-hidden="true">
+        <!-- JS replaces contents; keep placeholders to preserve spacing -->
+      </div>
+    </div>
+  </div>
 </header>
 
-<!-- Account dropdown / notifications (rendered by JS) -->
-<!-- Add account modal -->
-<div id="addAccountModal" class="modal-hidden">
-  <div class="modal-panel">
-    <h3>เพิ่มบัญชี</h3>
+<!-- Add account modal (styled by CSS) -->
+<div id="addAccountModal" class="modal-hidden" aria-hidden="true">
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="addAccountTitle">
+    <h3 id="addAccountTitle">เพิ่มบัญชี</h3>
     <form id="addAccountForm">
       <input type="email" name="email" placeholder="อีเมล" required>
       <input type="password" name="password" placeholder="รหัสผ่าน" required>
