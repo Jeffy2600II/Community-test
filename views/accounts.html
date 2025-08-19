@@ -4,90 +4,155 @@
   <meta charset="utf-8">
   <title>จัดการบัญชี — Community</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .accounts-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+    .accounts-list { display:flex; flex-direction:column; gap:0.6rem; }
+    .account-row { display:flex; align-items:center; gap:0.8rem; padding:0.8rem; border:1px solid #eee; border-radius:8px; background:#fff; }
+    .account-info { flex:1; }
+    .account-actions { display:flex; gap:0.5rem; }
+    .account-active { font-size:0.9rem; color:#27ae60; font-weight:700; padding:.2em .5em; border-radius:6px; background:#e8f8f1; }
+    .section-small { margin-top:1.2rem; padding:1rem; border:1px solid #eee; border-radius:8px; background:#fafafa; }
+    .small { font-size:0.85rem; color:#666; }
+    /* notifications list */
+    .notif-row { padding:12px; border:1px solid #eee; border-radius:8px; background:#fff; cursor:pointer; }
+    .notif-row.unread { background:#fffef6; }
+    .notif-list { display:flex; flex-direction:column; gap:0.6rem; }
+    .notif-header { display:flex; justify-content:space-between; align-items:center; gap:12px; padding-bottom:8px; }
+    .btn { padding:6px 10px; border-radius:6px; border:1px solid #ddd; background:#fff; cursor:pointer; }
+    .btn-ghost { background:transparent; border:1px solid #ddd; }
+    .btn-muted { background:#f5f7fa; border:1px solid #e6eef8; }
+  </style>
 </head>
 <body>
   <div id="headerSlot"></div>
-
   <main>
-    <div class="container">
-      <div class="card">
-        <div class="section-title"><span>จัดการบัญชี</span></div>
-        <div class="accounts-header" style="display:flex;align-items:center;justify-content:space-between;">
-          <div>
-            <h2>บัญชีที่บันทึกไว้</h2>
-            <div class="small">คุณสามารถเพิ่ม, สลับ หรือเอาบัญชีออกจากรายการได้ที่นี่</div>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <a href="/login?add=1"><button class="btn btn-primary">เพิ่มบัญชี</button></a>
-            <button id="btnSignOutAll" class="btn btn-ghost">ออกจากระบบ (active)</button>
-          </div>
-        </div>
+    <div class="section-title"><span>จัดการบัญชี</span></div>
 
-        <div id="accountsList" class="accounts-list" style="margin-top:12px;">
-          <i class="small">กำลังโหลด...</i>
-        </div>
-
-        <div class="card" id="activeAccountPanel" style="display:none;margin-top:12px;">
-          <h3>บัญชีที่ใช้งานอยู่ (Active)</h3>
-          <div id="activeAccountInfo">...</div>
-          <div style="margin-top:.8rem;">
-            <a href="/profile">ไปที่โปรไฟล์</a> •
-            <a href="#" id="btnViewSettings">ดูการตั้งค่าบัญชี</a>
-          </div>
-        </div>
-
-        <div class="card" id="notificationsPanel" style="display:none;margin-top:12px;">
-          <h3>การแจ้งเตือน</h3>
-          <div id="notificationsList"><i class="small">กำลังโหลด...</i></div>
-        </div>
+    <div class="accounts-header">
+      <div>
+        <h2>บัญชีที่บันทึกไว้</h2>
+        <div class="small">คุณสามารถเพิ่ม, สลับ หรือเอาบัญชีออกจากรายการได้ที่นี่</div>
+      </div>
+      <div style="display:flex;gap:0.6rem;align-items:center;">
+        <!-- เปลี่ยนพฤติกรรม: ไปที่หน้า /login?add=1 เพื่อเพิ่มบัญชี -->
+        <button id="btnAddAccount" class="btn">เพิ่มบัญชี</button>
+        <button id="btnSignOutAll" class="btn btn-muted">ออกจากระบบ (active)</button>
       </div>
     </div>
-  </main>
 
+    <div id="accountsList" class="accounts-list">
+      <i>กำลังโหลด...</i>
+    </div>
+
+    <div class="section-small" id="activeAccountPanel" style="display:none;">
+      <h3>บัญชีที่ใช้งานอยู่ (Active)</h3>
+      <div id="activeAccountInfo">...</div>
+      <div style="margin-top:.8rem;">
+        <a href="/profile">ไปที่โปรไฟล์</a> •
+        <a href="#" id="btnViewSettings">ดูการตั้งค่าบัญชี</a>
+      </div>
+    </div>
+
+    <div class="section-small" id="notificationsPanel" style="display:none;margin-top:1rem;">
+      <div class="notif-header">
+        <div>
+          <h3 style="margin:0;">การแจ้งเตือน</h3>
+          <div id="notifUnreadInfo" class="small">กำลังโหลด...</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button id="btnMarkAllRead" class="btn btn-ghost">ทำเครื่องหมายว่าอ่านทั้งหมด</button>
+          <button id="btnRefreshNotifs" class="btn btn-ghost">รีเฟรช</button>
+        </div>
+      </div>
+      <div id="notificationsList"><i>กำลังโหลด...</i></div>
+    </div>
+
+  </main>
   <div id="footerSlot"></div>
 
   <script src="/js/main.js"></script>
   <script>
-    document.getElementById('btnAddAccount')?.addEventListener('click', ()=> location.href = '/login?add=1');
+    // ---------- Helpers ----------
+    function escapeHtml(s) {
+      if (s === undefined || s === null) return '';
+      return String(s).replace(/[&<>"']/g, function (m) {
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]);
+      });
+    }
 
+    function computeNotificationUrl(n) {
+      if (!n || !n.meta) return null;
+      const m = n.meta;
+      if (m.url) return m.url;
+      if (m.postId) return `/post/${encodeURIComponent(m.postId)}`;
+      if (m.commentId && m.postId) return `/post/${encodeURIComponent(m.postId)}#comment-${encodeURIComponent(m.commentId)}`;
+      if (m.actorUsername) return `/user/${encodeURIComponent(m.actorUsername)}`;
+      if (m.username) return `/user/${encodeURIComponent(m.username)}`;
+      if (m.item && m.item.type === 'post' && m.item.id) return `/post/${encodeURIComponent(m.item.id)}`;
+      return null;
+    }
+
+    // ---------- Account actions ----------
+    document.getElementById('btnAddAccount').onclick = (e) => {
+      location.href = '/login?add=1';
+    };
+
+    document.getElementById('btnSignOutAll').onclick = async (e) => {
+      if (!confirm('ยืนยันออกจากระบบบัญชีปัจจุบัน?')) return;
+      await fetch('/api/logout', { method: 'POST' });
+      window.dispatchEvent(new Event('accountsChanged'));
+      await loadAccounts();
+    };
+
+    document.getElementById('btnViewSettings').onclick = async (e) => {
+      e.preventDefault();
+      try {
+        const r = await fetch('/api/account/settings');
+        if (!r.ok) throw new Error();
+        const d = await r.json();
+        if (d.success) {
+          alert('Account settings:\n' + JSON.stringify(d.settings, null, 2));
+        } else alert('ไม่สามารถโหลดการตั้งค่าได้');
+      } catch {
+        alert('เกิดข้อผิดพลาด');
+      }
+    };
+
+    // ---------- Load accounts ----------
     async function loadAccounts() {
       const container = document.getElementById('accountsList');
-      container.innerHTML = '<i class="small">กำลังโหลด...</i>';
+      container.innerHTML = '<i>กำลังโหลด...</i>';
       try {
         const res = await fetch('/api/accounts');
+        if (!res.ok) throw new Error('fetch failed');
         const data = await res.json();
         const { accounts, active } = data;
         container.innerHTML = '';
         if (!accounts || accounts.length === 0) {
-          container.innerHTML = '<i class="small">ยังไม่มีบัญชีบันทึกไว้</i>';
+          container.innerHTML = '<i>ยังไม่มีบัญชีบันทึกไว้</i>';
         } else {
           for (let acc of accounts) {
             const row = document.createElement('div');
             row.className = 'account-row';
-            row.style.display='flex';
-            row.style.alignItems='center';
-            row.style.gap='12px';
-            row.style.padding='12px';
-            row.style.border='1px solid rgba(15,23,42,0.04)';
-            row.style.borderRadius='8px';
-            row.style.marginBottom='8px';
             row.innerHTML = `
-              <img src="${acc.profilePic||'/img/default_profile.png'}" class="profile-pic" width="48" height="48" style="width:48px;height:48px;">
-              <div style="flex:1">
-                <div style="display:flex;align-items:center;gap:8px;"><div><strong>${acc.displayName||acc.username}</strong></div>
-                ${active === acc.username ? '<div class="badge">Active</div>' : ''}</div>
-                <div class="small">${acc.username}</div>
+              <img src="${escapeHtml(acc.profilePic||'/img/default_profile.png')}" class="profile-pic" width="48" height="48" style="width:48px;height:48px;">
+              <div class="account-info">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div><strong>${escapeHtml(acc.displayName||acc.username)}</strong></div>
+                  ${active === acc.username ? '<div class="account-active">Active</div>' : ''}
+                </div>
+                <div class="small">${escapeHtml(acc.username)}</div>
               </div>
-              <div style="display:flex;gap:8px;">
+              <div class="account-actions">
                 ${active === acc.username
-                  ? `<button class="btn btn-ghost" data-username="${acc.username}" data-action="signout">Sign out</button>`
-                  : `<button class="btn btn-primary" data-username="${acc.username}" data-action="use">Use</button>
-                     <button class="btn btn-ghost" data-username="${acc.username}" data-action="remove">Remove</button>`}
+                  ? `<button class="btn-muted" data-username="${escapeHtml(acc.username)}" data-action="signout">Sign out</button>`
+                  : `<button class="btn" data-username="${escapeHtml(acc.username)}" data-action="use">Use</button>
+                     <button class="btn-muted" data-username="${escapeHtml(acc.username)}" data-action="remove">Remove</button>`}
               </div>
             `;
             container.appendChild(row);
           }
-
+          // attach handlers
           container.querySelectorAll('button[data-action="use"]').forEach(b => {
             b.onclick = async (e) => {
               const un = b.getAttribute('data-username');
@@ -131,61 +196,160 @@
         }
 
         // active panel
-        if (active) {
+        if (active && accounts && accounts.length > 0) {
           document.getElementById('activeAccountPanel').style.display = '';
           const act = accounts.find(a => a.username === active) || accounts[0];
-          document.getElementById('activeAccountInfo').innerHTML = `<img src="${act.profilePic||'/img/default_profile.png'}" class="profile-pic" width="48"> <strong style="margin-left:8px">${act.displayName||act.username}</strong>`;
+          document.getElementById('activeAccountInfo').innerHTML = `<img src="${escapeHtml(act.profilePic||'/img/default_profile.png')}" class="profile-pic" width="48" style="vertical-align:middle;margin-right:8px;"> <strong>${escapeHtml(act.displayName||act.username)}</strong> <div class="small">${escapeHtml(act.username)}</div>`;
         } else {
           document.getElementById('activeAccountPanel').style.display = 'none';
         }
 
       } catch (err) {
-        container.innerHTML = '<i class="small">ไม่สามารถโหลดรายการบัญชีได้</i>';
+        container.innerHTML = '<i>ไม่สามารถโหลดรายการบัญชีได้</i>';
       }
     }
 
+    // ---------- Notifications: load, render, interactions ----------
     async function loadNotifications() {
+      const panel = document.getElementById('notificationsPanel');
+      const listEl = document.getElementById('notificationsList');
+      const unreadInfo = document.getElementById('notifUnreadInfo');
+      panel.style.display = 'none';
+      listEl.innerHTML = '<i>กำลังโหลด...</i>';
       try {
         const res = await fetch('/api/notifications');
-        if (!res.ok) return;
+        if (!res.ok) throw new Error('no notifications');
         const data = await res.json();
-        const panel = document.getElementById('notificationsPanel');
-        const list = document.getElementById('notificationsList');
-        panel.style.display = '';
-        let notifications = data.notifications || [];
-        if (!notifications || notifications.length === 0) {
-          list.innerHTML = '<i class="small">ยังไม่มีการแจ้งเตือน</i>';
-        } else {
-          list.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;"></div>';
-          for (let n of notifications.slice(0,50)) {
-            const it = document.createElement('div');
-            it.style.padding = '10px';
-            it.style.border = '1px solid rgba(15,23,42,0.04)';
-            it.style.borderRadius = '8px';
-            it.innerHTML = `<div style="display:flex;justify-content:space-between;"><div><strong>${n.type}</strong><div class="small">${n.message}</div></div><div class="small">${new Date(n.createdAt).toLocaleString()}</div></div>`;
-            if (!n.read) it.style.background = '#fffef6';
-            list.appendChild(it);
-          }
+        // get active username if available
+        let active = null;
+        if (window && window.globalActive) active = window.globalActive;
+        else {
+          try {
+            const ar = await fetch('/api/accounts');
+            if (ar.ok) {
+              const ad = await ar.json();
+              active = ad.active;
+            }
+          } catch {}
         }
-      } catch {}
+
+        let notifications = data.notifications || [];
+        // filter out notifications generated by active user themselves
+        if (active) {
+          notifications = notifications.filter(n => {
+            const a = String(active);
+            const props = ['username','author','actor','from','postAuthor','createdBy','user'];
+            for (let p of props) {
+              if (n[p] && String(n[p]) === a) return false;
+            }
+            if (n.post && n.post.username && String(n.post.username) === a) return false;
+            if (n.item && n.item.owner && String(n.item.owner) === a) return false;
+            return true;
+          });
+        }
+
+        panel.style.display = '';
+        const unreadCount = (notifications.length > 0 && Object.prototype.hasOwnProperty.call(notifications[0], 'read'))
+          ? notifications.filter(n => !n.read).length
+          : (data.unread || notifications.length);
+        unreadInfo.textContent = `${unreadCount} ยังไม่อ่าน`;
+
+        if (!notifications || notifications.length === 0) {
+          listEl.innerHTML = '<i>ยังไม่มีการแจ้งเตือน</i>';
+          return;
+        }
+
+        // render list
+        const wrapper = document.createElement('div');
+        wrapper.className = 'notif-list';
+        for (let n of notifications.slice(0, 200)) {
+          const it = document.createElement('div');
+          it.className = 'notif-row' + (n.read ? '' : ' unread');
+          it.dataset.notifId = n.id || '';
+          it.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div style="flex:1;">
+                <div style="font-weight:700;">${escapeHtml(n.type || 'การแจ้งเตือน')}</div>
+                <div class="small" style="margin-top:6px;">${escapeHtml(n.message || '')}</div>
+              </div>
+              <div class="small" style="margin-left:12px;">${new Date(n.createdAt).toLocaleString()}</div>
+            </div>
+          `;
+          // click handler: mark read (single) then navigate (if possible)
+          it.addEventListener('click', async (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            // optimistic UI
+            it.classList.remove('unread');
+            try {
+              await fetch('/api/notifications/mark-read', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: [n.id] })
+              });
+            } catch (err) {
+              console.warn('mark-read failed', err && err.message);
+            } finally {
+              // update header badge by signaling nav re-render
+              window.dispatchEvent(new Event('accountsChanged'));
+            }
+
+            const dest = computeNotificationUrl(n);
+            if (dest) {
+              // small delay to let server update badge; keeps UX snappy
+              setTimeout(() => location.assign(dest), 80);
+            } else {
+              // if no destination, refresh list to show read state
+              await loadNotifications();
+            }
+          }, { passive: true });
+
+          wrapper.appendChild(it);
+        }
+
+        // attach wrapper
+        listEl.innerHTML = '';
+        listEl.appendChild(wrapper);
+      } catch (err) {
+        console.warn('loadNotifications error', err && err.message);
+        listEl.innerHTML = '<i>ไม่สามารถโหลดการแจ้งเตือนได้</i>';
+        panel.style.display = '';
+      }
     }
 
-    document.getElementById('btnSignOutAll').onclick = async (e) => {
-      if (!confirm('ยืนยันออกจากระบบบัญชีปัจจุบัน?')) return;
-      await fetch('/api/logout', { method: 'POST' });
+    // ---------- Mark all read / Refresh controls ----------
+    document.getElementById('btnMarkAllRead').addEventListener('click', async function (ev) {
+      ev.preventDefault();
+      if (!confirm('ทำเครื่องหมายว่าอ่านทั้งหมด?')) return;
+      try {
+        await fetch('/api/notifications/mark-read', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+      } catch (err) {
+        console.warn('mark all read failed', err && err.message);
+      }
       window.dispatchEvent(new Event('accountsChanged'));
-      await loadAccounts();
-    };
+      await loadNotifications();
+    }, { passive: false });
 
-    document.getElementById('btnViewSettings').onclick = async (e) => {
-      e.preventDefault();
-      alert('ฟีเจอร์การตั้งค่าเพิ่มเติมจะตามมา');
-    };
+    document.getElementById('btnRefreshNotifs').addEventListener('click', async function (ev) {
+      ev.preventDefault();
+      await loadNotifications();
+    }, { passive: true });
 
+    // ---------- Init ----------
     (async ()=> {
       await loadAccounts();
       await loadNotifications();
     })();
+
+    // re-load when accountsChanged event occurs (header/account actions may update active)
+    window.addEventListener('accountsChanged', async () => {
+      await loadAccounts();
+      await loadNotifications();
+    });
   </script>
 </body>
 </html>
