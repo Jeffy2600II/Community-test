@@ -1,40 +1,48 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
     <title>แก้ไขโปรไฟล์</title>
     <link rel="stylesheet" href="/css/style.css">
-    <style>
-      main { max-width:720px; margin:1.2em auto; padding:1.2em; }
-      .form-row { margin-bottom:.8rem; }
-    </style>
 </head>
 <body>
   <div id="headerSlot"></div>
   <main>
-      <div class="section-title"><span>แก้ไขโปรไฟล์</span></div>
-      <form id="editProfileForm">
-          <div class="form-row"><input type="text" name="displayName" placeholder="ชื่อที่แสดง"></div>
-          <div class="form-row"><input type="email" name="email" placeholder="อีเมล (จะเห็นเมื่อตั้งค่าแสดง)"></div>
-          <div class="form-row">
-            <label><input type="checkbox" name="showEmail" id="showEmail"> แสดงอีเมลในโปรไฟล์สาธารณะ</label>
-          </div>
-          <button type="submit">บันทึก</button>
-          <p id="msg"></p>
-      </form>
+    <div class="container" style="max-width:720px;margin-top:20px;">
+      <div class="card">
+        <div class="section-title"><span>แก้ไขโปรไฟล์</span></div>
+        <form id="editProfileForm">
+            <label class="small">ชื่อที่แสดง</label>
+            <input type="text" name="displayName" placeholder="ชื่อที่แสดง">
+            <label class="small">อีเมล (จะเห็นเมื่อตั้งค่าแสดง)</label>
+            <input type="email" name="email" placeholder="อีเมล">
+            <div style="margin-top:8px">
+              <label><input type="checkbox" name="showEmail" id="showEmail"> แสดงอีเมลในโปรไฟล์สาธารณะ</label>
+            </div>
+            <div style="text-align:right;margin-top:12px">
+              <button type="submit" class="btn btn-primary">บันทึก</button>
+            </div>
+            <p id="msg" class="small" style="margin-top:8px"></p>
+        </form>
 
-      <form id="picForm" enctype="multipart/form-data">
-          <label>รูปโปรไฟล์: <input type="file" name="profilePic"></label>
-          <button type="submit">อัปโหลด</button>
-          <button id="removePicBtn" type="button">ลบรูป</button>
-      </form>
+        <hr style="margin:18px 0;">
+
+        <form id="picForm" enctype="multipart/form-data">
+            <label class="small">รูปโปรไฟล์</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <label class="btn btn-ghost">เลือกไฟล์ <input type="file" name="profilePic"></label>
+              <button type="submit" class="btn btn-primary">อัปโหลด</button>
+              <button id="removePicBtn" type="button" class="btn btn-ghost">ลบรูป</button>
+            </div>
+        </form>
+      </div>
+    </div>
   </main>
   <div id="footerSlot"></div>
 
 <script src="/js/main.js"></script>
 <script>
 (async ()=>{
-    // load existing profile
     const pr = await fetch('/api/profile');
     if (!pr.ok) { location.href = '/login'; return; }
     const data = await pr.json();
