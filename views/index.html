@@ -1,37 +1,50 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
     <title>Community Home</title>
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <div id="headerSlot"></div>
+
   <main>
-      <div class="section-title"><span>ฟีดโพสต์ล่าสุด</span></div>
-      <div id="feed"></div>
+    <div class="container">
+      <div class="card">
+        <div class="section-title"><span>ฟีดโพสต์ล่าสุด</span></div>
+        <div id="feed" class="feed">
+          <i class="small">กำลังโหลด...</i>
+        </div>
+      </div>
+    </div>
   </main>
+
   <div id="footerSlot"></div>
 <script src="/js/main.js"></script>
 <script>
 let myUsername = null;
-// ไม่มี renderNav() ที่นี่ ใช้ main.js เป็นตัวกลาง
 
 (async () => {
     const res = await fetch('/api/posts');
-    const { posts } = await res.json();
-    let feed = '';
+    const data = await res.json();
+    const posts = (data && data.posts) || [];
+    let feedHtml = '';
     for (let post of posts) {
-        feed += `<div class="post">
-            <h2><a href="/post/${post.id}">${post.title}</a></h2>
-            <div>โดย <a href="/user/${post.username}">${post.username}</a> - ${new Date(post.createdAt).toLocaleString()}</div>
-            ${post.image ? `<img src="${post.image}" class="post-img">` : ''}
-            <p>${post.content.slice(0, 160)}${post.content.length>160?'...':''}</p>
-            <a href="/post/${post.id}">อ่านต่อ</a>
-            ${myUsername === post.username ? `<a href="/post/${post.id}/edit">แก้ไข</a> <button onclick="deletePost('${post.id}')">ลบ</button>` : ''}
-        </div>`;
+        feedHtml += `<article class="post" aria-labelledby="title-${post.id}">
+            <div class="post-left"><img src="/img/default_profile.png" class="avatar-img" alt="${post.username}"></div>
+            <div class="post-body">
+              <h3 id="title-${post.id}" class="post-title"><a href="/post/${post.id}">${post.title}</a></h3>
+              <div class="post-meta">โดย <a href="/user/${post.username}">${post.username}</a> • ${new Date(post.createdAt).toLocaleString()}</div>
+              <div class="post-excerpt">${(post.content||'').slice(0, 220)}${(post.content||'').length>220?'...':''}</div>
+              ${post.image ? `<img src="${post.image}" class="post-img" alt="post image" loading="lazy">` : ''}
+              <div class="post-actions">
+                <a class="btn btn-ghost" href="/post/${post.id}">อ่านต่อ</a>
+                ${myUsername === post.username ? `<a class="btn btn-muted" href="/post/${post.id}/edit">แก้ไข</a> <button class="btn btn-ghost" onclick="deletePost('${post.id}')">ลบ</button>` : ''}
+              </div>
+            </div>
+        </article>`;
     }
-    document.getElementById('feed').innerHTML = feed || '<i>ยังไม่มีโพสต์</i>';
+    document.getElementById('feed').innerHTML = feedHtml || '<i class="small">ยังไม่มีโพสต์</i>';
 })();
 window.deletePost = async (postId) => {
     if (confirm('ลบโพสต์นี้?')) {
