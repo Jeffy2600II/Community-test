@@ -5,50 +5,90 @@
     <title>โปรไฟล์ของฉัน</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
+    <style>
+      /* เพิ่มเล็กน้อยเพื่อให้โปรไฟล์เป็น full-width ดูเป็นโปร */
+      main { max-width: 1100px; margin: 1.2em auto; padding: 1.6em; display: grid; grid-template-columns: 320px 1fr; gap: 1.2em; }
+      .profile-hero { background: linear-gradient(180deg,#fff,#fafafa); padding:1.2em; border-radius:8px; display:flex; flex-direction:column; align-items:center; gap:0.8rem; }
+      .profile-hero img { width:140px;height:140px;border-radius:12px;object-fit:cover;border:3px solid #eee; }
+      .profile-main { background:#fff;padding:1.2em;border-radius:8px; }
+      .username-line { color:#666; font-size:0.95rem; margin-top: -2px; }
+      .actions { margin-top:0.6rem; display:flex; gap:.6rem; }
+      @media (max-width:900px) {
+        main { grid-template-columns: 1fr; }
+      }
+    </style>
 </head>
 <body>
   <div id="headerSlot"></div>
   <main>
-      <div class="section-title"><span>โปรไฟล์ของฉัน</span></div>
-      <div id="profileBox"></div>
-      <div id="myPosts"></div>
+    <aside class="profile-hero" id="hero">
+      <img id="heroPic" src="/img/default_profile.png" alt="profile">
+      <div style="text-align:center;">
+        <div id="displayName" style="font-size:1.2rem;font-weight:700"></div>
+        <div id="usernameLine" class="username-line"></div>
+      </div>
+      <div class="actions">
+        <a href="/profile/edit"><button>แก้ไขโปรไฟล์</button></a>
+        <a href="/post/create"><button class="btn-muted">สร้างโพสต์</button></a>
+      </div>
+      <div class="small" id="counts" style="margin-top:.6rem"></div>
+    </aside>
+
+    <section class="profile-main">
+      <div id="aboutArea"></div>
+      <div id="myPosts" style="margin-top:1.2rem"></div>
+    </section>
   </main>
   <div id="footerSlot"></div>
+
 <script src="/js/main.js"></script>
 <script>
 (async ()=>{
-    // เรียก API ใช้ authMiddleware ที่ฝั่งเซิร์ฟเวอร์
+    // owner profile page uses /api/profile which requires auth
     const pr = await fetch('/api/profile');
     if (!pr.ok) {
-        // ถ้าไม่ผ่านการยืนยันตัวตน ให้เปลี่ยนทางไปหน้า login
+        // if not authenticated, redirect to login
         location.href = '/login';
         return;
     }
     const data = await pr.json();
-    if (!data.success) return document.getElementById('profileBox').innerText = 'ไม่สามารถโหลดโปรไฟล์';
+    if (!data.success) {
+        document.getElementById('aboutArea').innerText = 'ไม่สามารถโหลดโปรไฟล์';
+        return;
+    }
     const { profile, followersCount, followingCount } = data;
-    let html = '';
-    html += `<div class="profile-card">
-        <img src="${profile.profilePic || '/img/default_profile.png'}" width="80" class="profile-pic"><br>
-        <b>${profile.displayName}</b><br>
-        <span>${profile.email || ''}</span>
-        <p>ชื่อผู้ใช้: ${profile.username}</p>
-        <div class="small">ติดตาม: ${followingCount} • ผู้ติดตาม: ${followersCount}</div>
-        <div style="margin-top:.6rem;">
-          <a href="/user/${encodeURIComponent(profile.username)}">ดูโปรไฟล์แบบสาธารณะ</a>
-          <a href="/profile/edit" style="margin-left:0.8rem">แก้ไขโปรไฟล์</a>
-        </div>
-    </div>`;
-    document.getElementById('profileBox').innerHTML = html;
 
-    // โหลดโพสต์ของตนเอง
+    document.getElementById('heroPic').src = profile.profilePic || '/img/default_profile.png';
+    document.getElementById('displayName').innerText = profile.displayName || profile.username;
+    // show username under displayName (no label)
+    document.getElementById('usernameLine').innerText = '@' + profile.username;
+
+    document.getElementById('counts').innerHTML = `ติดตาม: ${followingCount} • ผู้ติดตาม: ${followersCount}`;
+
+    // About area - full width, professional layout
+    let aboutHtml = `<h3>เกี่ยวกับ</h3>
+        <div style="display:flex;gap:1rem;align-items:flex-start;">
+          <div style="flex:1">
+            <p>${profile.bio ? profile.bio : '<i>ยังไม่มีข้อมูล</i>'}</p>
+            <p class="small">เข้าร่วมเมื่อ: ${new Date(profile.createdAt).toLocaleDateString()}</p>
+          </div>
+          <div style="width:220px;">
+            <div class="small"><strong>อีเมล</strong></div>
+            <div>${profile.email || '<i>ไม่มี</i>'}</div>
+            <div class="small" style="margin-top:.6rem">การตั้งค่า: <span class="small">${profile.showEmail ? 'แสดงให้ผู้อื่นเห็น' : 'ไม่แสดง'}</span></div>
+          </div>
+        </div>`;
+    document.getElementById('aboutArea').innerHTML = aboutHtml;
+
+    // posts
     const pr2 = await fetch('/api/user/' + encodeURIComponent(profile.username) + '/posts');
-    if (!pr2.ok) return;
-    const postsData = await pr2.json();
-    const posts = postsData.posts || [];
-    let postlist = '<div class="section-title"><span>โพสต์ของฉัน</span></div>';
-    postlist += posts.length ? posts.map(p=>`<div class="post"><a href="/post/${p.id}">${p.title}</a> <div class="small">${new Date(p.createdAt).toLocaleString()}</div></div>`).join('') : '<i>ยังไม่มีโพสต์</i>';
-    document.getElementById('myPosts').innerHTML = postlist;
+    if (pr2.ok) {
+      const postsData = await pr2.json();
+      const posts = postsData.posts || [];
+      let postlist = '<div class="section-title"><span>โพสต์ของฉัน</span></div>';
+      postlist += posts.length ? posts.map(p=>`<div class="post"><h4><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div><p>${p.content.slice(0,200)}${p.content.length>200?'...':''}</p></div>`).join('') : '<i>ยังไม่มีโพสต์</i>';
+      document.getElementById('myPosts').innerHTML = postlist;
+    }
 })();
 </script>
 </body>
