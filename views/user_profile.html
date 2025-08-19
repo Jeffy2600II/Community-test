@@ -2,20 +2,37 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>Community User Profile</title>
+    <title>โปรไฟล์สมาชิก</title>
     <link rel="stylesheet" href="/css/style.css">
+    <style>
+      main { max-width: 1100px; margin: 1.2em auto; padding: 1.6em; display: grid; grid-template-columns: 320px 1fr; gap: 1.2em; }
+      .profile-hero { background:#fff;padding:1.2em;border-radius:8px; display:flex; flex-direction:column; align-items:center; gap:0.8rem; }
+      .profile-hero img { width:140px;height:140px;border-radius:12px;object-fit:cover;border:3px solid #eee; }
+      .profile-main { background:#fff;padding:1.2em;border-radius:8px; }
+      .username-line { color:#666; font-size:0.95rem; margin-top:-2px; }
+      @media (max-width:900px) { main { grid-template-columns:1fr; } }
+    </style>
 </head>
 <body>
   <div id="headerSlot"></div>
   <main>
-      <div class="section-title"><span>โปรไฟล์สมาชิก</span></div>
-      <div id="profileBox"></div>
-      <div style="margin: .6em 0;">
-        <button id="followBtn" style="display:none;"></button>
+    <aside class="profile-hero" id="hero">
+      <img id="heroPic" src="/img/default_profile.png" alt="profile">
+      <div style="text-align:center;">
+        <div id="displayName" style="font-size:1.2rem;font-weight:700"></div>
+        <div id="usernameLine" class="username-line"></div>
       </div>
-      <div id="userPosts"></div>
+      <div id="followArea"></div>
+      <div class="small" id="counts" style="margin-top:.6rem"></div>
+    </aside>
+
+    <section class="profile-main">
+      <div id="aboutArea"></div>
+      <div id="userPosts" style="margin-top:1.2rem"></div>
+    </section>
   </main>
   <div id="footerSlot"></div>
+
 <script src="/js/main.js"></script>
 <script>
 const username = decodeURIComponent(location.pathname.split('/')[2]);
@@ -23,59 +40,60 @@ const username = decodeURIComponent(location.pathname.split('/')[2]);
 async function renderProfile() {
     const pr = await fetch('/api/user/' + encodeURIComponent(username));
     const resp = await pr.json();
-    if(!resp.success) return document.getElementById('profileBox').innerHTML = '<b>ไม่พบผู้ใช้</b>';
+    if(!resp.success) return document.getElementById('aboutArea').innerHTML = '<b>ไม่พบผู้ใช้</b>';
     const { profile, followersCount, followingCount, isFollowing, myUsername } = resp;
 
-    let html = '';
-    html += `<div class="profile-card">
-        <img src="${profile.profilePic || '/img/default_profile.png'}" width="80" class="profile-pic"><br>
-        <b>${profile.displayName}</b><br>
-        <span>${profile.email || ''}</span>
-        <p>ชื่อผู้ใช้: ${profile.username}</p>
-        <div class="small">ติดตาม: ${followingCount} • ผู้ติดตาม: ${followersCount}</div>
-        <div style="margin-top:.6rem;">
-          <a href="/user/${encodeURIComponent(profile.username)}/posts">ดูโพสต์ของสมาชิกนี้</a>
-        </div>
-    </div>`;
-    document.getElementById('profileBox').innerHTML = html;
+    document.getElementById('heroPic').src = profile.profilePic || '/img/default_profile.png';
+    document.getElementById('displayName').innerText = profile.displayName || profile.username;
+    // show username under displayName (no label)
+    document.getElementById('usernameLine').innerText = '@' + profile.username;
 
-    // follow button logic
-    const followBtn = document.getElementById('followBtn');
+    document.getElementById('counts').innerHTML = `ติดตาม: ${followingCount} • ผู้ติดตาม: ${followersCount}`;
+
+    // follow button (show only if logged-in and not viewing yourself)
+    const followArea = document.getElementById('followArea');
+    followArea.innerHTML = '';
     if (myUsername && myUsername !== profile.username) {
-        followBtn.style.display = '';
-        followBtn.innerText = isFollowing ? 'Unfollow' : 'Follow';
-        followBtn.onclick = async () => {
-            try {
-                const url = isFollowing ? `/api/user/${encodeURIComponent(profile.username)}/unfollow` : `/api/user/${encodeURIComponent(profile.username)}/follow`;
-                const r = await fetch(url, { method: 'POST' });
-                const d = await r.json();
-                if (d && d.success) {
-                    // re-render profile to update counts and state
-                    await renderProfile();
-                } else if (d && d.msg) {
-                    alert(d.msg);
-                } else {
-                    // could be redirect to login -> go to login page
-                    location.href = '/login';
-                }
-            } catch (e) {
-                location.href = '/login';
-            }
-        };
-    } else {
-        followBtn.style.display = 'none';
+      const btn = document.createElement('button');
+      btn.innerText = isFollowing ? 'Unfollow' : 'Follow';
+      btn.onclick = async () => {
+        const url = isFollowing ? `/api/user/${encodeURIComponent(profile.username)}/unfollow` : `/api/user/${encodeURIComponent(profile.username)}/follow`;
+        const r = await fetch(url, { method: 'POST' });
+        const d = await r.json();
+        if (d && d.success) {
+          await renderProfile(); // reload
+        } else {
+          alert(d.msg || 'ไม่สำเร็จ');
+        }
+      };
+      followArea.appendChild(btn);
+    }
+
+    // About area
+    let aboutHtml = `<h3>เกี่ยวกับ</h3>
+      <div style="display:flex;gap:1rem;align-items:flex-start;">
+        <div style="flex:1">
+          <p>${profile.bio ? profile.bio : '<i>ยังไม่มีข้อมูล</i>'}</p>
+          <p class="small">เข้าร่วมเมื่อ: ${new Date(profile.createdAt).toLocaleDateString()}</p>
+        </div>
+        <div style="width:220px;">
+          ${profile.showEmail ? `<div class="small"><strong>อีเมล</strong></div><div>${profile.email}</div>` : `<div class="small"><strong>อีเมล</strong></div><div><i>ผู้ใช้ไม่ได้เปิดเผย</i></div>`}
+        </div>
+      </div>`;
+    document.getElementById('aboutArea').innerHTML = aboutHtml;
+
+    // posts
+    const pr2 = await fetch('/api/user/' + encodeURIComponent(username) + '/posts');
+    if (pr2.ok) {
+      const postsData = await pr2.json();
+      const posts = postsData.posts || [];
+      let postlist = '<div class="section-title"><span>โพสต์ของสมาชิกนี้</span></div>';
+      postlist += posts.length ? posts.map(p=>`<div class="post"><h4><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div><p>${p.content.slice(0,200)}${p.content.length>200?'...':''}</p></div>`).join('') : '<i>ยังไม่มีโพสต์</i>';
+      document.getElementById('userPosts').innerHTML = postlist;
     }
 }
 
-(async ()=>{
-    await renderProfile();
-    // load posts
-    const pr2 = await fetch('/api/user/' + encodeURIComponent(username) + '/posts');
-    const { posts } = await pr2.json();
-    let postlist = '<div class="section-title"><span>โพสต์ของสมาชิกนี้</span></div>';
-    postlist += posts.length ? posts.map(p=>`<div><a href="/post/${p.id}">${p.title}</a> <span class="small">${new Date(p.createdAt).toLocaleString()}</span></div>`).join('') : '<i>ยังไม่มีโพสต์</i>';
-    document.getElementById('userPosts').innerHTML = postlist;
-})();
+renderProfile();
 </script>
 </body>
 </html>
