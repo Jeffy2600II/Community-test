@@ -1,4 +1,4 @@
-// server.js (updated to support showEmail and profile changes)
+// server.js (full, updated)
 // Community app with accounts, multi-account cookies, followers, notifications, posts, comments
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -281,8 +281,6 @@ app.post('/api/register', (req, res) => {
         displayName: username,
         profilePic: '',
         password,
-        // privacy setting: whether to show email on public profile
-        showEmail: false,
         createdAt: new Date().toISOString()
     };
     fs.writeFileSync(getUserProfilePath(userId), JSON.stringify(profile, null, 2), 'utf8');
@@ -430,19 +428,12 @@ app.get('/api/accounts', (req, res) => {
 app.get('/api/profile', authMiddleware, (req, res) => {
     const userId = req.user.id;
     const profile = JSON.parse(fs.readFileSync(getUserProfilePath(userId), 'utf8'));
-    // owner view -> include email and showEmail flag
-    const safe = { ...profile };
-    delete safe.password;
+    delete profile.password;
     const followers = getFollowersForUser(userId) || [];
     const following = getFollowingForUser(userId) || [];
-    res.json({ success: true, profile: safe, followersCount: followers.length, followingCount: following.length });
+    res.json({ success: true, profile, followersCount: followers.length, followingCount: following.length });
 });
 
-/**
- * Public profile endpoint:
- * - returns profile information
- * - will NOT include email unless profile.showEmail === true OR the requester is owner
- */
 app.get('/api/user/:username', (req, res) => {
     const user = findUserByUsername(req.params.username);
     if (!user) return res.json({ success: false, msg: 'ไม่พบผู้ใช้' });
@@ -463,20 +454,9 @@ app.get('/api/user/:username', (req, res) => {
 
     const isFollowingFlag = myUserId ? isFollowing(myUserId, user._userId) : false;
 
-    // Prepare public-safe profile object
-    const publicProfile = { ...user };
-    delete publicProfile.password;
-
-    // If requester is not owner and user didn't opt-in to showEmail, strip email
-    if (!myUserId || String(myUserId) !== String(user._userId)) {
-        if (!publicProfile.showEmail) {
-            delete publicProfile.email;
-        }
-    }
-
     res.json({
         success: true,
-        profile: publicProfile,
+        profile: user,
         followersCount: followers.length,
         followingCount: following.length,
         isFollowing: isFollowingFlag,
@@ -484,26 +464,6 @@ app.get('/api/user/:username', (req, res) => {
     });
 });
 
-/* Update profile (owner only) - accept showEmail setting */
-app.post('/api/profile/update', authMiddleware, (req, res) => {
-    const userId = req.user.id;
-    const profilePath = getUserProfilePath(userId);
-    if (!fs.existsSync(profilePath)) return res.json({ success: false, msg: 'Profile missing' });
-
-    const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
-    const { displayName, email, showEmail } = req.body;
-    if (displayName) profile.displayName = displayName;
-    // Allow owner to change email (optional)
-    if (email) profile.email = email;
-    // showEmail may be sent as boolean or string 'true'
-    if (typeof showEmail !== 'undefined') {
-        profile.showEmail = (showEmail === true || showEmail === 'true' || showEmail === '1' || showEmail === 1);
-    }
-    fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2), 'utf8');
-    res.json({ success: true });
-});
-
-/* Follow / Unfollow and other APIs remain unchanged beyond previous implementation */
 /* Follow / Unfollow */
 app.post('/api/user/:username/follow', authMiddleware, (req, res) => {
     const target = findUserByUsername(req.params.username);
@@ -556,7 +516,7 @@ app.get('/api/user/:username/following', (req, res) => {
     res.json({ success: true, following: out });
 });
 
-/* Notifications API (unchanged) */
+/* Notifications API */
 app.get('/api/notifications', authMiddleware, (req, res) => {
     const userId = req.user.id;
     const nots = getNotificationsForUser(userId);
@@ -570,8 +530,206 @@ app.post('/api/notifications/mark-read', authMiddleware, (req, res) => {
     res.json({ success: true, notifications: updated, unread: updated.filter(n => !n.read).length });
 });
 
-/* The rest of post/comment endpoints unchanged (omitted here for brevity if same as previous implementation) */
-/* For completeness, include them as in the prior full server.js if needed. */
+/* Account settings example endpoint */
+app.get('/api/account/settings', authMiddleware, (req, res) => {
+    const userId = req.user.id;
+    const profile = JSON.parse(fs.readFileSync(getUserProfilePath(userId), 'utf8'));
+    delete profile.password;
+    const settings = {
+        profile,
+        security: { twoFactorEnabled: false, sessions: [] },
+        preferences: { emailNotifications: true }
+    };
+    res.json({ success: true, settings });
+});
+
+/* ------------------------
+   Post and Comment CRUD
+   ------------------------ */
+app.post('/api/post/create', authMiddleware, upload.single('postImage'), (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    const { title, content } = req.body;
+    if (!title || !content) return res.json({ success: false, msg: 'Missing fields' });
+
+    const postId = uuidv4();
+    const postDir = getPostDir(postId);
+    fs.mkdirSync(postDir, { recursive: true });
+
+    let img = '';
+    if (req.file) img = '/uploads/post_images/' + req.file.filename;
+
+    const post = {
+        id: postId,
+        username,
+        title,
+        content,
+        image: img,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    };
+    fs.writeFileSync(getPostPath(postId), JSON.stringify(post, null, 2), 'utf8');
+    fs.writeFileSync(getPostCommentsPath(postId), '[]', 'utf8');
+
+    // update user's posts list
+    const userPostsPath = path.join(getUserDir(userId), 'posts.json');
+    let userPosts = [];
+    if (fs.existsSync(userPostsPath)) userPosts = JSON.parse(fs.readFileSync(userPostsPath, 'utf8'));
+    userPosts.unshift(postId);
+    fs.writeFileSync(userPostsPath, JSON.stringify(userPosts, null, 2), 'utf8');
+
+    // Notify followers about new post (addNotificationToUser will skip self-notify)
+    try {
+        const followers = getFollowersForUser(userId) || [];
+        for (let followerId of followers) {
+            addNotificationToUser(followerId, 'new_post', `${username} โพสต์ใหม่: "${title}"`, { postId, actorId: userId, actorUsername: username });
+        }
+    } catch (e) {
+        console.error('notify followers error', e && e.message);
+    }
+
+    res.json({ success: true, postId });
+});
+
+app.post('/api/post/:id/edit', authMiddleware, upload.single('postImage'), (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    const postId = req.params.id;
+    const postPath = getPostPath(postId);
+    if (!fs.existsSync(postPath)) return res.json({ success: false, msg: 'Not found' });
+    const post = JSON.parse(fs.readFileSync(postPath, 'utf8'));
+    if (post.username !== username) return res.json({ success: false, msg: 'Not owner' });
+    const { title, content } = req.body;
+    if (title) post.title = title;
+    if (content) post.content = content;
+    if (req.file) {
+        if (post.image && fs.existsSync(path.join(__dirname, 'public', post.image))) {
+            fs.unlinkSync(path.join(__dirname, 'public', post.image));
+        }
+        post.image = '/uploads/post_images/' + req.file.filename;
+    }
+    post.updatedAt = new Date().toISOString();
+    fs.writeFileSync(postPath, JSON.stringify(post, null, 2), 'utf8');
+    res.json({ success: true });
+});
+
+app.delete('/api/post/:id', authMiddleware, (req, res) => {
+    const userId = req.user.id;
+    const username = req.user.username;
+    const postId = req.params.id;
+    const postPath = getPostPath(postId);
+    if (!fs.existsSync(postPath)) return res.json({ success: false, msg: 'Not found' });
+    const post = JSON.parse(fs.readFileSync(postPath, 'utf8'));
+    if (post.username !== username) return res.json({ success: false, msg: 'Not owner' });
+    if (post.image && fs.existsSync(path.join(__dirname, 'public', post.image))) {
+        fs.unlinkSync(path.join(__dirname, 'public', post.image));
+    }
+    fs.rmSync(getPostDir(postId), { recursive: true, force: true });
+    const userPostsPath = path.join(getUserDir(userId), 'posts.json');
+    let userPosts = [];
+    if (fs.existsSync(userPostsPath)) userPosts = JSON.parse(fs.readFileSync(userPostsPath, 'utf8'));
+    userPosts = userPosts.filter(pid => pid !== postId);
+    fs.writeFileSync(userPostsPath, JSON.stringify(userPosts, null, 2), 'utf8');
+    res.json({ success: true });
+});
+
+app.get('/api/post/:id', (req, res) => {
+    const postId = req.params.id;
+    const postPath = getPostPath(postId);
+    if (!fs.existsSync(postPath)) return res.json({ success: false, msg: 'Not found' });
+    const post = JSON.parse(fs.readFileSync(postPath, 'utf8'));
+    let comments = [];
+    if (fs.existsSync(getPostCommentsPath(postId))) comments = JSON.parse(fs.readFileSync(getPostCommentsPath(postId), 'utf8'));
+    let myUsername = null;
+    const token = req.cookies.token;
+    if (token) {
+        try { myUsername = jwt.verify(token, SECRET).username; } catch {}
+    }
+    res.json({ success: true, post, comments, owner: post.username, myUsername });
+});
+
+app.get('/api/posts', (req, res) => {
+    if (!fs.existsSync(POSTS_DIR)) return res.json({ success: true, posts: [] });
+    const postDirs = fs.readdirSync(POSTS_DIR);
+    let posts = [];
+    for (let postId of postDirs) {
+        const postPath = getPostPath(postId);
+        if (fs.existsSync(postPath)) {
+            const post = JSON.parse(fs.readFileSync(postPath, 'utf8'));
+            posts.push(post);
+        }
+    }
+    posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.json({ success: true, posts });
+});
+
+app.get('/api/user/:username/posts', (req, res) => {
+    const user = findUserByUsername(req.params.username);
+    if (!user) return res.json({ success: false, posts: [] });
+    const userPostsPath = path.join(getUserDir(user._userId), 'posts.json');
+    let posts = [];
+    if (fs.existsSync(userPostsPath)) {
+        const postIds = JSON.parse(fs.readFileSync(userPostsPath, 'utf8'));
+        for (let pid of postIds) {
+            const postPath = getPostPath(pid);
+            if (fs.existsSync(postPath)) posts.push(JSON.parse(fs.readFileSync(postPath, 'utf8')));
+        }
+    }
+    posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.json({ success: true, posts });
+});
+
+/* Comments */
+app.post('/api/post/:id/comment', authMiddleware, (req, res) => {
+    const postId = req.params.id;
+    const username = req.user.username;
+    const { content } = req.body;
+    if (!content) return res.json({ success: false, msg: 'Empty comment' });
+
+    const comment = { id: uuidv4(), postId, username, content, createdAt: new Date().toISOString() };
+    const commentsPath = getPostCommentsPath(postId);
+    let comments = [];
+    if (fs.existsSync(commentsPath)) comments = JSON.parse(fs.readFileSync(commentsPath, 'utf8'));
+    comments.push(comment);
+    fs.writeFileSync(commentsPath, JSON.stringify(comments, null, 2), 'utf8');
+
+    const userObj = findUserByUsername(username);
+    if (userObj) {
+        const userCommentsPath = path.join(getUserDir(userObj._userId), 'comments.json');
+        let userComments = [];
+        if (fs.existsSync(userCommentsPath)) userComments = JSON.parse(fs.readFileSync(userCommentsPath, 'utf8'));
+        userComments.push(comment.id);
+        fs.writeFileSync(userCommentsPath, JSON.stringify(userComments, null, 2), 'utf8');
+    }
+
+    // Notify post owner if different
+    try {
+        const post = JSON.parse(fs.readFileSync(getPostPath(postId), 'utf8'));
+        if (post && post.username && post.username !== username) {
+            const ownerObj = findUserByUsername(post.username);
+            if (ownerObj) {
+                addNotificationToUser(ownerObj._userId, 'comment', `${username} แสดงความคิดเห็นในโพสต์ของคุณ`, { postId, commentId: comment.id, actorId: userObj && userObj._userId, actorUsername: username });
+            }
+        }
+    } catch (e) {
+        // ignore
+    }
+
+    res.json({ success: true });
+});
+
+app.delete('/api/post/:postId/comment/:commentId', authMiddleware, (req, res) => {
+    const { postId, commentId } = req.params;
+    const username = req.user.username;
+    const commentsPath = getPostCommentsPath(postId);
+    if (!fs.existsSync(commentsPath)) return res.json({ success: false, msg: 'Not found' });
+    let comments = JSON.parse(fs.readFileSync(commentsPath, 'utf8'));
+    const idx = comments.findIndex(c => c.id === commentId && c.username === username);
+    if (idx === -1) return res.json({ success: false, msg: 'Not owner' });
+    comments.splice(idx, 1);
+    fs.writeFileSync(commentsPath, JSON.stringify(comments, null, 2), 'utf8');
+    res.json({ success: true });
+});
 
 /* 404 fallback */
 app.use((req, res) => {
