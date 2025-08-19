@@ -1,22 +1,31 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
     <title>แก้ไขโพสต์</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <div id="headerSlot"></div>
   <main>
-      <div class="section-title"><span>แก้ไขโพสต์</span></div>
-      <form id="editPostForm" enctype="multipart/form-data">
-          <input type="text" name="title" placeholder="หัวข้อ">
-          <textarea name="content" placeholder="เนื้อหา"></textarea>
-          <label>เปลี่ยนรูป: <input type="file" name="postImage"></label>
-          <button type="submit">อัปเดต</button>
-          <p id="msg"></p>
-      </form>
+    <div class="container" style="max-width:800px;margin-top:24px;">
+      <div class="card">
+        <div class="section-title"><span>แก้ไขโพสต์</span></div>
+        <form id="editPostForm" enctype="multipart/form-data">
+            <label class="small">หัวข้อ</label>
+            <input type="text" name="title" placeholder="หัวข้อ">
+            <label class="small">เนื้อหา</label>
+            <textarea name="content" placeholder="เนื้อหา"></textarea>
+            <div style="margin-top:8px" class="input-file">
+              <label class="btn btn-ghost">เปลี่ยนรูป: <input type="file" name="postImage"></label>
+            </div>
+            <div style="text-align:right;margin-top:12px">
+              <button type="submit" class="btn btn-primary">อัปเดต</button>
+            </div>
+            <p id="msg" class="small" style="margin-top:8px"></p>
+        </form>
+      </div>
+    </div>
   </main>
   <div id="footerSlot"></div>
 <script src="/js/main.js"></script>
