@@ -1,5 +1,17 @@
 // server.js (full, updated)
-// Community app with accounts, multi-account cookies, followers, notifications, posts, comments
+// Features:
+// - Argon2 password hashing
+// - Access token (JWT) short-lived, refresh tokens server-side (rotating)
+// - Device manager integration: device-linked sessions & inactivity-based revocation (30 days)
+// - Followers / following per-user
+// - Notifications per-user
+// - Posts & comments CRUD
+// - Profile APIs with showEmail privacy setting
+// - Secure cookie usage, helmet, basic rate-limiting
+//
+// Requirements:
+// npm i express body-parser cookie-parser multer jsonwebtoken uuid argon2 helmet express-rate-limit
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
@@ -8,10 +20,20 @@ const fs = require('fs');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
+const argon2 = require('argon2');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+
+const deviceManager = require('./public/server/deviceManager'); // ensure file exists
 
 const app = express();
-const PORT = 3000;
-const SECRET = "community_super_secret_2025";
+const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
+
+// Secrets - set these via environment in production
+const SECRET = process.env.JWT_SECRET || "community_super_secret_2025";
+const REFRESH_TOKEN_HMAC_KEY = process.env.REFRESH_HMAC_KEY || "refresh_hmac_key_change_me";
+
 const DATA_DIR = path.join(__dirname, 'data');
 const USERS_DIR = path.join(DATA_DIR, 'users');
 const POSTS_DIR = path.join(DATA_DIR, 'posts');
@@ -23,11 +45,21 @@ const POST_IMG_DIR = path.join(UPLOADS_DIR, 'post_images');
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
+// Security middleware
+app.use(helmet());
 app.use(express.static('public'));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
+// rate limiter (basic)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: { success: false, msg: 'Too many requests, slow down' }
+});
+
+// multer for uploads
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         if (file.fieldname === 'profilePic') cb(null, PROFILE_PIC_DIR);
@@ -41,8 +73,13 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 /* ------------------------
-   Helper functions
+   Helper utilities
    ------------------------ */
+function readJSON(p, fallback = null) {
+  try { if (!fs.existsSync(p)) return fallback; return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; }
+}
+function writeJSON(p, obj) { fs.writeFileSync(p, JSON.stringify(obj, null, 2), 'utf8'); }
+
 function findUserByUsername(usernameRaw) {
     const username = decodeURIComponent(usernameRaw);
     if (!fs.existsSync(USERS_DIR)) return null;
@@ -57,7 +94,7 @@ function findUserByUsername(usernameRaw) {
                     delete safe.password;
                     return { ...safe, _userId: userId };
                 }
-            } catch { /* ignore parse errors */ }
+            } catch {}
         }
     }
     return null;
@@ -71,70 +108,41 @@ function findUserByEmail(email) {
             try {
                 const user = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
                 if (user.email === email) return user;
-            } catch { /* ignore */ }
+            } catch {}
         }
     }
     return null;
 }
+
 function getUserDir(userId) { return path.join(USERS_DIR, userId); }
 function getUserProfilePath(userId) { return path.join(USERS_DIR, userId, 'profile.json'); }
-function getFollowersPath(userId) { return path.join(USERS_DIR, userId, 'followers.json'); }
-function getFollowingPath(userId) { return path.join(USERS_DIR, userId, 'following.json'); }
+function getUserSessionsPath(userId) { return path.join(USERS_DIR, userId, 'sessions.json'); }
+function ensureUserSessionsFile(userId) { const p = getUserSessionsPath(userId); if (!fs.existsSync(p)) fs.writeFileSync(p, '[]', 'utf8'); return p; }
+function readUserSessions(userId) { ensureUserSessionsFile(userId); try { return JSON.parse(fs.readFileSync(getUserSessionsPath(userId), 'utf8')); } catch { return []; } }
+function writeUserSessions(userId, arr) { fs.writeFileSync(getUserSessionsPath(userId), JSON.stringify(arr, null, 2), 'utf8'); }
+
+function getFollowersPath(userId) { return path.join(getUserDir(userId), 'followers.json'); }
+function getFollowingPath(userId) { return path.join(getUserDir(userId), 'following.json'); }
 function getPostDir(postId) { return path.join(POSTS_DIR, postId); }
 function getPostPath(postId) { return path.join(POSTS_DIR, postId, 'post.json'); }
 function getPostCommentsPath(postId) { return path.join(POSTS_DIR, postId, 'comments.json'); }
 
-/* authMiddleware: protects HTML routes and APIs that expect a session via cookie.token */
-function authMiddleware(req, res, next) {
-    const token = req.cookies.token;
-    if (!token) {
-        // For browser navigation we redirect to login
-        return res.redirect('/login');
-    }
-    try {
-        req.user = jwt.verify(token, SECRET);
-        next();
-    } catch {
-        res.clearCookie('token');
-        return res.redirect('/login');
-    }
-}
-
-/* Lightweight JSON file helpers for followers/following and notifications */
-function ensureJsonFile(p, initial = '[]') {
-    if (!fs.existsSync(p)) fs.writeFileSync(p, initial, 'utf8');
-    return p;
-}
-function getFollowersForUser(userId) {
-    const p = getFollowersPath(userId);
-    ensureJsonFile(p);
-    try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return []; }
-}
-function getFollowingForUser(userId) {
-    const p = getFollowingPath(userId);
-    ensureJsonFile(p);
-    try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return []; }
-}
+function ensureJsonFile(p, initial = '[]') { if (!fs.existsSync(p)) fs.writeFileSync(p, initial, 'utf8'); return p; }
+function getFollowersForUser(userId) { const p = getFollowersPath(userId); ensureJsonFile(p); try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return []; } }
+function getFollowingForUser(userId) { const p = getFollowingPath(userId); ensureJsonFile(p); try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return []; } }
 function addFollower(targetUserId, followerUserId) {
     const fPath = ensureJsonFile(getFollowersPath(targetUserId));
     let followers = JSON.parse(fs.readFileSync(fPath, 'utf8'));
-    if (!followers.includes(followerUserId)) {
-        followers.push(followerUserId);
-        fs.writeFileSync(fPath, JSON.stringify(followers, null, 2), 'utf8');
-    }
+    if (!followers.includes(followerUserId)) { followers.push(followerUserId); fs.writeFileSync(fPath, JSON.stringify(followers, null, 2), 'utf8'); }
     const folPath = ensureJsonFile(getFollowingPath(followerUserId));
     let following = JSON.parse(fs.readFileSync(folPath, 'utf8'));
-    if (!following.includes(targetUserId)) {
-        following.push(targetUserId);
-        fs.writeFileSync(folPath, JSON.stringify(following, null, 2), 'utf8');
-    }
+    if (!following.includes(targetUserId)) { following.push(targetUserId); fs.writeFileSync(folPath, JSON.stringify(following, null, 2), 'utf8'); }
 }
 function removeFollower(targetUserId, followerUserId) {
     const fPath = ensureJsonFile(getFollowersPath(targetUserId));
     let followers = JSON.parse(fs.readFileSync(fPath, 'utf8'));
     followers = followers.filter(id => id !== followerUserId);
     fs.writeFileSync(fPath, JSON.stringify(followers, null, 2), 'utf8');
-
     const folPath = ensureJsonFile(getFollowingPath(followerUserId));
     let following = JSON.parse(fs.readFileSync(folPath, 'utf8'));
     following = following.filter(id => id !== targetUserId);
@@ -145,44 +153,26 @@ function isFollowing(followerUserId, targetUserId) {
     return following.includes(targetUserId);
 }
 
-/* Notifications helpers (store per-user in users/{id}/notifications.json) */
+/* Notifications helpers */
 function ensureUserNotificationsFile(userId) {
     const p = path.join(getUserDir(userId), 'notifications.json');
     if (!fs.existsSync(p)) fs.writeFileSync(p, '[]', 'utf8');
     return p;
 }
-/**
- * addNotificationToUser: will skip creating a notification if meta.actorId or meta.actorUsername
- * indicates the actor is the same as the recipient (prevents self-notify).
- * Returns created notification object or null if skipped / error.
- */
 function addNotificationToUser(userId, type, message, meta = {}) {
     try {
-        // determine recipient username if possible
         let recipientUsername = null;
         const profilePath = getUserProfilePath(userId);
         if (fs.existsSync(profilePath)) {
-            try {
-                const p = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
-                recipientUsername = p.username;
-            } catch {}
+            try { const p = JSON.parse(fs.readFileSync(profilePath, 'utf8')); recipientUsername = p.username; } catch {}
         }
-
         if (meta) {
             if (meta.actorId && String(meta.actorId) === String(userId)) return null;
             if (meta.actorUsername && recipientUsername && String(meta.actorUsername) === String(recipientUsername)) return null;
         }
-
         const p = ensureUserNotificationsFile(userId);
         const arr = JSON.parse(fs.readFileSync(p, 'utf8'));
-        const n = {
-            id: uuidv4(),
-            type,
-            message,
-            meta,
-            createdAt: new Date().toISOString(),
-            read: false
-        };
+        const n = { id: uuidv4(), type, message, meta, createdAt: new Date().toISOString(), read: false };
         arr.unshift(n);
         fs.writeFileSync(p, JSON.stringify(arr, null, 2), 'utf8');
         return n;
@@ -191,81 +181,130 @@ function addNotificationToUser(userId, type, message, meta = {}) {
         return null;
     }
 }
-function getNotificationsForUser(userId) {
-    const p = ensureUserNotificationsFile(userId);
-    try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return []; }
-}
+function getNotificationsForUser(userId) { const p = ensureUserNotificationsFile(userId); try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return []; } }
 function markNotificationsRead(userId, ids = []) {
     const p = ensureUserNotificationsFile(userId);
     let arr = JSON.parse(fs.readFileSync(p, 'utf8'));
     let changed = false;
     if (!Array.isArray(ids) || ids.length === 0) {
-        arr = arr.map(n => ({ ...n, read: true }));
-        changed = true;
+        arr = arr.map(n => ({ ...n, read: true })); changed = true;
     } else {
-        arr = arr.map(n => {
-            if (ids.includes(n.id) && !n.read) { changed = true; return { ...n, read: true }; }
-            return n;
-        });
+        arr = arr.map(n => { if (ids.includes(n.id) && !n.read) { changed = true; return { ...n, read: true }; } return n; });
     }
     if (changed) fs.writeFileSync(p, JSON.stringify(arr, null, 2), 'utf8');
     return arr;
 }
 
-/* -- Helpers for accounts-in-cookie (client-visible list) -- */
-function readAccountsFromReq(req) {
-    try {
-        const s = req.cookies.accounts;
-        if (!s) return [];
-        const parsed = JSON.parse(s);
-        if (!Array.isArray(parsed)) return [];
-        return parsed;
-    } catch { return []; }
+/* Token/session utilities */
+function generateRandomTokenBytes(n = 48) { return crypto.randomBytes(n).toString('hex'); }
+function hashRefreshToken(token) { return crypto.createHmac('sha256', REFRESH_TOKEN_HMAC_KEY).update(token).digest('hex'); }
+function signAccessToken(payload, opts = {}) { return jwt.sign(payload, SECRET, { expiresIn: opts.expiresIn || '15m' }); }
+function verifyAccessToken(token) { try { return jwt.verify(token, SECRET); } catch { return null; } }
+
+function createSession(userId, meta = {}, expiresAt = null) {
+    const sessions = readUserSessions(userId);
+    const rawToken = generateRandomTokenBytes(48);
+    const tokenHash = hashRefreshToken(rawToken);
+    const sessionId = uuidv4();
+    const now = new Date().toISOString();
+    const session = { id: sessionId, tokenHash, createdAt: now, lastUsedAt: now, expiresAt: expiresAt, revoked: false, meta };
+    sessions.push(session);
+    writeUserSessions(userId, sessions);
+    return { rawToken, sessionId };
 }
-function writeAccountsCookie(res, accounts) {
-    try {
-        res.cookie('accounts', JSON.stringify(accounts), { httpOnly: false });
-    } catch { /* ignore */ }
-}
-function filterValidAccounts(accounts) {
-    const out = [];
-    for (let token of accounts) {
-        try {
-            jwt.verify(token, SECRET);
-            out.push(token);
-        } catch { /* skip invalid */ }
+
+function rotateRefreshTokenForUser(userId, incomingRawToken) {
+    const sessions = readUserSessions(userId);
+    const incomingHash = hashRefreshToken(incomingRawToken);
+    for (let s of sessions) {
+        if (s.tokenHash === incomingHash && !s.revoked) {
+            if (s.expiresAt && new Date(s.expiresAt) < new Date()) return null;
+            const newRaw = generateRandomTokenBytes(48);
+            s.tokenHash = hashRefreshToken(newRaw);
+            s.lastUsedAt = new Date().toISOString();
+            writeUserSessions(userId, sessions);
+            return { newRaw, sessionId: s.id };
+        }
     }
-    return out;
+    return null;
+}
+
+function revokeSessionByToken(userId, rawToken) {
+    const sessions = readUserSessions(userId);
+    const h = hashRefreshToken(rawToken);
+    let changed = false;
+    for (let s of sessions) {
+        if (s.tokenHash === h && !s.revoked) { s.revoked = true; changed = true; }
+    }
+    if (changed) writeUserSessions(userId, sessions);
+    return changed;
+}
+function revokeSessionById(userId, sessionId) {
+    const sessions = readUserSessions(userId);
+    let changed = false;
+    for (let s of sessions) {
+        if (s.id === sessionId && !s.revoked) { s.revoked = true; changed = true; }
+    }
+    if (changed) writeUserSessions(userId, sessions);
+    return changed;
+}
+
+/* Device & inactivity policy */
+const INACTIVITY_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+function authMiddleware(req, res, next) {
+    const token = req.cookies.token;
+    if (!token) return res.redirect('/login');
+    const payload = verifyAccessToken(token);
+    if (!payload) return res.redirect('/login');
+
+    const deviceId = req.cookies.deviceId;
+    if (deviceId && deviceManager.isInactive(deviceId, INACTIVITY_THRESHOLD_MS)) {
+        deviceManager.revokeDevice(deviceId);
+        res.clearCookie('token'); res.clearCookie('refresh');
+        return res.redirect('/login');
+    }
+    if (deviceId) deviceManager.recordActivity(deviceId);
+    req.user = payload;
+    next();
+}
+
+function apiAuthMiddleware(req, res, next) {
+    const token = req.cookies.token;
+    if (!token) return res.status(401).json({ success: false, msg: 'Not authenticated' });
+    const payload = verifyAccessToken(token);
+    if (!payload) return res.status(401).json({ success: false, msg: 'Token invalid or expired' });
+
+    const deviceId = req.cookies.deviceId;
+    if (deviceId && deviceManager.isInactive(deviceId, INACTIVITY_THRESHOLD_MS)) {
+        deviceManager.revokeDevice(deviceId);
+        res.clearCookie('token'); res.clearCookie('refresh');
+        return res.status(401).json({ success: false, msg: 'Device inactive, logged out' });
+    }
+    if (deviceId) deviceManager.recordActivity(deviceId);
+    req.user = payload;
+    next();
 }
 
 /* ------------------------
-   HTML pages routes
+   HTML page routes
    ------------------------ */
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'views/index.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views/login.html')));
 app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'views/register.html')));
-
-// Serve personal profile page (requires auth) - this page uses /api/profile to fetch data
 app.get('/profile', authMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'views/profile.html')));
 app.get('/profile/edit', authMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'views/edit_profile.html')));
-
-// public user profile (view other users)
 app.get('/user/:username', (req, res) => res.sendFile(path.join(__dirname, 'views/user_profile.html')));
-
-// accounts managing page
 app.get('/accounts', authMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'views/accounts.html')));
-
-// Post pages
 app.get('/post/create', authMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'views/create_post.html')));
 app.get('/post/:id/edit', authMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'views/edit_post.html')));
 app.get('/post/:id', (req, res) => res.sendFile(path.join(__dirname, 'views/post.html')));
 
 /* ------------------------
-   API routes
+   Auth & session APIs
    ------------------------ */
 
-/* Auth: register, login, add-account, logout, switch, accounts list */
-app.post('/api/register', (req, res) => {
+app.post('/api/register', authLimiter, async (req, res) => {
     const { username, email, password } = req.body;
     if (!username || !email || !password) return res.json({ success: false, msg: 'Missing fields' });
     if (findUserByUsername(username)) return res.json({ success: false, msg: 'Username exists' });
@@ -275,300 +314,322 @@ app.post('/api/register', (req, res) => {
     const userDir = getUserDir(userId);
     fs.mkdirSync(userDir, { recursive: true });
 
+    const hashed = await argon2.hash(password, { type: argon2.argon2id });
+
     const profile = {
-        id: userId,
-        username, email,
+        id: userId, username, email,
         displayName: username,
         profilePic: '',
-        password,
+        password: hashed,
         createdAt: new Date().toISOString(),
-        showEmail: false
+        showEmail: false,
+        bio: ''
     };
-    fs.writeFileSync(getUserProfilePath(userId), JSON.stringify(profile, null, 2), 'utf8');
-    fs.writeFileSync(path.join(userDir, 'posts.json'), '[]', 'utf8');
-    fs.writeFileSync(path.join(userDir, 'comments.json'), '[]', 'utf8');
-    fs.writeFileSync(path.join(userDir, 'notifications.json'), '[]', 'utf8');
-    fs.writeFileSync(getFollowersPath(userId), '[]', 'utf8');
-    fs.writeFileSync(getFollowingPath(userId), '[]', 'utf8');
+    writeJSON(getUserProfilePath(userId), profile);
+    writeJSON(path.join(userDir, 'posts.json'), []);
+    writeJSON(path.join(userDir, 'comments.json'), []);
+    writeJSON(path.join(userDir, 'notifications.json'), []);
+    writeJSON(getUserSessionsPath(userId), []);
+    writeJSON(getFollowersPath(userId), []);
+    writeJSON(getFollowingPath(userId), []);
 
     res.json({ success: true });
 });
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', authLimiter, async (req, res) => {
     const { email, password } = req.body;
+    if (!email || !password) return res.json({ success: false, msg: 'Missing credentials' });
     const user = findUserByEmail(email);
-    if (!user || user.password !== password) return res.json({ success: false, msg: 'Invalid credentials' });
+    if (!user) return res.json({ success: false, msg: 'Invalid credentials' });
 
-    const token = jwt.sign({ id: user.id, email: user.email, username: user.username }, SECRET, { expiresIn: '2d' });
-    res.cookie('token', token, { httpOnly: true });
-
-    // add to accounts cookie list
-    const existing = readAccountsFromReq(req);
-    let valid = filterValidAccounts(existing);
-    const already = valid.find(t => {
-        try { return jwt.verify(t, SECRET).username === user.username; } catch { return false; }
-    });
-    if (!already) valid.push(token);
-    else {
-        valid = valid.map(t => {
-            try {
-                const p = jwt.verify(t, SECRET);
-                if (p.username === user.username) return token;
-                return t;
-            } catch { return null; }
-        }).filter(Boolean);
+    try {
+        const ok = await argon2.verify(user.password, password);
+        if (!ok) return res.json({ success: false, msg: 'Invalid credentials' });
+    } catch {
+        return res.json({ success: false, msg: 'Invalid credentials' });
     }
-    writeAccountsCookie(res, valid);
+
+    const accessPayload = { id: user.id, username: user.username };
+    const accessToken = signAccessToken(accessPayload, { expiresIn: '15m' });
+
+    const meta = { ip: req.ip, ua: req.get('User-Agent') || '', createdFrom: 'web' };
+    const { rawToken, sessionId } = createSession(user.id, meta, null);
+
+    let deviceId = req.cookies.deviceId;
+    if (!deviceId) {
+        deviceId = deviceManager.createDevice();
+        res.cookie('deviceId', deviceId, {
+            httpOnly: false,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'Strict',
+            maxAge: 5 * 365 * 24 * 60 * 60 * 1000
+        });
+    }
+    deviceManager.linkSession(deviceId, user.id, sessionId);
+
+    res.cookie('token', accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'Strict',
+        maxAge: 15 * 60 * 1000
+    });
+    res.cookie('refresh', rawToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'Strict',
+        maxAge: 365 * 24 * 60 * 60 * 1000
+    });
+
+    // maintain accounts cookie (client-visible minimal tokens)
+    const tokenForAccounts = jwt.sign({ id: user.id, email: user.email, username: user.username }, SECRET, { expiresIn: '365d' });
+    try {
+        const existing = req.cookies.accounts ? JSON.parse(req.cookies.accounts) : [];
+        const arr = Array.isArray(existing) ? existing : [];
+        const hasUser = arr.some(t => {
+            try { return jwt.verify(t, SECRET).username === user.username; } catch { return false; }
+        });
+        if (!hasUser) arr.push(tokenForAccounts);
+        res.cookie('accounts', JSON.stringify(arr), { httpOnly: false });
+    } catch {}
 
     res.json({ success: true });
 });
 
-app.post('/api/add-account', (req, res) => {
-    const { email, password } = req.body;
-    if (!email || !password) return res.json({ success: false, msg: 'Missing fields' });
-    const user = findUserByEmail(email);
-    if (!user || user.password !== password) return res.json({ success: false, msg: 'Invalid credentials' });
+app.post('/api/token/refresh', async (req, res) => {
+    const rawRefresh = req.cookies.refresh;
+    const deviceId = req.cookies.deviceId;
 
-    const token = jwt.sign({ id: user.id, email: user.email, username: user.username }, SECRET, { expiresIn: '2d' });
-    let accounts = readAccountsFromReq(req);
-    accounts = filterValidAccounts(accounts);
-    const exists = accounts.find(t => {
-        try { return jwt.verify(t, SECRET).username === user.username; } catch { return false; }
-    });
-    if (!exists) accounts.push(token);
-    else {
-        accounts = accounts.map(t => {
-            try {
-                const p = jwt.verify(t, SECRET);
-                if (p.username === user.username) return token;
-                return t;
-            } catch { return null; }
-        }).filter(Boolean);
+    if (deviceId && deviceManager.isInactive(deviceId, INACTIVITY_THRESHOLD_MS)) {
+        deviceManager.revokeDevice(deviceId);
+        res.clearCookie('token'); res.clearCookie('refresh');
+        return res.status(401).json({ success: false, msg: 'Device inactive, please login again' });
     }
-    writeAccountsCookie(res, accounts);
+    if (!rawRefresh) return res.status(401).json({ success: false, msg: 'No refresh token' });
 
-    if (!req.cookies.token) res.cookie('token', token, { httpOnly: true });
+    // naive scan - for file-based store. Replace with DB lookup for production.
+    const userDirs = fs.readdirSync(USERS_DIR || []);
+    for (let userId of userDirs) {
+        const sessionsPath = getUserSessionsPath(userId);
+        if (!fs.existsSync(sessionsPath)) continue;
+        const rotated = rotateRefreshTokenForUser(userId, rawRefresh);
+        if (rotated) {
+            if (deviceId) {
+                deviceManager.recordActivity(deviceId);
+                deviceManager.linkSession(deviceId, userId, rotated.sessionId);
+            }
+            const profile = JSON.parse(fs.readFileSync(getUserProfilePath(userId), 'utf8'));
+            const newAccess = signAccessToken({ id: profile.id, username: profile.username }, { expiresIn: '15m' });
 
-    res.json({ success: true, username: user.username });
+            res.cookie('token', newAccess, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'Strict',
+                maxAge: 15 * 60 * 1000
+            });
+            res.cookie('refresh', rotated.newRaw, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'Strict',
+                maxAge: 365 * 24 * 60 * 60 * 1000
+            });
+            return res.json({ success: true });
+        }
+    }
+
+    return res.status(401).json({ success: false, msg: 'Refresh token invalid' });
 });
 
 app.post('/api/logout', (req, res) => {
-    res.clearCookie('token');
-    res.json({ success: true });
-});
+    const rawRefresh = req.cookies.refresh;
+    const deviceId = req.cookies.deviceId;
 
-app.post('/api/accounts/switch', (req, res) => {
-    const { username } = req.body;
-    if (!username) return res.json({ success: false, msg: 'Missing username' });
-    const accounts = filterValidAccounts(readAccountsFromReq(req));
-    for (let token of accounts) {
-        try {
-            const p = jwt.verify(token, SECRET);
-            if (p.username === username) {
-                res.cookie('token', token, { httpOnly: true });
-                return res.json({ success: true });
+    if (rawRefresh) {
+        const userDirs = fs.readdirSync(USERS_DIR || []);
+        for (let userId of userDirs) {
+            const sessionsPath = getUserSessionsPath(userId);
+            if (!fs.existsSync(sessionsPath)) continue;
+            const sessions = readUserSessions(userId);
+            const found = sessions.find(s => s.tokenHash === hashRefreshToken(rawRefresh));
+            if (found) {
+                found.revoked = true;
+                writeUserSessions(userId, sessions);
+                if (deviceId) deviceManager.unlinkSession(deviceId, userId, found.id);
+                break;
             }
-        } catch {}
-    }
-    return res.json({ success: false, msg: 'Account not found' });
-});
-
-app.post('/api/accounts/remove', (req, res) => {
-    const { username } = req.body;
-    if (!username) return res.json({ success: false, msg: 'Missing username' });
-    let accounts = filterValidAccounts(readAccountsFromReq(req));
-    accounts = accounts.filter(t => {
-        try {
-            const p = jwt.verify(t, SECRET);
-            return p.username !== username;
-        } catch { return false; }
-    });
-    writeAccountsCookie(res, accounts);
-
-    const activeToken = req.cookies.token;
-    if (activeToken) {
-        try {
-            const p = jwt.verify(activeToken, SECRET);
-            if (p.username === username) {
-                if (accounts.length > 0) res.cookie('token', accounts[0], { httpOnly: true });
-                else res.clearCookie('token');
-            }
-        } catch {
-            if (accounts.length > 0) res.cookie('token', accounts[0], { httpOnly: true });
-            else res.clearCookie('token');
         }
-    } else {
-        if (accounts.length === 0) res.clearCookie('token');
     }
+
+    res.clearCookie('token'); res.clearCookie('refresh');
     res.json({ success: true });
 });
 
-app.get('/api/accounts', (req, res) => {
-    const accounts = filterValidAccounts(readAccountsFromReq(req));
-    const out = [];
-    for (let token of accounts) {
-        try {
-            const p = jwt.verify(token, SECRET);
-            const u = findUserByUsername(p.username);
-            out.push({
-                username: p.username,
-                displayName: (u && u.displayName) || p.username,
-                profilePic: (u && u.profilePic) || ''
-            });
-        } catch {}
+app.post('/api/logout-all', apiAuthMiddleware, (req, res) => {
+    const userId = req.user.id;
+    const sessions = readUserSessions(userId);
+    for (let s of sessions) s.revoked = true;
+    writeUserSessions(userId, sessions);
+
+    const devicesDir = path.join(__dirname, 'data', 'devices');
+    if (fs.existsSync(devicesDir)) {
+        for (const f of fs.readdirSync(devicesDir)) {
+            try {
+                const device = JSON.parse(fs.readFileSync(path.join(devicesDir, f), 'utf8'));
+                device.sessions = device.sessions.filter(s => s.userId !== userId);
+                fs.writeFileSync(path.join(devicesDir, f), JSON.stringify(device, null, 2), 'utf8');
+            } catch {}
+        }
     }
-    let active = null;
-    const activeToken = req.cookies.token;
-    if (activeToken) {
-        try { active = jwt.verify(activeToken, SECRET).username; } catch { active = null; }
-    }
-    res.json({ success: true, accounts: out, active });
+
+    res.clearCookie('token'); res.clearCookie('refresh');
+    res.json({ success: true });
 });
 
-/* Profile APIs */
-app.get('/api/profile', authMiddleware, (req, res) => {
+/* ------------------------
+   Profile endpoints
+   ------------------------ */
+
+app.get('/api/profile', apiAuthMiddleware, (req, res) => {
     const userId = req.user.id;
     const profileRaw = JSON.parse(fs.readFileSync(getUserProfilePath(userId), 'utf8'));
     const profile = { ...profileRaw };
     delete profile.password;
-    // Ensure showEmail exists
     if (typeof profile.showEmail === 'undefined') profile.showEmail = false;
-    const followers = getFollowersForUser(userId) || [];
-    const following = getFollowingForUser(userId) || [];
-    // For owner's view, include email
+    const followers = fs.existsSync(getFollowersPath(userId)) ? JSON.parse(fs.readFileSync(getFollowersPath(userId), 'utf8')) : [];
+    const following = fs.existsSync(getFollowingPath(userId)) ? JSON.parse(fs.readFileSync(getFollowingPath(userId), 'utf8')) : [];
     res.json({ success: true, profile, followersCount: followers.length, followingCount: following.length });
 });
 
-/**
- * Public profile endpoint:
- * - returns basic profile fields
- * - email is only included if profile.showEmail === true
- * - also returns isFollowing (if requester authenticated)
- */
-app.get('/api/user/:username', (req, res) => {
-    const user = findUserByUsername(req.params.username);
-    if (!user) return res.json({ success: false, msg: 'ไม่พบผู้ใช้' });
-
-    // ensure showEmail exists
-    if (typeof user.showEmail === 'undefined') user.showEmail = false;
-
-    const followers = getFollowersForUser(user._userId) || [];
-    const following = getFollowingForUser(user._userId) || [];
-
-    let myUsername = null;
-    let myUserId = null;
-    const token = req.cookies.token;
-    if (token) {
-        try {
-            const p = jwt.verify(token, SECRET);
-            myUsername = p.username;
-            myUserId = p.id;
-        } catch {}
-    }
-
-    const isFollowingFlag = myUserId ? isFollowing(myUserId, user._userId) : false;
-
-    // construct public profile object without sensitive fields
-    const publicProfile = {
-        id: user.id,
-        username: user.username,
-        displayName: user.displayName,
-        profilePic: user.profilePic || '',
-        createdAt: user.createdAt,
-        showEmail: !!user.showEmail
-    };
-    // include email only if showEmail===true
-    if (user.showEmail) publicProfile.email = user.email;
-
-    res.json({
-        success: true,
-        profile: publicProfile,
-        followersCount: followers.length,
-        followingCount: following.length,
-        isFollowing: isFollowingFlag,
-        myUsername
-    });
-});
-
-/* Update profile (owner) - allow updating displayName, email, showEmail */
-app.post('/api/profile/update', authMiddleware, (req, res) => {
+app.post('/api/profile/update', apiAuthMiddleware, (req, res) => {
     const userId = req.user.id;
     const profilePath = getUserProfilePath(userId);
     if (!fs.existsSync(profilePath)) return res.json({ success: false, msg: 'Profile not found' });
     const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
-    const { displayName, email, showEmail } = req.body;
+    const { displayName, email, showEmail, bio } = req.body;
     if (displayName) profile.displayName = displayName;
     if (typeof email !== 'undefined') profile.email = email;
     if (typeof showEmail !== 'undefined') {
-        // coerce to boolean
         if (typeof showEmail === 'string') profile.showEmail = showEmail === 'true' || showEmail === '1';
         else profile.showEmail = !!showEmail;
     }
+    if (typeof bio !== 'undefined') profile.bio = bio;
     fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2), 'utf8');
     res.json({ success: true });
 });
 
-/* Follow / Unfollow (unchanged) */
-app.post('/api/user/:username/follow', authMiddleware, (req, res) => {
+app.post('/api/profile/upload-pic', apiAuthMiddleware, upload.single('profilePic'), (req, res) => {
+    const userId = req.user.id;
+    const profilePath = getUserProfilePath(userId);
+    if (!fs.existsSync(profilePath)) return res.json({ success: false, msg: 'Profile not found' });
+    const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+    if (req.file) {
+        // remove old pic if exists
+        if (profile.profilePic && fs.existsSync(path.join(__dirname, 'public', profile.profilePic))) {
+            try { fs.unlinkSync(path.join(__dirname, 'public', profile.profilePic)); } catch {}
+        }
+        profile.profilePic = '/uploads/profile_pics/' + req.file.filename;
+        fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2), 'utf8');
+        return res.json({ success: true, profilePic: profile.profilePic });
+    }
+    res.json({ success: false, msg: 'No file' });
+});
+
+app.post('/api/profile/remove-pic', apiAuthMiddleware, (req, res) => {
+    const userId = req.user.id;
+    const profilePath = getUserProfilePath(userId);
+    if (!fs.existsSync(profilePath)) return res.json({ success: false, msg: 'Profile not found' });
+    const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+    if (profile.profilePic && fs.existsSync(path.join(__dirname, 'public', profile.profilePic))) {
+        try { fs.unlinkSync(path.join(__dirname, 'public', profile.profilePic)); } catch {}
+    }
+    profile.profilePic = '';
+    fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2), 'utf8');
+    res.json({ success: true });
+});
+
+app.get('/api/user/:username', (req, res) => {
+    const user = findUserByUsername(req.params.username);
+    if (!user) return res.json({ success: false, msg: 'ไม่พบผู้ใช้' });
+    if (typeof user.showEmail === 'undefined') user.showEmail = false;
+    const followers = fs.existsSync(getFollowersPath(user._userId)) ? JSON.parse(fs.readFileSync(getFollowersPath(user._userId), 'utf8')) : [];
+    const following = fs.existsSync(getFollowingPath(user._userId)) ? JSON.parse(fs.readFileSync(getFollowingPath(user._userId), 'utf8')) : [];
+    let myUsername = null, myUserId = null;
+    const token = req.cookies.token;
+    if (token) {
+        const p = verifyAccessToken(token);
+        if (p) { myUsername = p.username; myUserId = p.id; }
+    }
+    const isFollowingFlag = myUserId ? (fs.existsSync(getFollowingPath(myUserId)) && JSON.parse(fs.readFileSync(getFollowingPath(myUserId), 'utf8')).includes(user._userId)) : false;
+    const publicProfile = { id: user.id, username: user.username, displayName: user.displayName, profilePic: user.profilePic || '', createdAt: user.createdAt, showEmail: !!user.showEmail };
+    if (user.showEmail) publicProfile.email = user.email;
+    res.json({ success: true, profile: publicProfile, followersCount: followers.length, followingCount: following.length, isFollowing: isFollowingFlag, myUsername });
+});
+
+/* Follow / Unfollow */
+app.post('/api/user/:username/follow', apiAuthMiddleware, (req, res) => {
     const target = findUserByUsername(req.params.username);
     if (!target) return res.json({ success: false, msg: 'Target not found' });
     const actorId = req.user.id;
     if (actorId === target._userId) return res.json({ success: false, msg: 'Cannot follow yourself' });
 
     addFollower(target._userId, actorId);
-
-    // notify target of new follower (meta includes actor)
     addNotificationToUser(target._userId, 'new_follower', `${req.user.username} ติดตามคุณ`, { actorId, actorUsername: req.user.username });
-
     const followers = getFollowersForUser(target._userId) || [];
     res.json({ success: true, followersCount: followers.length });
 });
 
-app.post('/api/user/:username/unfollow', authMiddleware, (req, res) => {
+app.post('/api/user/:username/unfollow', apiAuthMiddleware, (req, res) => {
     const target = findUserByUsername(req.params.username);
     if (!target) return res.json({ success: false, msg: 'Target not found' });
     const actorId = req.user.id;
     if (actorId === target._userId) return res.json({ success: false, msg: 'Cannot unfollow yourself' });
 
     removeFollower(target._userId, actorId);
-
     const followers = getFollowersForUser(target._userId) || [];
     res.json({ success: true, followersCount: followers.length });
 });
 
-/* Remaining APIs (notifications, posts, comments) - same as earlier implementation */
-/* Notifications API */
-app.get('/api/notifications', authMiddleware, (req, res) => {
+app.get('/api/user/:username/followers', (req, res) => {
+    const user = findUserByUsername(req.params.username);
+    if (!user) return res.json({ success: false, msg: 'User not found' });
+    const followers = getFollowersForUser(user._userId) || [];
+    const out = followers.map(uid => {
+        const p = JSON.parse(fs.readFileSync(getUserProfilePath(uid), 'utf8'));
+        delete p.password;
+        return { id: uid, username: p.username, displayName: p.displayName, profilePic: p.profilePic || '' };
+    });
+    res.json({ success: true, followers: out });
+});
+app.get('/api/user/:username/following', (req, res) => {
+    const user = findUserByUsername(req.params.username);
+    if (!user) return res.json({ success: false, msg: 'User not found' });
+    const following = getFollowingForUser(user._userId) || [];
+    const out = following.map(uid => {
+        const p = JSON.parse(fs.readFileSync(getUserProfilePath(uid), 'utf8'));
+        delete p.password;
+        return { id: uid, username: p.username, displayName: p.displayName, profilePic: p.profilePic || '' };
+    });
+    res.json({ success: true, following: out });
+});
+
+/* Notifications */
+app.get('/api/notifications', apiAuthMiddleware, (req, res) => {
     const userId = req.user.id;
     const nots = getNotificationsForUser(userId);
     const unreadCount = nots.filter(n => !n.read).length;
     res.json({ success: true, notifications: nots, unread: unreadCount });
 });
-app.post('/api/notifications/mark-read', authMiddleware, (req, res) => {
+app.post('/api/notifications/mark-read', apiAuthMiddleware, (req, res) => {
     const userId = req.user.id;
     const { ids } = req.body;
     const updated = markNotificationsRead(userId, ids || []);
     res.json({ success: true, notifications: updated, unread: updated.filter(n => !n.read).length });
 });
 
-/* Account settings example endpoint */
-app.get('/api/account/settings', authMiddleware, (req, res) => {
-    const userId = req.user.id;
-    const profile = JSON.parse(fs.readFileSync(getUserProfilePath(userId), 'utf8'));
-    delete profile.password;
-    const settings = {
-        profile,
-        security: { twoFactorEnabled: false, sessions: [] },
-        preferences: { emailNotifications: true }
-    };
-    res.json({ success: true, settings });
-});
+/* ------------------------
+   Posts & Comments
+   ------------------------ */
 
-/* Posts & Comments (same as before) */
-// ... (for brevity assume unchanged sections for post create/edit/delete, comments, posts listing)
-// Reuse the previous full implementation here in your repo. For clarity, I'm not duplicating the whole block again.
-
-app.post('/api/post/create', authMiddleware, upload.single('postImage'), (req, res) => {
+app.post('/api/post/create', apiAuthMiddleware, upload.single('postImage'), (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
     const { title, content } = req.body;
@@ -581,17 +642,9 @@ app.post('/api/post/create', authMiddleware, upload.single('postImage'), (req, r
     let img = '';
     if (req.file) img = '/uploads/post_images/' + req.file.filename;
 
-    const post = {
-        id: postId,
-        username,
-        title,
-        content,
-        image: img,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    };
-    fs.writeFileSync(getPostPath(postId), JSON.stringify(post, null, 2), 'utf8');
-    fs.writeFileSync(getPostCommentsPath(postId), '[]', 'utf8');
+    const post = { id: postId, username, title, content, image: img, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    writeJSON(getPostPath(postId), post);
+    writeJSON(getPostCommentsPath(postId), []);
 
     // update user's posts list
     const userPostsPath = path.join(getUserDir(userId), 'posts.json');
@@ -600,20 +653,18 @@ app.post('/api/post/create', authMiddleware, upload.single('postImage'), (req, r
     userPosts.unshift(postId);
     fs.writeFileSync(userPostsPath, JSON.stringify(userPosts, null, 2), 'utf8');
 
-    // Notify followers about new post (addNotificationToUser will skip self-notify)
+    // notify followers
     try {
         const followers = getFollowersForUser(userId) || [];
         for (let followerId of followers) {
             addNotificationToUser(followerId, 'new_post', `${username} โพสต์ใหม่: "${title}"`, { postId, actorId: userId, actorUsername: username });
         }
-    } catch (e) {
-        console.error('notify followers error', e && e.message);
-    }
+    } catch (e) { console.error('notify followers error', e && e.message); }
 
     res.json({ success: true, postId });
 });
 
-app.post('/api/post/:id/edit', authMiddleware, upload.single('postImage'), (req, res) => {
+app.post('/api/post/:id/edit', apiAuthMiddleware, upload.single('postImage'), (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
     const postId = req.params.id;
@@ -626,16 +677,16 @@ app.post('/api/post/:id/edit', authMiddleware, upload.single('postImage'), (req,
     if (content) post.content = content;
     if (req.file) {
         if (post.image && fs.existsSync(path.join(__dirname, 'public', post.image))) {
-            fs.unlinkSync(path.join(__dirname, 'public', post.image));
+            try { fs.unlinkSync(path.join(__dirname, 'public', post.image)); } catch {}
         }
         post.image = '/uploads/post_images/' + req.file.filename;
     }
     post.updatedAt = new Date().toISOString();
-    fs.writeFileSync(postPath, JSON.stringify(post, null, 2), 'utf8');
+    writeJSON(postPath, post);
     res.json({ success: true });
 });
 
-app.delete('/api/post/:id', authMiddleware, (req, res) => {
+app.delete('/api/post/:id', apiAuthMiddleware, (req, res) => {
     const userId = req.user.id;
     const username = req.user.username;
     const postId = req.params.id;
@@ -644,7 +695,7 @@ app.delete('/api/post/:id', authMiddleware, (req, res) => {
     const post = JSON.parse(fs.readFileSync(postPath, 'utf8'));
     if (post.username !== username) return res.json({ success: false, msg: 'Not owner' });
     if (post.image && fs.existsSync(path.join(__dirname, 'public', post.image))) {
-        fs.unlinkSync(path.join(__dirname, 'public', post.image));
+        try { fs.unlinkSync(path.join(__dirname, 'public', post.image)); } catch {}
     }
     fs.rmSync(getPostDir(postId), { recursive: true, force: true });
     const userPostsPath = path.join(getUserDir(userId), 'posts.json');
@@ -665,7 +716,7 @@ app.get('/api/post/:id', (req, res) => {
     let myUsername = null;
     const token = req.cookies.token;
     if (token) {
-        try { myUsername = jwt.verify(token, SECRET).username; } catch {}
+        try { myUsername = verifyAccessToken(token).username; } catch {}
     }
     res.json({ success: true, post, comments, owner: post.username, myUsername });
 });
@@ -702,19 +753,17 @@ app.get('/api/user/:username/posts', (req, res) => {
 });
 
 /* Comments */
-app.post('/api/post/:id/comment', authMiddleware, (req, res) => {
+app.post('/api/post/:id/comment', apiAuthMiddleware, (req, res) => {
     const postId = req.params.id;
     const username = req.user.username;
     const { content } = req.body;
     if (!content) return res.json({ success: false, msg: 'Empty comment' });
-
     const comment = { id: uuidv4(), postId, username, content, createdAt: new Date().toISOString() };
     const commentsPath = getPostCommentsPath(postId);
     let comments = [];
     if (fs.existsSync(commentsPath)) comments = JSON.parse(fs.readFileSync(commentsPath, 'utf8'));
     comments.push(comment);
-    fs.writeFileSync(commentsPath, JSON.stringify(comments, null, 2), 'utf8');
-
+    writeJSON(commentsPath, comments);
     const userObj = findUserByUsername(username);
     if (userObj) {
         const userCommentsPath = path.join(getUserDir(userObj._userId), 'comments.json');
@@ -723,7 +772,6 @@ app.post('/api/post/:id/comment', authMiddleware, (req, res) => {
         userComments.push(comment.id);
         fs.writeFileSync(userCommentsPath, JSON.stringify(userComments, null, 2), 'utf8');
     }
-
     // Notify post owner if different
     try {
         const post = JSON.parse(fs.readFileSync(getPostPath(postId), 'utf8'));
@@ -733,14 +781,11 @@ app.post('/api/post/:id/comment', authMiddleware, (req, res) => {
                 addNotificationToUser(ownerObj._userId, 'comment', `${username} แสดงความคิดเห็นในโพสต์ของคุณ`, { postId, commentId: comment.id, actorId: userObj && userObj._userId, actorUsername: username });
             }
         }
-    } catch (e) {
-        // ignore
-    }
-
+    } catch {}
     res.json({ success: true });
 });
 
-app.delete('/api/post/:postId/comment/:commentId', authMiddleware, (req, res) => {
+app.delete('/api/post/:postId/comment/:commentId', apiAuthMiddleware, (req, res) => {
     const { postId, commentId } = req.params;
     const username = req.user.username;
     const commentsPath = getPostCommentsPath(postId);
@@ -749,16 +794,15 @@ app.delete('/api/post/:postId/comment/:commentId', authMiddleware, (req, res) =>
     const idx = comments.findIndex(c => c.id === commentId && c.username === username);
     if (idx === -1) return res.json({ success: false, msg: 'Not owner' });
     comments.splice(idx, 1);
-    fs.writeFileSync(commentsPath, JSON.stringify(comments, null, 2), 'utf8');
+    writeJSON(commentsPath, comments);
     res.json({ success: true });
 });
 
-/* 404 fallback */
-app.use((req, res) => {
-    res.status(404).send('Not found');
-});
+/* ------------------------
+   404 fallback & start
+   ------------------------ */
+app.use((req, res) => { res.status(404).send('Not found'); });
 
-/* Start server */
 app.listen(PORT, () => {
     console.log(`Community app running at http://localhost:${PORT}`);
 });
