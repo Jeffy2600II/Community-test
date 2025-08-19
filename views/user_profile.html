@@ -1,35 +1,31 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
     <title>โปรไฟล์สมาชิก</title>
     <link rel="stylesheet" href="/css/style.css">
-    <style>
-      main { max-width: 1100px; margin: 1.2em auto; padding: 1.6em; display: grid; grid-template-columns: 320px 1fr; gap: 1.2em; }
-      .profile-hero { background:#fff;padding:1.2em;border-radius:8px; display:flex; flex-direction:column; align-items:center; gap:0.8rem; }
-      .profile-hero img { width:140px;height:140px;border-radius:12px;object-fit:cover;border:3px solid #eee; }
-      .profile-main { background:#fff;padding:1.2em;border-radius:8px; }
-      .username-line { color:#666; font-size:0.95rem; margin-top:-2px; }
-      @media (max-width:900px) { main { grid-template-columns:1fr; } }
-    </style>
 </head>
 <body>
   <div id="headerSlot"></div>
   <main>
-    <aside class="profile-hero" id="hero">
-      <img id="heroPic" src="/img/default_profile.png" alt="profile">
-      <div style="text-align:center;">
-        <div id="displayName" style="font-size:1.2rem;font-weight:700"></div>
-        <div id="usernameLine" class="username-line"></div>
-      </div>
-      <div id="followArea"></div>
-      <div class="small" id="counts" style="margin-top:.6rem"></div>
-    </aside>
+    <div class="container">
+      <div class="grid-2">
+        <aside class="profile-hero card" id="hero">
+          <img id="heroPic" src="/img/default_profile.png" alt="profile" class="profile-hero avatar">
+          <div style="text-align:center;">
+            <div id="displayName" style="font-size:1.2rem;font-weight:700"></div>
+            <div id="usernameLine" class="small" style="margin-top:4px"></div>
+          </div>
+          <div id="followArea" style="margin-top:8px"></div>
+          <div class="small" id="counts" style="margin-top:8px"></div>
+        </aside>
 
-    <section class="profile-main">
-      <div id="aboutArea"></div>
-      <div id="userPosts" style="margin-top:1.2rem"></div>
-    </section>
+        <section class="profile-main">
+          <div class="card" id="aboutArea"></div>
+          <div class="card" id="userPosts" style="margin-top:12px"></div>
+        </section>
+      </div>
+    </div>
   </main>
   <div id="footerSlot"></div>
 
@@ -45,16 +41,14 @@ async function renderProfile() {
 
     document.getElementById('heroPic').src = profile.profilePic || '/img/default_profile.png';
     document.getElementById('displayName').innerText = profile.displayName || profile.username;
-    // show username under displayName (no label)
     document.getElementById('usernameLine').innerText = '@' + profile.username;
-
     document.getElementById('counts').innerHTML = `ติดตาม: ${followingCount} • ผู้ติดตาม: ${followersCount}`;
 
-    // follow button (show only if logged-in and not viewing yourself)
     const followArea = document.getElementById('followArea');
     followArea.innerHTML = '';
     if (myUsername && myUsername !== profile.username) {
       const btn = document.createElement('button');
+      btn.className = 'btn ' + (isFollowing ? 'btn-ghost' : 'btn-primary');
       btn.innerText = isFollowing ? 'Unfollow' : 'Follow';
       btn.onclick = async () => {
         const url = isFollowing ? `/api/user/${encodeURIComponent(profile.username)}/unfollow` : `/api/user/${encodeURIComponent(profile.username)}/follow`;
@@ -62,24 +56,16 @@ async function renderProfile() {
         const d = await r.json();
         if (d && d.success) {
           await renderProfile(); // reload
-        } else {
-          alert(d.msg || 'ไม่สำเร็จ');
-        }
+        } else alert(d.msg || 'ไม่สำเร็จ');
       };
       followArea.appendChild(btn);
     }
 
     // About area
     let aboutHtml = `<h3>เกี่ยวกับ</h3>
-      <div style="display:flex;gap:1rem;align-items:flex-start;">
-        <div style="flex:1">
-          <p>${profile.bio ? profile.bio : '<i>ยังไม่มีข้อมูล</i>'}</p>
-          <p class="small">เข้าร่วมเมื่อ: ${new Date(profile.createdAt).toLocaleDateString()}</p>
-        </div>
-        <div style="width:220px;">
-          ${profile.showEmail ? `<div class="small"><strong>อีเมล</strong></div><div>${profile.email}</div>` : `<div class="small"><strong>อีเมล</strong></div><div><i>ผู้ใช้ไม่ได้เปิดเผย</i></div>`}
-        </div>
-      </div>`;
+      <div class="small" style="margin-top:8px">${profile.bio ? profile.bio : '<i>ยังไม่มีข้อมูล</i>'}</div>
+      <div class="small" style="margin-top:10px">เข้าร่วมเมื่อ: ${new Date(profile.createdAt).toLocaleDateString()}</div>
+      <div style="margin-top:8px" class="small"><strong>อีเมล:</strong> ${profile.showEmail ? (profile.email || '<i>ไม่มี</i>') : '<i>ซ่อน</i>'}</div>`;
     document.getElementById('aboutArea').innerHTML = aboutHtml;
 
     // posts
@@ -88,7 +74,7 @@ async function renderProfile() {
       const postsData = await pr2.json();
       const posts = postsData.posts || [];
       let postlist = '<div class="section-title"><span>โพสต์ของสมาชิกนี้</span></div>';
-      postlist += posts.length ? posts.map(p=>`<div class="post"><h4><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div><p>${p.content.slice(0,200)}${p.content.length>200?'...':''}</p></div>`).join('') : '<i>ยังไม่มีโพสต์</i>';
+      postlist += posts.length ? posts.map(p=>`<div class="post" style="padding:10px 12px;margin-bottom:8px;"><div style="flex:1"><h4 style="margin:0"><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div><div style="margin-top:6px">${p.content.slice(0,140)}${p.content.length>140?'...':''}</div></div></div>`).join('') : '<i class="small">ยังไม่มีโพสต์</i>';
       document.getElementById('userPosts').innerHTML = postlist;
     }
 }
