@@ -1,21 +1,36 @@
-<header>
-  <h1><a href="/">COMMUNITY</a></h1>
-  <nav id="navBar"></nav>
+<header class="site-header" role="banner">
+  <div class="container">
+    <div class="header-left" style="align-items:center;">
+      <a class="logo" href="/" aria-label="COMMUNITY home">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="border-radius:8px;">
+          <rect width="24" height="24" rx="6" fill="#2f80ed"></rect>
+          <path d="M7 13h10M7 9h10" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+        <div style="display:flex;flex-direction:column;line-height:1">
+          <div class="brand">COMMUNITY</div>
+          <div class="tagline">พื้นที่แลกเปลี่ยนความรู้</div>
+        </div>
+      </a>
+
+      <nav aria-label="Primary" style="display:flex;gap:12px;">
+        <a href="/" title="หน้าแรก">หน้าแรก</a>
+        <a href="/post/create" title="สร้างโพสต์">สร้างโพสต์</a>
+        <a href="/accounts" title="จัดการบัญชี">บัญชี</a>
+      </nav>
+    </div>
+
+    <div class="header-search" role="search" aria-label="Site search">
+      <form onsubmit="event.preventDefault(); const q=this.query.value.trim(); if(q) location.href='/search?q='+encodeURIComponent(q);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="margin-left:6px" aria-hidden="true"><path d="M21 21l-4.35-4.35" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="11" cy="11" r="6" stroke="#97a0b3" stroke-width="2"></circle></svg>
+        <input type="search" name="query" placeholder="ค้นหาบทความ ผู้ใช้งาน หรือแท็ก" aria-label="ค้นหา">
+      </form>
+    </div>
+
+    <div class="header-actions" id="navBar" aria-hidden="false">
+      <!-- navBar is intentionally left as a hook for public/js/main.js to populate
+           it will render account area (avatar / sign in links) and notification bell -->
+    </div>
+  </div>
 </header>
 
-<!-- Account dropdown / notifications (rendered by JS) -->
-<!-- Add account modal -->
-<div id="addAccountModal" class="modal-hidden">
-  <div class="modal-panel">
-    <h3>เพิ่มบัญชี</h3>
-    <form id="addAccountForm">
-      <input type="email" name="email" placeholder="อีเมล" required>
-      <input type="password" name="password" placeholder="รหัสผ่าน" required>
-      <div style="text-align:right;margin-top:.5em;">
-        <button id="cancelAddAccount" type="button" class="btn-muted">ยกเลิก</button>
-        <button type="submit">เพิ่มบัญชี</button>
-      </div>
-      <p id="addAccountMsg" class="form-msg"></p>
-    </form>
-  </div>
-</div>
+<!-- small helper partials remain available to JS, header uses .container for alignment -->
