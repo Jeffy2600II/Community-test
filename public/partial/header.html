@@ -12,6 +12,7 @@
         </div>
       </a>
 
+      <!-- PRIMARY NAV: เก็บไว้ที่นี่เพียงแห่งเดียว -->
       <nav aria-label="Primary" style="display:flex;gap:12px;">
         <a href="/" title="หน้าแรก">หน้าแรก</a>
         <a href="/post/create" title="สร้างโพสต์">สร้างโพสต์</a>
@@ -26,11 +27,7 @@
       </form>
     </div>
 
-    <div class="header-actions" id="navBar" aria-hidden="false">
-      <!-- navBar is intentionally left as a hook for public/js/main.js to populate
-           it will render account area (avatar / sign in links) and notification bell -->
-    </div>
+    <!-- ช่องว่างสำหรับ account area (JS จะเติมเฉพาะส่วนบัญชี/การแจ้งเตือนที่ด้านขวา) -->
+    <div class="header-actions" id="navBar" aria-hidden="false"></div>
   </div>
 </header>
-
-<!-- small helper partials remain available to JS, header uses .container for alignment -->
