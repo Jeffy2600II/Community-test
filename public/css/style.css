@@ -503,13 +503,11 @@ a { color: var(--accent); text-decoration: none; }
 .row { display:flex; gap:12px; align-items:center; }
 .col { display:flex; flex-direction:column; gap:8px; }
 
-/* ======= Mobile-First Professional Redesign (Only Media Queries for Mobile) =======
-   This section completely reworks the UI for mobile devices.
-   Inspired by leading platforms such as YouTube/Google mobile layouts.
-   Applies for screens <= 650px (phones) and tweaks for <= 950px (tablets).
-   All elements are repositioned, resized, and restyled for a true "app-like" mobile experience.
-   Place this CSS block at the end of your main stylesheet.
-   ================================================================================== */
+/* ======= Mobile Professional Redesign: ใช้งานได้จริงกับระบบนี้ =======
+   เฉพาะมือถือ (≤650px) — ใช้แต่คลาสที่มีจริงเท่านั้น
+   ปรับโครงสร้างทุกอย่างให้เป็น mobile-first จริง (header, card, grid, post, form, button, dropdown ฯลฯ)
+   วางไว้ท้ายสุดของไฟล์ style.css
+======================================================================= */
 
 @media (max-width: 650px) {
   :root {
@@ -528,7 +526,7 @@ a { color: var(--accent); text-decoration: none; }
   body {
     font-size: 1rem;
     background: #f7f9fb;
-    padding-bottom: 72px; /* for tabbar */
+    padding-bottom: 54px; /* กันชนล่าง */
   }
   .container {
     max-width: 100vw;
@@ -550,8 +548,7 @@ a { color: var(--accent); text-decoration: none; }
   /* Header: Fixed Top, App-Like */
   .site-header {
     position: fixed;
-    top: 0;
-    left: 0;
+    top: 0; left: 0;
     width: 100vw;
     height: 54px;
     z-index: 2000;
@@ -580,7 +577,6 @@ a { color: var(--accent); text-decoration: none; }
   .logo .tagline {
     display: none;
   }
-  /* Only show icon & hamburger for nav */
   .header-search {
     display: none !important;
   }
@@ -597,51 +593,12 @@ a { color: var(--accent); text-decoration: none; }
     border-radius: 7px !important;
     padding: 0;
   }
-  /* Mobile Tab Bar (Fixed Bottom) */
-  body::after {
-    content: "";
-    display: block;
-    height: 56px;
-  }
-  .mobile-tabbar {
-    position: fixed;
-    left: 0; right: 0; bottom: 0;
-    height: 56px;
-    background: #fff;
-    border-top: 1px solid #ececec;
-    box-shadow: 0 -1px 8px #0001;
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    z-index: 2001;
-  }
-  .mobile-tabbar a {
-    flex: 1;
-    text-align: center;
-    color: var(--muted);
-    padding: 6px 0;
-    font-size: 1.18rem;
-    text-decoration: none;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    align-items: center;
-    font-weight: 600;
-    transition: color 0.18s;
-  }
-  .mobile-tabbar a.active, .mobile-tabbar a:active {
-    color: var(--accent);
-  }
-  .mobile-tabbar .icon {
-    font-size: 1.45rem;
-    display: block;
-  }
   /* Feed/Post List: Cardless, Vertical, Touchable */
-  .feed, .post-list {
+  .feed {
     gap: 0;
     padding: 0;
   }
-  .post, .post-list .post {
+  .post {
     border-radius: 0;
     margin: 0 -10px;
     box-shadow: none;
@@ -790,53 +747,6 @@ a { color: var(--accent); text-decoration: none; }
   /* Hide scrollbars for full-app feel */
   ::-webkit-scrollbar { width: 0 !important; background: transparent !important; }
 }
-
-/* Tablet (small desktop) - slightly less aggressive: */
-@media (min-width: 651px) and (max-width: 950px) {
-  :root {
-    --max-width: 96vw;
-    --max-width-narrow: 96vw;
-    font-size: 16px;
-  }
-  .container {
-    max-width: 96vw;
-    padding: 0 var(--space-md);
-  }
-  .card {
-    border-radius: var(--radius);
-    padding: var(--space-lg) var(--space-md);
-    margin: var(--space-sm) 0;
-  }
-  .site-header .container {
-    height: 60px;
-    padding-left: var(--space-md);
-    padding-right: var(--space-md);
-  }
-  .header-search {
-    display: none !important;
-  }
-  .avatar-btn, .avatar-img {
-    width: 34px !important;
-    height: 34px !important;
-    border-radius: 7px !important;
-  }
-  .profile-hero .avatar, .avatar-circle, .avatar-img {
-    width: 92px !important;
-    height: 92px !important;
-  }
-  .grid-2 {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-  }
-  .dropdown-panel {
-    min-width: 80vw;
-    max-width: 96vw;
-    left: 2vw !important;
-    right: 2vw !important;
-  }
-}
-/* END: Mobile-First Professional Redesign */
 
 /* Provide a subtle focus outline for keyboard users (only show when focusing via keyboard) */
 :root:focus-within .btn:focus { outline-offset: 3px; }
