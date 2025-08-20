@@ -4,6 +4,26 @@
     <meta charset="utf-8">
     <title>โปรไฟล์ของฉัน</title>
     <link rel="stylesheet" href="/css/style.css">
+    <style>
+      .public-profile-btn {
+        margin-top: 12px;
+        display: flex;
+        justify-content: center;
+      }
+      .public-profile-btn .btn {
+        padding: 6px 16px;
+        border-radius: 7px;
+        border: 1px solid #2f80ed;
+        background: #fff;
+        color: #2f80ed;
+        cursor: pointer;
+        transition: background 0.2s;
+        font-size: 1rem;
+      }
+      .public-profile-btn .btn:hover {
+        background: #eaf4ff;
+      }
+    </style>
 </head>
 <body>
   <div id="headerSlot"></div>
@@ -14,16 +34,16 @@
           <img id="heroPic" src="/img/default_profile.png" alt="profile" class="profile-hero avatar">
           <div style="text-align:center;">
             <div id="displayName" style="font-size:1.2rem;font-weight:700"></div>
-            <div id="usernameLine" class="small mt-8"></div>
+            <div id="usernameLine" class="small" style="margin-top:4px"></div>
           </div>
-          <div class="actions mt-8">
+          <div class="actions" style="margin-top:8px;">
             <a href="/profile/edit"><button class="btn btn-primary">แก้ไขโปรไฟล์</button></a>
             <a href="/post/create"><button class="btn btn-ghost">สร้างโพสต์</button></a>
           </div>
           <div class="public-profile-btn">
             <button id="btnViewPublic" class="btn" type="button">ดูโปรไฟล์สาธารณะ</button>
           </div>
-          <div class="small mt-8" id="counts"></div>
+          <div class="small" id="counts" style="margin-top:8px"></div>
         </aside>
 
         <section class="profile-main">
@@ -50,9 +70,9 @@
     document.getElementById('counts').innerHTML = `ติดตาม: ${followingCount} • ผู้ติดตาม: ${followersCount}`;
 
     let aboutHtml = `<h3>เกี่ยวกับ</h3>
-      <div class="small mt-8">${profile.bio ? profile.bio : '<i>ยังไม่มีข้อมูล</i>'}</div>
-      <div class="small mt-10">เข้าร่วมเมื่อ: ${new Date(profile.createdAt).toLocaleDateString()}</div>
-      <div class="small mt-8"><strong>อีเมล:</strong> ${profile.showEmail ? (profile.email || '<i>ไม่มี</i>') : '<i>ซ่อน</i>'}</div>`;
+      <div class="small" style="margin-top:8px">${profile.bio ? profile.bio : '<i>ยังไม่มีข้อมูล</i>'}</div>
+      <div class="small" style="margin-top:10px">เข้าร่วมเมื่อ: ${new Date(profile.createdAt).toLocaleDateString()}</div>
+      <div style="margin-top:8px" class="small"><strong>อีเมล:</strong> ${profile.showEmail ? (profile.email || '<i>ไม่มี</i>') : '<i>ซ่อน</i>'}</div>`;
     document.getElementById('aboutArea').innerHTML = aboutHtml;
 
     // ปุ่มดูโปรไฟล์สาธารณะ
@@ -66,7 +86,7 @@
       const postsData = await pr2.json();
       const posts = postsData.posts || [];
       let postlist = '<div class="section-title"><span>โพสต์ของฉัน</span></div>';
-      postlist += posts.length ? posts.map(p=>`<div class="post" style="padding:10px 12px;margin-bottom:8px;"><div style="flex:1"><h4 style="margin:0"><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div></div></div>`).join('') : '<i class="small">ยังไม่มีโพสต์</i>';
+      postlist += posts.length ? posts.map(p=>`<div class="post" style="padding:10px 12px;margin-bottom:8px;"><div style="flex:1"><h4 style="margin:0"><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div></div></div>`).join('') : '<i>ยังไม่มีโพสต์</i>';
       document.getElementById('myPosts').innerHTML = postlist;
     }
 })();
