@@ -120,6 +120,7 @@
           </div>
           <div class="notif-controls" role="toolbar" aria-label="Notification actions">
             <div class="small" id="notifSummary">กำลังโหลด…</div>
+            <!-- use shared button classes from global CSS; allow wrapping -->
             <button id="btnRefreshNotif" class="btn btn-ghost" type="button" title="รีเฟรชการแจ้งเตือน">รีเฟรช</button>
             <button id="btnMarkAllRead" class="btn btn-primary" type="button" title="ทำเครื่องหมายว่าอ่านทั้งหมด">ทำเครื่องหมายว่าอ่านทั้งหมด</button>
           </div>
@@ -208,8 +209,7 @@
           row.tabIndex = 0;
           row.setAttribute('role', 'button');
 
-          // Use existing button classes for the sign-out/remove action.
-          // Use btn + btn-ghost to ensure consistent styling across the app.
+          // Build contents using existing classes; sign-out/remove uses shared btn classes
           row.innerHTML = `
             <img src="${acc.profilePic || '/img/default_profile.png'}" alt="${acc.username}" class="profile-pic">
             <div class="account-info">
@@ -220,7 +220,7 @@
               <div class="small" style="color:var(--muted)">${escapeHtml(acc.username)}</div>
             </div>
             <div class="account-actions">
-              <button class="btn btn-ghost" data-username="${escapeHtml(acc.username)}" data-action="remove">ออกจากระบบ</button>
+              <button class="btn btn-ghost" data-username="${escapeHtml(acc.username)}" data-action="remove">${activeUsername === acc.username ? 'ออก (Logout)' : 'ออก'}</button>
             </div>
           `;
 
@@ -256,13 +256,12 @@
           removeBtn.addEventListener('click', async (ev) => {
             ev.stopPropagation();
             const un = removeBtn.getAttribute('data-username');
-            if (!confirm(`ออกจากบัญชี ${un} ?`)) return;
+            if (!confirm(`${activeUsername === un ? 'ออกจากระบบและลบจากรายการ?' : 'ออกจากบัญชีนี้?'} `)) return;
             try {
               if (activeUsername === un) {
                 // logout active
                 await apiPost('/api/logout', {});
               } else {
-                // remove stored account
                 await apiPost('/api/accounts/remove', { username: un });
               }
               window.dispatchEvent(new Event('accountsChanged'));
@@ -368,6 +367,7 @@
           } else {
             btnGoto.href = '#';
             btnGoto.addEventListener('click', (e) => e.preventDefault());
+            btnGoto.classList.remove('btn-primary');
             btnGoto.classList.add('btn-ghost');
           }
 
@@ -398,22 +398,24 @@
       // Refresh & Mark All handlers
       btnRefresh.addEventListener('click', async () => {
         btnRefresh.disabled = true;
+        const orig = btnRefresh.textContent;
         btnRefresh.textContent = 'กำลังรีเฟรช…';
         await loadNotifications();
         btnRefresh.disabled = false;
-        btnRefresh.textContent = 'รีเฟรช';
+        btnRefresh.textContent = orig || 'รีเฟรช';
       });
 
       btnMarkAll.addEventListener('click', async () => {
         if (!confirm('ทำเครื่องหมายว่าอ่านทั้งหมด?')) return;
         btnMarkAll.disabled = true;
+        const orig = btnMarkAll.textContent;
         btnMarkAll.textContent = 'กำลังบันทึก…';
         try {
           await apiPost('/api/notifications/mark-read', {}); // empty => mark all
         } catch (e) { /* ignore */ }
         await loadNotifications();
         btnMarkAll.disabled = false;
-        btnMarkAll.textContent = 'ทำเครื่องหมายว่าอ่านทั้งหมด';
+        btnMarkAll.textContent = orig || 'ทำเครื่องหมายว่าอ่านทั้งหมด';
         window.dispatchEvent(new Event('accountsChanged'));
       });
 
