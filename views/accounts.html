@@ -207,6 +207,9 @@
           row.className = 'account-row';
           row.tabIndex = 0;
           row.setAttribute('role', 'button');
+
+          // Use existing button classes for the sign-out/remove action.
+          // Use btn + btn-ghost to ensure consistent styling across the app.
           row.innerHTML = `
             <img src="${acc.profilePic || '/img/default_profile.png'}" alt="${acc.username}" class="profile-pic">
             <div class="account-info">
@@ -217,12 +220,13 @@
               <div class="small" style="color:var(--muted)">${escapeHtml(acc.username)}</div>
             </div>
             <div class="account-actions">
-              <button class="btn-muted-inline" data-username="${escapeHtml(acc.username)}" data-action="remove">ออก</button>
+              <button class="btn btn-ghost" data-username="${escapeHtml(acc.username)}" data-action="remove">ออกจากระบบ</button>
             </div>
           `;
+
           // clicking row (except the remove button) switches account if not active
           row.addEventListener('click', async (e) => {
-            if (e.target && e.target.tagName === 'BUTTON') return;
+            if (e.target && (e.target.tagName === 'BUTTON' || e.target.closest('button'))) return;
             if (activeUsername === acc.username) return;
             if (!confirm(`สลับไปใช้บัญชี ${acc.username} ?`)) return;
             try {
@@ -238,6 +242,7 @@
               alert('เกิดข้อผิดพลาดขณะสลับบัญชี');
             }
           });
+
           // keyboard support
           row.addEventListener('keydown', (e) => {
             if ((e.key === 'Enter' || e.key === ' ') ) {
@@ -257,6 +262,7 @@
                 // logout active
                 await apiPost('/api/logout', {});
               } else {
+                // remove stored account
                 await apiPost('/api/accounts/remove', { username: un });
               }
               window.dispatchEvent(new Event('accountsChanged'));
