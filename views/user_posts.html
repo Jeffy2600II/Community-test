@@ -2,15 +2,17 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>โพสต์ของสมาชิก</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <div id="headerSlot"></div>
   <main>
+    <div class="container mt-16" style="max-width:800px;">
       <div class="section-title"><span>โพสต์ของสมาชิก</span></div>
       <div id="userPosts"></div>
+    </div>
   </main>
   <div id="footerSlot"></div>
 <script src="/js/main.js"></script>
@@ -20,7 +22,7 @@ const username = location.pathname.split('/')[2];
     const pr2 = await fetch('/api/user/' + username + '/posts');
     const { posts } = await pr2.json();
     let postlist = '';
-    postlist += posts.length ? posts.map(p=>`<div><a href="/post/${p.id}">${p.title}</a> <span class="small">${new Date(p.createdAt).toLocaleString()}</span></div>`).join('') : '<i>ยังไม่มีโพสต์</i>';
+    postlist += posts.length ? posts.map(p=>`<div class="post" style="padding:10px 12px;margin-bottom:8px;"><div style="flex:1"><h4 style="margin:0"><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div></div></div>`).join('') : '<i class="small">ยังไม่มีโพสต์</i>';
     document.getElementById('userPosts').innerHTML = postlist;
 })();
 </script>
