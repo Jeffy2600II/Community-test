@@ -5,39 +5,11 @@
     <title>แก้ไขโปรไฟล์</title>
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
-    <style>
-      #avatarPreviewCrop { max-width:120px; max-height:120px; border-radius:50%; display:block; margin:10px 0; object-fit:cover; }
-      .modal-fullscreen-bg {
-        position: fixed; z-index: 9999; left: 0; top: 0; width: 100vw; height: 100vh;
-        background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center;
-      }
-      .modal-fullscreen-content {
-        background: #fff; border-radius: 14px; max-width: 96vw; max-height: 96vh; width: 720px;
-        box-shadow: 0 2px 20px 0 #0003; padding: 20px; position: relative; display: flex; gap: 12px;
-        align-items: center; justify-content: center; flex-direction: column;
-      }
-      .modal-fullscreen-content h3 { margin-top:0; }
-      .modal-fullscreen-content .cropper-container { border-radius:50%!important; }
-      .modal-btns { margin-top:16px; display:flex; justify-content: center; gap: 16px; }
-      .modal-btns button { min-width: 90px; }
-      #cropperImage { max-width:640px; max-height:640px; border-radius:0; background:#eee; display:block; }
-      @media (max-width: 720px) {
-        .modal-fullscreen-content { width:96vw; }
-        #cropperImage { max-width:88vw; }
-      }
-      .profile-edit-btns { display: flex; gap: 10px; margin-top: 10px; }
-      .profile-pic-box { display: flex; flex-direction: column; align-items: center; }
-      .profile-pic-box img { border-radius: 50%; background: #eee; box-shadow: 0 1px 8px #0002; }
-      /* small inline message area (hidden by default) - used only for non-blocking error messages */
-      #inlineMsg { display:none; margin-top:8px; color:#b71c1c; font-size:0.95rem; }
-      /* utility hide */
-      .hidden { display: none !important; }
-    </style>
 </head>
 <body>
   <div id="headerSlot"></div>
   <main>
-    <div class="container" style="max-width:720px;margin-top:20px;">
+    <div class="container max-w-720 mt-20">
       <div class="card">
         <div class="section-title"><span>แก้ไขโปรไฟล์</span></div>
         <form id="editProfileForm">
@@ -45,7 +17,7 @@
             <input type="text" name="displayName" placeholder="ชื่อที่แสดง">
             <label class="small">อีเมล (จะเห็นเมื่อตั้งค่าแสดง)</label>
             <input type="email" name="email" placeholder="อีเมล">
-            <div style="margin-top:8px">
+            <div class="mt-8">
               <label><input type="checkbox" name="showEmail" id="showEmail"> แสดงอีเมลในโปรไฟล์สาธารณะ</label>
             </div>
             <div style="text-align:right;margin-top:12px">
@@ -54,7 +26,7 @@
             <p id="msg" class="small" style="margin-top:8px"></p>
         </form>
 
-        <hr style="margin:18px 0;">
+        <hr class="divider">
         <div class="profile-pic-box">
           <img id="avatarPreviewCrop" src="/img/default_profile.png" alt="โปรไฟล์" width="120" height="120">
           <div class="profile-edit-btns" id="picButtons">
@@ -81,7 +53,7 @@
 
         <!-- Modal: Cropper -->
         <div id="cropperModal" class="modal-fullscreen-bg hidden" aria-hidden="true">
-          <div class="modal-fullscreen-content" role="dialog" aria-modal="true">
+          <div class="modal-fullscreen-content cropper-modal" role="dialog" aria-modal="true">
             <h3 id="cropperModalTitle">ปรับตำแหน่งรูปโปรไฟล์</h3>
             <div style="display:flex; gap:16px; width:100%; justify-content:center; align-items:flex-start; flex-wrap:wrap;">
               <img id="cropperImage" src="" alt="Crop" aria-hidden="false">
@@ -107,9 +79,9 @@
   เป้าหมาย:
   - ถ้าไม่มีรูปโปรไฟล์ (profile.profilePic ว่าง) ให้แสดงปุ่ม "อัปโหลดรูปโปรไฟล์" เท่านั้น
     และซ่อนปุ่มแก้ไข/ลบทั้งหมด
-  - ถ้ามีรูปโปรไฟล์ เช่น profile.profilePic มีค่า ให้แสดงปุ่ม "แก้ไขโปรไฟล์" และ "ลบรูป" (และไม่แสดงปุ่มอัปโหลดเดี่ยว)
+  - ถ้ามีรูปโปรไฟล์ ให้แสดงปุ่ม "แก้ไขโปรไฟล์" และ "ลบรูป"
   - ปรับพฤติกรรมการอัปโหลด/แก้ไข/ยกเลิกให้คง preview ไว้ตามที่เคยแก้ไขก่อนหน้า
-  - ไม่มีการแจ้งเตือนเมื่อสำเร็จ; แจ้งเฉพาะเมื่อมีข้อผิดพลาดหรือเมื่อต้องยืนยัน
+  - ไม่มีการแจ้งเตือนเมื่อสำเร็จ; แจ้งเฉพาะเมื่อมีข้อผิดพลาดหรือเมื่อต้องการยืนยัน
 */
 
 let cropper = null;
@@ -322,7 +294,7 @@ document.getElementById('btnCropSave').addEventListener('click', async function(
 
 // Cancel cropping: restore preview to what it was before opening modal
 document.getElementById('btnCropCancel').addEventListener('click', function() {
-  const ok = confirm('คุณต้องการยกเลิกใช่หรือไม่?\nระบบจะยกเลิกการอัปโหลดรูปนี้และการแก้ไขต่างๆจะไม่ถูกบันทึก');
+  const ok = confirm('คุณต้องการยกเลิกใช่หรือไม่?\nระบบจะยกเลิกการอัปโหลดรูปนี้และกู้คืนรูปก่อนหน้า');
   if (!ok) return;
   const preview = document.getElementById('avatarPreviewCrop');
   preview.src = prevPreviewSrc || '/img/default_profile.png';
@@ -386,6 +358,44 @@ document.getElementById('removePicBtn').addEventListener('click', async function
     console.error('init error', e);
   }
 })();
+
+/* Submit profile text form */
+document.getElementById('editProfileForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = {};
+  for (let [k, v] of fd.entries()) {
+    if (k === 'showEmail') {
+      body.showEmail = true;
+    } else {
+      body[k] = v;
+    }
+  }
+  // when checkbox unchecked, ensure false
+  if (!('showEmail' in body)) body.showEmail = false;
+
+  try {
+    const res = await fetch('/api/profile/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    const msgEl = document.getElementById('msg');
+    if (data && data.success) {
+      msgEl.style.color = '#080';
+      msgEl.innerText = 'บันทึกสำเร็จ';
+      setTimeout(() => { location.reload(); }, 700);
+    } else {
+      msgEl.style.color = '#d00';
+      msgEl.innerText = data && data.msg ? data.msg : 'ไม่สามารถบันทึกได้';
+    }
+  } catch (err) {
+    const msgEl = document.getElementById('msg');
+    msgEl.style.color = '#d00';
+    msgEl.innerText = 'เกิดข้อผิดพลาดขณะบันทึก';
+  }
+});
 </script>
 </body>
 </html>
