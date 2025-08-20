@@ -4,6 +4,17 @@
     <meta charset="utf-8">
     <title>โปรไฟล์ของฉัน</title>
     <link rel="stylesheet" href="/css/style.css">
+    <style>
+      .profile-switch-view {
+        display: flex;
+        gap: 10px;
+        margin: 12px 0 0 0;
+        justify-content: center;
+      }
+      .profile-switch-view .btn {
+        min-width: 110px;
+      }
+    </style>
 </head>
 <body>
   <div id="headerSlot"></div>
@@ -20,6 +31,9 @@
             <a href="/profile/edit"><button class="btn btn-primary">แก้ไขโปรไฟล์</button></a>
             <a href="/post/create"><button class="btn btn-ghost">สร้างโพสต์</button></a>
           </div>
+          <div class="profile-switch-view" id="profileSwitchView" style="display:none;">
+            <!-- ปุ่มจะถูกเติมด้วย JS -->
+          </div>
           <div class="small" id="counts" style="margin-top:8px"></div>
         </aside>
 
@@ -35,6 +49,7 @@
 <script src="/js/main.js"></script>
 <script>
 (async ()=>{
+    // โหลดข้อมูลโปรไฟล์ตัวเอง
     const pr = await fetch('/api/profile');
     if (!pr.ok) { location.href = '/login'; return; }
     const data = await pr.json();
@@ -46,6 +61,18 @@
     document.getElementById('usernameLine').innerText = '@' + profile.username;
     document.getElementById('counts').innerHTML = `ติดตาม: ${followingCount} • ผู้ติดตาม: ${followersCount}`;
 
+    // ปุ่มสลับดูโปรไฟล์ส่วนตัว/สาธารณะ
+    const switchView = document.getElementById('profileSwitchView');
+    if (switchView) {
+      // แสดงปุ่มเสมอในหน้า profile (ดู public กับดูส่วนตัว)
+      switchView.style.display = 'flex';
+      switchView.innerHTML = `
+        <a href="/user/${encodeURIComponent(profile.username)}" class="btn btn-ghost">ดูโปรไฟล์แบบสาธารณะ</a>
+        <a href="/profile" class="btn btn-muted">ดูโปรไฟล์แบบเจ้าของ</a>
+      `;
+    }
+
+    // about
     let aboutHtml = `<h3>เกี่ยวกับ</h3>
       <div class="small" style="margin-top:8px">${profile.bio ? profile.bio : '<i>ยังไม่มีข้อมูล</i>'}</div>
       <div class="small" style="margin-top:10px">เข้าร่วมเมื่อ: ${new Date(profile.createdAt).toLocaleDateString()}</div>
@@ -58,7 +85,7 @@
       const postsData = await pr2.json();
       const posts = postsData.posts || [];
       let postlist = '<div class="section-title"><span>โพสต์ของฉัน</span></div>';
-      postlist += posts.length ? posts.map(p=>`<div class="post" style="padding:10px 12px;margin-bottom:8px;"><div style="flex:1"><h4 style="margin:0"><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div><div style="margin-top:6px">${p.content.slice(0,160)}${p.content.length>160?'...':''}</div></div></div>`).join('') : '<i class="small">ยังไม่มีโพสต์</i>';
+      postlist += posts.length ? posts.map(p=>`<div class="post" style="padding:10px 12px;margin-bottom:8px;"><div style="flex:1"><h4 style="margin:0"><a href="/post/${p.id}">${p.title}</a></h4><div class="small" style="color:#888">${new Date(p.createdAt).toLocaleString()}</div></div></div>`).join('') : '<div class="small" style="padding:14px 0;">ยังไม่มีโพสต์</div>';
       document.getElementById('myPosts').innerHTML = postlist;
     }
 })();
