@@ -1,25 +1,48 @@
-<header class="site-header" role="banner">
-  <div class="container">
-    <a class="logo" href="/" aria-label="COMMUNITY home">
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="border-radius:8px;">
-        <rect width="24" height="24" rx="6" fill="#2f80ed"></rect>
-        <path d="M7 13h10M7 9h10" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path>
-      </svg>
-      <div style="display:flex;flex-direction:column;line-height:1">
-        <div class="brand">COMMUNITY</div>
-        <div class="tagline">พื้นที่แลกเปลี่ยนความรู้</div>
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="utf-8">
+    <title>สร้างโพสต์ใหม่</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="headerSlot"></div>
+  <main>
+    <div class="container max-w-800 mt-24">
+      <div class="card">
+        <div class="section-title"><span>สร้างโพสต์ใหม่</span></div>
+        <form id="postForm" enctype="multipart/form-data">
+            <label class="small">หัวข้อ</label>
+            <input type="text" name="title" placeholder="หัวข้อ" required>
+            <label class="small">เนื้อหา</label>
+            <textarea name="content" placeholder="เนื้อหา" required></textarea>
+            <div class="input-file mt-8">
+              <label class="btn btn-ghost" style="display:inline-flex;align-items:center;gap:8px;">
+                แนบรูป (ถ้ามี) <input type="file" name="postImage">
+              </label>
+            </div>
+            <div style="text-align:right;margin-top:12px">
+              <button type="submit" class="btn btn-primary">โพสต์</button>
+            </div>
+            <p id="msg" class="small" style="margin-top:8px"></p>
+        </form>
       </div>
-    </a>
-
-    <div class="header-search" role="search" aria-label="Site search">
-      <form onsubmit="event.preventDefault(); const q=this.query.value.trim(); if(q) location.href='/search?q='+encodeURIComponent(q);">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="margin-left:6px" aria-hidden="true"><path d="M21 21l-4.35-4.35" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="11" cy="11" r="6" stroke="#97a0b3" stroke-width="2"></circle></svg>
-        <input type="search" name="query" placeholder="ค้นหาบทความ ผู้ใช้งาน หรือแท็ก" aria-label="ค้นหา">
-      </form>
     </div>
-
-    <!-- navBar is a hook for JS to populate account-actions / notifications.
-         Do NOT include static navigation links here to avoid duplication. -->
-    <div id="navBar" class="header-actions" aria-hidden="false"></div>
-  </div>
-</header>
+  </main>
+  <div id="footerSlot"></div>
+<script src="/js/main.js"></script>
+<script>
+document.getElementById('postForm').onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const res = await fetch('/api/post/create', {
+        method: 'POST',
+        body: fd
+    });
+    const data = await res.json();
+    document.getElementById('msg').innerText = data.success ? 'โพสต์สำเร็จ' : data.msg;
+    if (data.success) setTimeout(() => location.replace('/post/'+data.postId), 1200);
+};
+</script>
+</body>
+</html>
