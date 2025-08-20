@@ -4,8 +4,34 @@
     <meta charset="utf-8">
     <title>แก้ไขโปรไฟล์</title>
     <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
     <style>
-      #avatarPreview { max-width:100px; max-height:100px; border-radius:50%; display: block; margin: 10px 0; }
+      #avatarPreviewCrop { max-width:120px; max-height:120px; border-radius:50%; display:block; margin:10px 0; object-fit:cover; }
+      .modal-fullscreen-bg {
+        position: fixed; z-index: 9999; left: 0; top: 0; width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center;
+      }
+      .modal-fullscreen-content {
+        background: #fff; border-radius: 14px; max-width: 96vw; max-height: 96vh; width: 720px;
+        box-shadow: 0 2px 20px 0 #0003; padding: 20px; position: relative; display: flex; gap: 12px;
+        align-items: center; justify-content: center; flex-direction: column;
+      }
+      .modal-fullscreen-content h3 { margin-top:0; }
+      .modal-fullscreen-content .cropper-container { border-radius:50%!important; }
+      .modal-btns { margin-top:16px; display:flex; justify-content: center; gap: 16px; }
+      .modal-btns button { min-width: 90px; }
+      #cropperImage { max-width:640px; max-height:640px; border-radius:0; background:#eee; display:block; }
+      @media (max-width: 720px) {
+        .modal-fullscreen-content { width:96vw; }
+        #cropperImage { max-width:88vw; }
+      }
+      .profile-edit-btns { display: flex; gap: 10px; margin-top: 10px; }
+      .profile-pic-box { display: flex; flex-direction: column; align-items: center; }
+      .profile-pic-box img { border-radius: 50%; background: #eee; box-shadow: 0 1px 8px #0002; }
+      /* small inline message area (hidden by default) - used only for non-blocking error messages */
+      #inlineMsg { display:none; margin-top:8px; color:#b71c1c; font-size:0.95rem; }
+      /* utility hide */
+      .hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -29,24 +55,314 @@
         </form>
 
         <hr style="margin:18px 0;">
+        <div class="profile-pic-box">
+          <img id="avatarPreviewCrop" src="/img/default_profile.png" alt="โปรไฟล์" width="120" height="120">
+          <div class="profile-edit-btns" id="picButtons">
+            <!-- Upload button (shown only when no profilePic) -->
+            <button id="uploadPicBtn" class="btn btn-primary" type="button" style="display:none;">อัปโหลดรูปโปรไฟล์</button>
+            <!-- Edit / Remove (shown only when profilePic exists) -->
+            <button id="editPicBtn" class="btn btn-primary" type="button" style="display:none;">แก้ไขโปรไฟล์</button>
+            <button id="removePicBtn" type="button" class="btn btn-ghost" style="display:none;">ลบรูป</button>
+          </div>
+          <div id="inlineMsg" role="status" aria-live="polite"></div>
+        </div>
 
-        <form id="picForm" enctype="multipart/form-data">
-            <label class="small">รูปโปรไฟล์</label>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <label class="btn btn-ghost">เลือกไฟล์ <input type="file" id="avatarInput" name="profilePic" accept="image/*"></label>
-              <button type="submit" class="btn btn-primary">อัปโหลด</button>
-              <button id="removePicBtn" type="button" class="btn btn-ghost">ลบรูป</button>
+        <!-- Modal: เลือกว่าจะอัปโหลดใหม่หรือแก้ไข (only used when profile exists) -->
+        <div id="chooseEditModal" class="modal-fullscreen-bg hidden" aria-hidden="true">
+          <div class="modal-fullscreen-content" role="dialog" aria-modal="true">
+            <h3>แก้ไขรูปโปรไฟล์</h3>
+            <div style="margin:20px 0; display:flex; flex-direction:column; gap:10px; width:100%; align-items:center;">
+              <button id="btnUploadNew" class="btn btn-primary" style="width:60%;">อัปโหลดรูปใหม่</button>
+              <button id="btnEditCurrent" class="btn btn-ghost" style="width:60%;">แก้ไขรูปโปรไฟล์ปัจจุบัน</button>
             </div>
-            <canvas id="avatarPreview" width="100" height="100" style="display:none;"></canvas>
-        </form>
+            <button id="btnChooseEditCancel" class="btn btn-ghost">ยกเลิก</button>
+          </div>
+        </div>
+
+        <!-- Modal: Cropper -->
+        <div id="cropperModal" class="modal-fullscreen-bg hidden" aria-hidden="true">
+          <div class="modal-fullscreen-content" role="dialog" aria-modal="true">
+            <h3 id="cropperModalTitle">ปรับตำแหน่งรูปโปรไฟล์</h3>
+            <div style="display:flex; gap:16px; width:100%; justify-content:center; align-items:flex-start; flex-wrap:wrap;">
+              <img id="cropperImage" src="" alt="Crop" aria-hidden="false">
+            </div>
+            <div class="modal-btns">
+              <button id="btnCropSave" class="btn btn-primary">บันทึก</button>
+              <button id="btnCropCancel" class="btn btn-ghost">ยกเลิก</button>
+            </div>
+            <!-- hidden file input for upload new -->
+            <input type="file" id="avatarInput" accept="image/*" style="display:none;">
+          </div>
+        </div>
+
       </div>
     </div>
   </main>
   <div id="footerSlot"></div>
 
 <script src="/js/main.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
 <script>
-(async ()=>{
+/*
+  เป้าหมาย:
+  - ถ้าไม่มีรูปโปรไฟล์ (profile.profilePic ว่าง) ให้แสดงปุ่ม "อัปโหลดรูปโปรไฟล์" เท่านั้น
+    และซ่อนปุ่มแก้ไข/ลบทั้งหมด
+  - ถ้ามีรูปโปรไฟล์ เช่น profile.profilePic มีค่า ให้แสดงปุ่ม "แก้ไขโปรไฟล์" และ "ลบรูป" (และไม่แสดงปุ่มอัปโหลดเดี่ยว)
+  - ปรับพฤติกรรมการอัปโหลด/แก้ไข/ยกเลิกให้คง preview ไว้ตามที่เคยแก้ไขก่อนหน้า
+  - ไม่มีการแจ้งเตือนเมื่อสำเร็จ; แจ้งเฉพาะเมื่อมีข้อผิดพลาดหรือเมื่อต้องยืนยัน
+*/
+
+let cropper = null;
+let croppedBlob = null;
+let lastFile = null;
+let currentProfilePicUrl = '';
+let currentProfilePicOriginalUrl = '';
+let originalBlob = null;
+let prevPreviewSrc = '';
+let tempObjectUrl = null;
+
+/* utilities to show/hide modals */
+function showChooseModal(show) {
+  const el = document.getElementById('chooseEditModal');
+  el.classList.toggle('hidden', !show);
+  el.setAttribute('aria-hidden', !show);
+}
+function showCropperModal(show) {
+  const el = document.getElementById('cropperModal');
+  el.classList.toggle('hidden', !show);
+  el.setAttribute('aria-hidden', !show);
+}
+
+/* show/hide buttons depending on whether user has a profilePic */
+function updatePicButtons() {
+  const hasPic = !!currentProfilePicUrl && currentProfilePicUrl !== '/img/default_profile.png';
+  document.getElementById('uploadPicBtn').style.display = hasPic ? 'none' : 'inline-block';
+  document.getElementById('editPicBtn').style.display = hasPic ? 'inline-block' : 'none';
+  document.getElementById('removePicBtn').style.display = hasPic ? 'inline-block' : 'none';
+}
+
+/* inline error message */
+function setInlineMsg(text) {
+  const el = document.getElementById('inlineMsg');
+  if (!text) { el.style.display = 'none'; el.textContent = ''; }
+  else { el.style.display = 'block'; el.textContent = text; }
+}
+
+/* cropper setup/cleanup */
+function setupCropper(imgEl) {
+  if (cropper) { cropper.destroy(); cropper = null; }
+  cropper = new Cropper(imgEl, {
+    aspectRatio: 1,
+    viewMode: 1,
+    dragMode: 'move',
+    autoCropArea: 1,
+    minCropBoxWidth: 120,
+    minCropBoxHeight: 120,
+    movable: true,
+    scalable: true,
+    zoomable: true,
+    rotatable: false,
+    cropBoxResizable: true,
+    background: false,
+    guides: false,
+    highlight: false,
+    center: true,
+    crop() {
+      const canvas = cropper.getCroppedCanvas({ width: 400, height: 400, imageSmoothingQuality: 'high' });
+      if (!canvas) return;
+      const preview = document.getElementById('avatarPreviewCrop');
+      preview.style.display = 'block';
+      preview.src = canvas.toDataURL('image/jpeg', 0.92);
+      canvas.toBlob(function(blob){ croppedBlob = blob; }, 'image/jpeg', 0.92);
+    }
+  });
+}
+
+async function openCropperModal(file, fromCurrent = false) {
+  // save current preview to be able to restore on cancel
+  const previewEl = document.getElementById('avatarPreviewCrop');
+  prevPreviewSrc = previewEl.src || '';
+
+  const imgEl = document.getElementById('cropperImage');
+
+  // cleanup previous object url
+  if (tempObjectUrl) {
+    try { URL.revokeObjectURL(tempObjectUrl); } catch(e) {}
+    tempObjectUrl = null;
+  }
+
+  if (fromCurrent) {
+    if (currentProfilePicOriginalUrl) {
+      try {
+        const r = await fetch(currentProfilePicOriginalUrl + '?t=' + Date.now());
+        if (!r.ok) throw new Error('fetch original failed');
+        const blob = await r.blob();
+        originalBlob = blob;
+        tempObjectUrl = URL.createObjectURL(blob);
+        imgEl.src = tempObjectUrl;
+        showCropperModal(true);
+        imgEl.onload = () => setupCropper(imgEl);
+      } catch (e) {
+        console.warn('Cannot fetch original, falling back to avatar:', e && e.message);
+        originalBlob = null;
+        if (currentProfilePicUrl) {
+          tempObjectUrl = currentProfilePicUrl + '?t=' + Date.now();
+          imgEl.src = tempObjectUrl;
+          showCropperModal(true);
+          imgEl.onload = () => setupCropper(imgEl);
+        } else {
+          setInlineMsg('ไม่พบรูปต้นฉบับสำหรับแก้ไข โปรดอัปโหลดรูปใหม่');
+        }
+      }
+    } else {
+      setInlineMsg('ไม่มีรูปต้นฉบับให้แก้ไข (original) — โปรดอัปโหลดรูปใหม่');
+    }
+  } else {
+    if (!file) return;
+    lastFile = file;
+    originalBlob = file;
+    tempObjectUrl = URL.createObjectURL(file);
+    imgEl.src = tempObjectUrl;
+    showCropperModal(true);
+    imgEl.onload = () => setupCropper(imgEl);
+  }
+}
+
+function closeCropperModalAndCleanup() {
+  if (cropper) { cropper.destroy(); cropper = null; }
+  const imgEl = document.getElementById('cropperImage');
+  imgEl.src = '';
+  showCropperModal(false);
+  if (tempObjectUrl && tempObjectUrl.startsWith('blob:')) {
+    try { URL.revokeObjectURL(tempObjectUrl); } catch(e) {}
+  }
+  tempObjectUrl = null;
+  setInlineMsg('');
+}
+
+/* Button handlers */
+
+// When there's no profile, this upload button is shown — open file picker
+document.getElementById('uploadPicBtn').addEventListener('click', function() {
+  setInlineMsg('');
+  document.getElementById('avatarInput').value = '';
+  document.getElementById('avatarInput').click();
+});
+
+// Edit button (when profile exists) => show choose modal
+document.getElementById('editPicBtn').addEventListener('click', function() {
+  setInlineMsg('');
+  showChooseModal(true);
+});
+document.getElementById('btnChooseEditCancel').addEventListener('click', function() {
+  showChooseModal(false);
+});
+
+// In choose modal: upload new or edit current
+document.getElementById('btnUploadNew').addEventListener('click', function() {
+  showChooseModal(false);
+  document.getElementById('avatarInput').value = '';
+  document.getElementById('avatarInput').click();
+});
+document.getElementById('btnEditCurrent').addEventListener('click', function() {
+  showChooseModal(false);
+  openCropperModal(null, true);
+});
+
+// file input change (user chose a new file)
+document.getElementById('avatarInput').addEventListener('change', function(e) {
+  const file = this.files[0];
+  if (!file) return;
+  openCropperModal(file, false);
+});
+
+// Save: crop and upload (send profilePic and original if available)
+document.getElementById('btnCropSave').addEventListener('click', async function() {
+  if (!cropper) return;
+  const canvas = cropper.getCroppedCanvas({ width: 800, height: 800, imageSmoothingQuality: 'high' });
+  if (!canvas) { setInlineMsg('ไม่สามารถตัดภาพได้'); return; }
+  canvas.toBlob(async function(blob) {
+    croppedBlob = blob;
+    const preview = document.getElementById('avatarPreviewCrop');
+    preview.src = canvas.toDataURL('image/jpeg', 0.92);
+
+    const fd = new FormData();
+    fd.append('profilePic', croppedBlob, 'avatar.jpg');
+    if (originalBlob) {
+      fd.append('original', originalBlob, 'original.jpg');
+    }
+
+    try {
+      const res = await fetch('/api/profile/upload-pic', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data && data.success) {
+        // update current urls silently; use server avatar path if available
+        if (data.url) {
+          currentProfilePicUrl = data.url;
+          preview.src = data.url + '?t=' + Date.now();
+        }
+        if (data.original) currentProfilePicOriginalUrl = data.original;
+        closeCropperModalAndCleanup();
+        // no alert on success — update UI and reload to sync server state
+        updatePicButtons();
+        location.reload();
+      } else {
+        setInlineMsg((data && data.msg) ? data.msg : 'เกิดข้อผิดพลาดในการอัปโหลด');
+        preview.src = prevPreviewSrc || '/img/default_profile.png';
+        closeCropperModalAndCleanup();
+      }
+    } catch (e) {
+      console.error('upload error', e);
+      setInlineMsg('การเชื่อมต่อไปยังเซิร์ฟเวอร์ล้มเหลว');
+      preview.src = prevPreviewSrc || '/img/default_profile.png';
+      closeCropperModalAndCleanup();
+    }
+  }, 'image/jpeg', 0.92);
+});
+
+// Cancel cropping: restore preview to what it was before opening modal
+document.getElementById('btnCropCancel').addEventListener('click', function() {
+  const ok = confirm('คุณต้องการยกเลิกใช่หรือไม่?\nระบบจะยกเลิกการอัปโหลดรูปนี้และการแก้ไขต่างๆจะไม่ถูกบันทึก');
+  if (!ok) return;
+  const preview = document.getElementById('avatarPreviewCrop');
+  preview.src = prevPreviewSrc || '/img/default_profile.png';
+  croppedBlob = null;
+  lastFile = null;
+  originalBlob = null;
+  if (tempObjectUrl && tempObjectUrl.startsWith('blob:')) {
+    try { URL.revokeObjectURL(tempObjectUrl); } catch(e) {}
+  }
+  tempObjectUrl = null;
+  document.getElementById('avatarInput').value = '';
+  closeCropperModalAndCleanup();
+});
+
+// remove profile
+document.getElementById('removePicBtn').addEventListener('click', async function() {
+  if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบรูปโปรไฟล์?')) return;
+  try {
+    const res = await fetch('/api/profile/remove-pic', { method: 'POST' });
+    const d = await res.json();
+    if (d && d.success) {
+      // update UI silently
+      document.getElementById('avatarPreviewCrop').src = '/img/default_profile.png';
+      currentProfilePicUrl = '';
+      currentProfilePicOriginalUrl = '';
+      updatePicButtons();
+      // reload to sync server state (no alert)
+      location.reload();
+    } else {
+      setInlineMsg('ลบรูปไม่สำเร็จ');
+    }
+  } catch (e) {
+    console.error('remove error', e);
+    setInlineMsg('เกิดข้อผิดพลาดขณะลบรูป');
+  }
+});
+
+/* Load profile on page load */
+(async function init() {
+  try {
     const pr = await fetch('/api/profile');
     if (!pr.ok) { location.href = '/login'; return; }
     const data = await pr.json();
@@ -55,76 +371,21 @@
     document.querySelector('input[name=displayName]').value = profile.displayName || '';
     document.querySelector('input[name=email]').value = profile.email || '';
     document.getElementById('showEmail').checked = !!profile.showEmail;
+
+    // determine current profile URLs; if profilePic empty -> no profile
+    currentProfilePicUrl = profile.profilePic && profile.profilePic !== '' ? profile.profilePic : '';
+    currentProfilePicOriginalUrl = profile.profilePicOriginal && profile.profilePicOriginal !== '' ? profile.profilePicOriginal : '';
+
+    // set preview: if have cropped avatar use it (cache-busted), otherwise default image
+    const previewEl = document.getElementById('avatarPreviewCrop');
+    if (currentProfilePicUrl) previewEl.src = currentProfilePicUrl + '?t=' + Date.now();
+    else previewEl.src = '/img/default_profile.png';
+
+    updatePicButtons();
+  } catch (e) {
+    console.error('init error', e);
+  }
 })();
-
-// --------- PROFILE FORM ---------
-document.getElementById('editProfileForm').onsubmit = async e => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const body = {
-        displayName: fd.get('displayName'),
-        email: fd.get('email'),
-        showEmail: document.getElementById('showEmail').checked
-    };
-    const res = await fetch('/api/profile/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-    });
-    const data = await res.json();
-    document.getElementById('msg').innerText = data.success ? 'บันทึกสำเร็จ' : (data.msg || 'ผิดพลาด');
-    if (data.success) setTimeout(() => location.replace('/profile'), 800);
-};
-
-// --------- PROFILE PIC CROP + UPLOAD ---------
-let croppedBlob = null;
-document.getElementById('avatarInput').addEventListener('change', function(e) {
-  const file = this.files[0];
-  if (!file) return;
-  const img = new Image();
-  const url = URL.createObjectURL(file);
-  img.onload = function() {
-    const min = Math.min(img.width, img.height);
-    const sx = (img.width - min) / 2;
-    const sy = (img.height - min) / 2;
-    const canvas = document.getElementById('avatarPreview');
-    canvas.width = canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.drawImage(img, sx, sy, min, min, 0, 0, canvas.width, canvas.height);
-    canvas.style.display = 'block';
-    // สร้าง blob สำหรับอัปโหลดจริง
-    canvas.toBlob(function(blob){
-      croppedBlob = blob;
-    }, 'image/jpeg', 0.92);
-    URL.revokeObjectURL(url);
-  };
-  img.src = url;
-});
-
-document.getElementById('picForm').onsubmit = async e => {
-    e.preventDefault();
-    const fd = new FormData();
-    if (croppedBlob) {
-      fd.append('profilePic', croppedBlob, 'avatar.jpg');
-    } else {
-      // fallback: ยังไม่ได้เลือกหรือ crop
-      const fileInput = document.getElementById('avatarInput');
-      if (fileInput.files[0]) {
-        fd.append('profilePic', fileInput.files[0]);
-      }
-    }
-    const res = await fetch('/api/profile/upload-pic', { method: 'POST', body: fd });
-    const data = await res.json();
-    if (data.success) alert('อัปโหลดสำเร็จ!'); else alert('ผิดพลาด');
-    if (data.success) location.reload();
-};
-
-document.getElementById('removePicBtn').onclick = async () => {
-    if (!confirm('ลบรูปโปรไฟล์?')) return;
-    await fetch('/api/profile/remove-pic', { method: 'POST' });
-    location.reload();
-};
 </script>
 </body>
 </html>
