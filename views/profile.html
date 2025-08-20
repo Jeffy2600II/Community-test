@@ -1,68 +1,95 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="utf-8">
-  <title>โปรไฟล์ของฉัน — Community</title>
-  <link rel="stylesheet" href="/css/style.css">
-  <style>
-    .profile-header { display:flex; align-items:center; gap:1.2rem; margin-bottom:2rem; }
-    .profile-avatar { width:90px; height:90px; border-radius:50%; object-fit:cover; }
-    .profile-meta { flex:1; }
-    .profile-section { margin-bottom:2.2rem; }
-    .btn { padding:6px 14px; border-radius:7px; border:1px solid #ddd; background:#fff; cursor:pointer; }
-    .btn-secondary { background:#f9f9f9; color:#333; }
-  </style>
+    <meta charset="utf-8">
+    <title>โปรไฟล์ของฉัน</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+      .public-profile-btn {
+        margin-top: 12px;
+        display: flex;
+        justify-content: center;
+      }
+      .public-profile-btn .btn {
+        padding: 6px 16px;
+        border-radius: 7px;
+        border: 1px solid #2f80ed;
+        background: #fff;
+        color: #2f80ed;
+        cursor: pointer;
+        transition: background 0.2s;
+        font-size: 1rem;
+      }
+      .public-profile-btn .btn:hover {
+        background: #eaf4ff;
+      }
+    </style>
 </head>
 <body>
   <div id="headerSlot"></div>
   <main>
-    <div class="profile-header">
-      <img id="profileAvatar" class="profile-avatar" src="/img/default_profile.png" alt="avatar">
-      <div class="profile-meta">
-        <div id="profileDisplayName" style="font-size:1.5rem;font-weight:700;">ชื่อผู้ใช้</div>
-        <div id="profileUsername" style="color:#888;margin-top:0.2rem;">@username</div>
-        <div id="profileBio" class="small" style="margin-top:.6rem;"></div>
-        <div style="margin-top:1rem;">
-          <!-- ปุ่มดูโปรไฟล์สาธารณะ -->
-          <button id="btnViewPublic" class="btn btn-secondary">ดูโปรไฟล์สาธารณะ</button>
-        </div>
+    <div class="container">
+      <div class="grid-2">
+        <aside class="profile-hero card" id="hero">
+          <img id="heroPic" src="/img/default_profile.png" alt="profile" class="profile-hero avatar">
+          <div style="text-align:center;">
+            <div id="displayName" style="font-size:1.2rem;font-weight:700"></div>
+            <div id="usernameLine" class="small" style="margin-top:4px"></div>
+          </div>
+          <div class="actions" style="margin-top:8px;">
+            <a href="/profile/edit"><button class="btn btn-primary">แก้ไขโปรไฟล์</button></a>
+            <a href="/post/create"><button class="btn btn-ghost">สร้างโพสต์</button></a>
+          </div>
+          <div class="public-profile-btn">
+            <button id="btnViewPublic" class="btn" type="button">ดูโปรไฟล์สาธารณะ</button>
+          </div>
+          <div class="small" id="counts" style="margin-top:8px"></div>
+        </aside>
+
+        <section class="profile-main">
+          <div class="card" id="aboutArea"></div>
+          <div class="card" id="myPosts" style="margin-top:12px"></div>
+        </section>
       </div>
-    </div>
-    <div class="profile-section">
-      <strong>บทความของฉัน</strong>
-      <div id="myPosts"></div>
     </div>
   </main>
   <div id="footerSlot"></div>
-  <script src="/js/main.js"></script>
-  <script>
-    // โหลดข้อมูลโปรไฟล์ผู้ใช้ที่ล็อกอิน
-    async function loadProfile() {
-      try {
-        const res = await fetch('/api/account/profile');
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-        document.getElementById('profileAvatar').src = data.profilePic||'/img/default_profile.png';
-        document.getElementById('profileDisplayName').textContent = data.displayName||data.username;
-        document.getElementById('profileUsername').textContent = '@' + data.username;
-        document.getElementById('profileBio').textContent = data.bio||'';
-        // ปุ่มดูโปรไฟล์สาธารณะ
-        document.getElementById('btnViewPublic').onclick = function() {
-          window.location.href = '/user/' + encodeURIComponent(data.username);
-        };
-        // โหลดโพสต์
-        if (Array.isArray(data.posts)) {
-          const posts = data.posts.map(
-            p => `<div style="margin-top:10px;"><a href="/post/${p.id}">${p.title}</a></div>`
-          ).join('');
-          document.getElementById('myPosts').innerHTML = posts || '<i>ยังไม่มีโพสต์</i>';
-        }
-      } catch (e) {
-        document.getElementById('profileDisplayName').textContent = 'ไม่พบข้อมูล';
-        document.getElementById('profileUsername').textContent = '';
-      }
+
+<script src="/js/main.js"></script>
+<script>
+(async ()=>{
+    const pr = await fetch('/api/profile');
+    if (!pr.ok) { location.href = '/login'; return; }
+    const data = await pr.json();
+    if (!data.success) { document.getElementById('aboutArea').innerText = 'ไม่สามารถโหลดโปรไฟล์'; return; }
+    const { profile, followersCount, followingCount } = data;
+
+    document.getElementById('heroPic').src = profile.profilePic || '/img/default_profile.png';
+    document.getElementById('displayName').innerText = profile.displayName || profile.username;
+    document.getElementById('usernameLine').innerText = '@' + profile.username;
+    document.getElementById('counts').innerHTML = `ติดตาม: ${followingCount} • ผู้ติดตาม: ${followersCount}`;
+
+    let aboutHtml = `<h3>เกี่ยวกับ</h3>
+      <div class="small" style="margin-top:8px">${profile.bio ? profile.bio : '<i>ยังไม่มีข้อมูล</i>'}</div>
+      <div class="small" style="margin-top:10px">เข้าร่วมเมื่อ: ${new Date(profile.createdAt).toLocaleDateString()}</div>
+      <div style="margin-top:8px" class="small"><strong>อีเมล:</strong> ${profile.showEmail ? (profile.email || '<i>ไม่มี</i>') : '<i>ซ่อน</i>'}</div>`;
+    document.getElementById('aboutArea').innerHTML = aboutHtml;
+
+    // ปุ่มดูโปรไฟล์สาธารณะ
+    document.getElementById('btnViewPublic').onclick = function() {
+      window.location.href = '/user/' + encodeURIComponent(profile.username);
+    };
+
+    // โพสต์ของฉัน
+    const pr2 = await fetch('/api/user/' + encodeURIComponent(profile.username) + '/posts');
+    if (pr2.ok) {
+      const postsData = await pr2.json();
+      const posts = postsData.posts || [];
+      let postlist = '<div class="section-title"><span>โพสต์ของฉัน</span></div>';
+      postlist += posts.length ? posts.map(p=>`<div class="post" style="padding:10px 12px;margin-bottom:8px;"><div style="flex:1"><h4 style="margin:0"><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div></div></div>`).join('') : '<i>ยังไม่มีโพสต์</i>';
+      document.getElementById('myPosts').innerHTML = postlist;
     }
-    loadProfile();
-  </script>
+})();
+</script>
 </body>
 </html>
