@@ -617,10 +617,33 @@ img { max-width: 100%; height: auto; display: block; }
   .logo .brand { font-size: 1rem; }
   .logo .tagline { display:none; }
 
-  /* header-bottom collapsed by default */
-  .header-bottom { opacity: 0; pointer-events: none; transform: translateY(-100%);
-    background: #ffffff; }
-  .header-bottom.open { opacity: 1; pointer-events: auto; transform: translateY(100%); }
+ /* header-bottom collapsed by default */
+.header-bottom {
+  position: fixed; /* ทำให้มัน overlay ได้ */
+  top: 0; 
+  left: 0;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.9); /* โปร่งใส + ทันสมัย */
+  backdrop-filter: blur(10px); /* ให้ดูเป็น glass effect */
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15); /* shadow สวยๆ */
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+  
+  transition: 
+    transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.3s ease;
+  z-index: 1000;
+}
+
+/* เมื่อเปิด */
+.header-bottom.open {
+  transform: translateY(0); /* เลื่อนลงมาเต็มๆ */
+  opacity: 1;
+  pointer-events: auto;
+}
 
   /* show mobile toggle button */
   #mobileMenuToggle { display: inline-flex; }
