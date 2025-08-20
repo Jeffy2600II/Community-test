@@ -157,6 +157,10 @@
       <div id="activeAccountPanel" class="card hidden" aria-hidden="true">
         <h3>บัญชีที่ใช้งานอยู่</h3>
         <div id="activeAccountInfo" class="mt-16"></div>
+        <!-- New: go-to-profile button placed below active profile info -->
+        <div id="activeAccountActions" class="mt-16" style="display:none;">
+          <a id="btnGoToProfile" class="btn btn-ghost" href="/profile">ไปที่โปรไฟล์</a>
+        </div>
       </div>
 
       <div class="card notif-card" id="notificationsCard" aria-live="polite">
@@ -185,20 +189,18 @@
   <script>
     /**
      * Updated accounts.html behavior:
-     * - Removed per-item "ไปที่" button and per-item visible "mark" button.
-     * - Added kebab (3-dot) menu at top-right of each notification; dropdown only has "ทำเครื่องหมายว่าอ่าน/ไม่อ่าน".
-     * - Clicking anywhere on a notification navigates to its target (if available) and marks it read.
-     * - Implement "smart" incremental updates: poll server periodically and diff changes (add/update/remove) without re-rendering entire list.
+     * - Added "ไปที่โปรไฟล์" button under the active account panel.
+     * - Kept kebab (3-dot) dropdown on each notification; clicking notification content navigates to the target and marks it read.
+     * - Smart incremental updates for notifications (poll+diff) to avoid full re-renders.
      *
-     * Notes:
-     * - Uses existing API endpoints: /api/accounts, /api/notifications, /api/notifications/mark-read, /api/accounts/switch, /api/accounts/remove, /api/logout
-     * - No global CSS changes — page-scoped CSS handles kebab/dropdown visuals.
+     * This script updates renderActivePanel to show the go-to-profile button and to set its href dynamically (keeps /profile).
      */
-
     (function () {
       const accountsListEl = document.getElementById('accountsList');
       const activePanel = document.getElementById('activeAccountPanel');
       const activeAccountInfoEl = document.getElementById('activeAccountInfo');
+      const activeAccountActionsEl = document.getElementById('activeAccountActions');
+      const btnGoToProfile = document.getElementById('btnGoToProfile');
       const notifListEl = document.getElementById('notifList');
       const notifSummaryEl = document.getElementById('notifSummary');
       const btnRefresh = document.getElementById('btnRefreshNotif');
@@ -206,37 +208,20 @@
 
       let accountsData = [];
       let activeUsername = null;
-      // notificationsMap: id -> notification object (latest)
       let notificationsMap = new Map();
-      // polling handle
       let pollHandle = null;
-      const POLL_INTERVAL = 9000; // 9 seconds
+      const POLL_INTERVAL = 9000;
 
-      /* --- API helpers --- */
       async function apiGet(path) {
-        try {
-          const r = await fetch(path);
-          return await r.json();
-        } catch (e) {
-          console.error('apiGet error', path, e);
-          return null;
-        }
+        try { const r = await fetch(path); return await r.json(); } catch (e) { console.error('apiGet error', path, e); return null; }
       }
       async function apiPost(path, body = {}) {
         try {
-          const r = await fetch(path, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-          });
+          const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           return await r.json();
-        } catch (e) {
-          console.error('apiPost error', path, e);
-          return null;
-        }
+        } catch (e) { console.error('apiPost error', path, e); return null; }
       }
 
-      /* --- Accounts handling (same as before) --- */
       async function loadAccounts() {
         accountsListEl.innerHTML = '<div class="small">กำลังโหลด...</div>';
         const data = await apiGet('/api/accounts');
@@ -248,7 +233,6 @@
         activeUsername = data.active || null;
         renderAccounts();
         renderActivePanel();
-        // start/update notifications polling
         await initialNotificationsLoadAndStartPolling();
       }
 
@@ -325,12 +309,14 @@
         if (!activeUsername) {
           activePanel.classList.add('hidden');
           activePanel.setAttribute('aria-hidden', 'true');
+          activeAccountActionsEl.style.display = 'none';
           return;
         }
         const activeAcc = accountsData.find(a => a.username === activeUsername) || accountsData[0];
         if (!activeAcc) {
           activePanel.classList.add('hidden');
           activePanel.setAttribute('aria-hidden', 'true');
+          activeAccountActionsEl.style.display = 'none';
           return;
         }
         activePanel.classList.remove('hidden');
@@ -344,18 +330,14 @@
             </div>
           </div>
         `;
+        // Show go-to-profile action; prefer /profile (authenticated view)
+        activeAccountActionsEl.style.display = '';
+        btnGoToProfile.href = '/profile';
+        btnGoToProfile.setAttribute('aria-label', 'ไปที่โปรไฟล์');
       }
 
       /* ---------------- Notifications: smart incremental updates ---------------- */
-
-      // Convert server array -> map for easy diffing
-      function arrayToMap(arr) {
-        const m = new Map();
-        for (const n of (arr || [])) m.set(n.id, n);
-        return m;
-      }
-
-      // Initial load + start polling
+      function arrayToMap(arr) { const m = new Map(); for (const n of (arr || [])) m.set(n.id, n); return m; }
       async function initialNotificationsLoadAndStartPolling() {
         const data = await apiGet('/api/notifications');
         if (!data || !data.success) {
@@ -364,14 +346,11 @@
           return;
         }
         notificationsMap = arrayToMap(data.notifications || []);
-        renderAllNotifications(); // initial render
+        renderAllNotifications();
         notifSummaryEl.textContent = `${data.unread || countUnread(notificationsMap)} รายการยังไม่อ่าน`;
-        // start polling (clear previous)
         if (pollHandle) clearInterval(pollHandle);
         pollHandle = setInterval(pollNotifications, POLL_INTERVAL);
       }
-
-      // Poll endpoint, diff and apply minimal updates
       async function pollNotifications() {
         const data = await apiGet('/api/notifications');
         if (!data || !data.success) return;
@@ -379,15 +358,8 @@
         diffAndApplyNotifications(newMap);
         notifSummaryEl.textContent = `${data.unread || countUnread(newMap)} รายการยังไม่อ่าน`;
       }
+      function countUnread(map) { let c = 0; for (const v of map.values()) if (!v.read) c++; return c; }
 
-      // Count unread from map
-      function countUnread(map) {
-        let c = 0;
-        for (const v of map.values()) if (!v.read) c++;
-        return c;
-      }
-
-      // Initial full render
       function renderAllNotifications() {
         notifListEl.innerHTML = '';
         if (!notificationsMap.size) {
@@ -400,12 +372,8 @@
         }
       }
 
-      // Diff newMap vs notificationsMap and apply minimal DOM updates:
-      // - update existing items in place (if changed)
-      // - append new items
-      // - remove items that disappeared
       function diffAndApplyNotifications(newMap) {
-        // remove nodes not in newMap
+        // remove
         for (const [id] of notificationsMap) {
           if (!newMap.has(id)) {
             const existingEl = document.getElementById('notif-' + id);
@@ -413,51 +381,26 @@
             notificationsMap.delete(id);
           }
         }
-        // update existing and add new (keep ordering of newMap)
-        // We'll re-order DOM to match newMap order — for subtlety, only move nodes when position changed
-        let insertBeforeNode = null;
-        // We iterate through newMap (preserving server order)
+        // update / add and reorder to server order
         for (const notif of newMap.values()) {
           const existing = notificationsMap.get(notif.id);
           if (existing) {
-            // compare stringified to check if changed; if changed update in place
             if (JSON.stringify(existing) !== JSON.stringify(notif)) {
               createOrUpdateNotifNode(notif, true);
             }
-            // reposition node if necessary
-            const node = document.getElementById('notif-' + notif.id);
-            if (insertBeforeNode) {
-              // insert before insertBeforeNode
-              if (node && node.nextSibling !== insertBeforeNode) {
-                notifListEl.insertBefore(node, insertBeforeNode);
-              }
-            } else {
-              // append to end if not already last
-              if (node && node.nextSibling) {
-                notifListEl.appendChild(node);
-              }
-            }
           } else {
-            // new notification -> create and insert at correct position
             const node = createOrUpdateNotifNode(notif, false);
-            if (insertBeforeNode) notifListEl.insertBefore(node, insertBeforeNode);
-            else notifListEl.appendChild(node);
+            notifListEl.appendChild(node);
           }
-          // set insertBeforeNode to the DOM node that currently follows this notif in newMap order
-          // find next id in newMap by peeking iterator (tricky). Simpler approach: we don't compute insertBefore for each,
-          // we'll just ensure ordering by building an array and then appending in order after updates.
         }
-        // To ensure ordering exactly matches server, rebuild order: (but do minimal DOM churn by moving existing nodes)
-        const orderedIds = Array.from(newMap.keys());
-        for (const id of orderedIds) {
+        // reorder DOM to match newMap
+        for (const id of Array.from(newMap.keys())) {
           const node = document.getElementById('notif-' + id);
           if (node) notifListEl.appendChild(node);
         }
-        // replace notificationsMap content with newMap content
         notificationsMap = new Map(newMap);
       }
 
-      // Create or update node. If updateOnly=true we assume node exists.
       function createOrUpdateNotifNode(notif, updateOnly = false) {
         const id = notif.id;
         let el = document.getElementById('notif-' + id);
@@ -466,61 +409,39 @@
           el = document.createElement('div');
           el.id = 'notif-' + id;
           el.className = 'notif-item' + (isUnread ? ' unread' : '');
-          // main content wrapper (so we can click anywhere except kebab)
           const content = document.createElement('div');
           content.className = 'notif-content';
           el.appendChild(content);
-          // kebab button
           const kebab = document.createElement('button');
           kebab.className = 'notif-kebab';
           kebab.setAttribute('aria-haspopup', 'true');
           kebab.setAttribute('aria-expanded', 'false');
           kebab.innerHTML = `<span class="kebab-dot" aria-hidden="true"></span>`;
           el.appendChild(kebab);
-          // event: click notification (navigate & mark read)
           content.addEventListener('click', async (ev) => {
             ev.stopPropagation();
             const dest = computeNotificationUrl(notif);
-            // optimistically mark read if unread
             if (!notif.read) {
-              try {
-                await apiPost('/api/notifications/mark-read', { ids: [notif.id] });
-                // update UI for this item
-                markNodeReadState(el, true);
-                // update local map
-                const copy = Object.assign({}, notif, { read: true });
-                notificationsMap.set(notif.id, copy);
-              } catch (e) { /* ignore */ }
+              try { await apiPost('/api/notifications/mark-read', { ids: [notif.id] }); } catch (e) {}
+              markNodeReadState(el, true);
+              notificationsMap.set(notif.id, Object.assign({}, notif, { read: true }));
             }
             if (dest) location.assign(dest);
           });
-          // kebab toggling
           kebab.addEventListener('click', (ev) => {
             ev.stopPropagation();
-            // close any other open dropdowns
             closeAllNotifDropdowns();
             const open = kebab.getAttribute('aria-expanded') === 'true';
-            if (open) {
-              removeNotifDropdown(el);
-              kebab.setAttribute('aria-expanded', 'false');
-            } else {
-              kebab.setAttribute('aria-expanded', 'true');
-              openNotifDropdown(el, notif);
-            }
+            if (open) { removeNotifDropdown(el); kebab.setAttribute('aria-expanded', 'false'); }
+            else { kebab.setAttribute('aria-expanded', 'true'); openNotifDropdown(el, notif); }
           });
-          // close dropdown when clicking outside
           document.addEventListener('click', (e) => {
-            if (!el.contains(e.target)) {
-              removeNotifDropdown(el);
-              const kb = el.querySelector('.notif-kebab');
-              if (kb) kb.setAttribute('aria-expanded', 'false');
-            }
+            if (!el.contains(e.target)) { removeNotifDropdown(el); const kb = el.querySelector('.notif-kebab'); if (kb) kb.setAttribute('aria-expanded', 'false'); }
           }, true);
         }
 
-        // update content (title/time/message)
         const content = el.querySelector('.notif-content');
-        content.innerHTML = ''; // replace children
+        content.innerHTML = '';
         const meta = document.createElement('div');
         meta.className = 'meta';
         const typ = document.createElement('div');
@@ -539,27 +460,19 @@
         content.appendChild(meta);
         content.appendChild(msg);
 
-        // adjust unread class
         if (isUnread) el.classList.add('unread'); else el.classList.remove('unread');
 
-        // keyboard: Enter/Space simulate click on content
         el.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            el.querySelector('.notif-content').click();
-          }
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.querySelector('.notif-content').click(); }
         });
 
         return el;
       }
 
-      // mark node read state visually
       function markNodeReadState(node, read = true) {
-        if (read) node.classList.remove('unread');
-        else node.classList.add('unread');
+        if (read) node.classList.remove('unread'); else node.classList.add('unread');
       }
 
-      // dropdown management
       function openNotifDropdown(itemEl, notif) {
         removeNotifDropdown(itemEl);
         const dd = document.createElement('div');
@@ -572,32 +485,21 @@
           ev.stopPropagation();
           try {
             if (isRead) {
-              // mark unread: server API doesn't provide direct "mark-unread" -> we'll call mark-read with [] to toggle? backend doesn't support unmark.
-              // But we can attempt to mark all read except this? Since backend only supports mark-read, we will emulate "mark unread" by toggling client state only.
-              // Safer approach: if backend doesn't support un-read, we simply update UI locally to appear unread.
+              // backend doesn't provide mark-unread; emulate locally
               markNodeReadState(itemEl, false);
-              // update local map
-              const copy = Object.assign({}, notif, { read: false });
-              notificationsMap.set(notif.id, copy);
+              notificationsMap.set(notif.id, Object.assign({}, notif, { read: false }));
             } else {
               await apiPost('/api/notifications/mark-read', { ids: [notif.id] });
               markNodeReadState(itemEl, true);
-              const copy = Object.assign({}, notif, { read: true });
-              notificationsMap.set(notif.id, copy);
+              notificationsMap.set(notif.id, Object.assign({}, notif, { read: true }));
             }
-          } catch (e) {
-            console.error('mark/unmark error', e);
-          } finally {
+          } catch (e) { console.error('mark/unmark error', e); }
+          finally {
             removeNotifDropdown(itemEl);
-            // refresh summary
-            apiGet('/api/notifications').then(d => {
-              if (d && d.success) notifSummaryEl.textContent = `${d.unread || countUnread(arrayToMap(d.notifications || []))} รายการยังไม่อ่าน`;
-            });
+            apiGet('/api/notifications').then(d => { if (d && d.success) notifSummaryEl.textContent = `${d.unread || countUnread(arrayToMap(d.notifications || []))} รายการยังไม่อ่าน`; });
           }
         });
         dd.appendChild(btnToggleRead);
-
-        // append dropdown to item
         itemEl.appendChild(dd);
       }
 
@@ -612,7 +514,19 @@
         document.querySelectorAll('.notif-kebab').forEach(k => k.setAttribute('aria-expanded', 'false'));
       }
 
-      /* --- Handlers for Refresh & Mark All (keeps smart update logic) --- */
+      function computeNotificationUrl(n) {
+        if (!n || !n.meta) return null;
+        const m = n.meta;
+        if (m.url) return m.url;
+        if (m.postId) return `/post/${encodeURIComponent(m.postId)}`;
+        if (m.commentId && m.postId) return `/post/${encodeURIComponent(m.postId)}#comment-${encodeURIComponent(m.commentId)}`;
+        if (m.actorUsername) return `/user/${encodeURIComponent(m.actorUsername)}`;
+        if (m.username) return `/user/${encodeURIComponent(m.username)}`;
+        if (m.item && m.item.type === 'post' && m.item.id) return `/post/${encodeURIComponent(m.item.id)}`;
+        return null;
+      }
+
+      // Refresh & Mark All handlers
       btnRefresh.addEventListener('click', async () => {
         btnRefresh.disabled = true;
         const orig = btnRefresh.textContent;
@@ -627,41 +541,19 @@
         btnMarkAll.disabled = true;
         const orig = btnMarkAll.textContent;
         btnMarkAll.textContent = 'กำลังบันทึก…';
-        try {
-          await apiPost('/api/notifications/mark-read', {}); // empty => mark all
-        } catch (e) { console.error(e); }
-        // Smart update: fetch latest and diff
+        try { await apiPost('/api/notifications/mark-read', {}); } catch (e) { console.error(e); }
         await pollNotifications();
         btnMarkAll.disabled = false;
         btnMarkAll.textContent = orig || 'ทำเครื่องหมายว่าอ่านทั้งหมด';
         window.dispatchEvent(new Event('accountsChanged'));
       });
 
-      /* Utility functions */
-      function computeNotificationUrl(n) {
-        if (!n || !n.meta) return null;
-        const m = n.meta;
-        if (m.url) return m.url;
-        if (m.postId) return `/post/${encodeURIComponent(m.postId)}`;
-        if (m.commentId && m.postId) return `/post/${encodeURIComponent(m.postId)}#comment-${encodeURIComponent(m.commentId)}`;
-        if (m.actorUsername) return `/user/${encodeURIComponent(m.actorUsername)}`;
-        if (m.username) return `/user/${encodeURIComponent(m.username)}`;
-        if (m.item && m.item.type === 'post' && m.item.id) return `/post/${encodeURIComponent(m.item.id)}`;
-        return null;
-      }
+      function arrayToMap(arr) { const m = new Map(); for (const n of (arr || [])) m.set(n.id, n); return m; }
+      function escapeHtml(s) { if (!s && s !== 0) return ''; return String(s).replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
 
-      function escapeHtml(s) {
-        if (!s && s !== 0) return '';
-        return String(s).replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
-      }
-
-      // initial mount
       window.addEventListener('load', loadAccounts);
       window.addEventListener('accountsChanged', loadAccounts);
-      // cleanup on unload
-      window.addEventListener('beforeunload', () => {
-        if (pollHandle) clearInterval(pollHandle);
-      });
+      window.addEventListener('beforeunload', () => { if (pollHandle) clearInterval(pollHandle); });
 
     })();
   </script>
