@@ -42,7 +42,7 @@
       <h3>บัญชีที่ใช้งานอยู่ (Active)</h3>
       <div id="activeAccountInfo">...</div>
       <div style="margin-top:.8rem;">
-        <a id="linkToProfile" href="/profile">ดูโปรไฟล์</a>
+        <a id="linkToProfile" href="/profile">ไปที่โปรไฟล์</a>
       </div>
     </div>
 
@@ -126,7 +126,7 @@
                 }
               });
             }
-            // ปุ่ม sign out (remove)
+            // ปุ่ม sign out (remove หรือ logout)
             row.querySelectorAll('button[data-action="signout"]').forEach(b => {
               b.onclick = async (e) => {
                 e.stopPropagation();
@@ -177,9 +177,9 @@
                   <div class="small">${act.username}</div>
                 </div>
               </div>`;
-            // ปุ่มดูโปรไฟล์: ลิงก์ไป /profile เสมอ
+            // ลิงก์โปรไฟล์ (ไปที่ /profile เท่านั้น)
             const link = document.getElementById('linkToProfile');
-            if (link) link.href = "/profile";
+            if (link) link.href = `/profile`;
           } else {
             document.getElementById('activeAccountInfo').textContent = 'ไม่พบข้อมูลบัญชีที่ใช้งาน';
           }
