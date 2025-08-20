@@ -14,10 +14,10 @@
           <img id="heroPic" src="/img/default_profile.png" alt="profile" class="profile-hero avatar">
           <div style="text-align:center;">
             <div id="displayName" style="font-size:1.2rem;font-weight:700"></div>
-            <div id="usernameLine" class="small" style="margin-top:4px"></div>
+            <div id="usernameLine" class="small mt-8"></div>
           </div>
-          <div id="followArea" style="margin-top:8px"></div>
-          <div class="small" id="counts" style="margin-top:8px"></div>
+          <div id="followArea" class="mt-8"></div>
+          <div class="small mt-8" id="counts"></div>
         </aside>
 
         <section class="profile-main">
@@ -63,9 +63,9 @@ async function renderProfile() {
 
     // About area
     let aboutHtml = `<h3>เกี่ยวกับ</h3>
-      <div class="small" style="margin-top:8px">${profile.bio ? profile.bio : '<i>ยังไม่มีข้อมูล</i>'}</div>
-      <div class="small" style="margin-top:10px">เข้าร่วมเมื่อ: ${new Date(profile.createdAt).toLocaleDateString()}</div>
-      <div style="margin-top:8px" class="small"><strong>อีเมล:</strong> ${profile.showEmail ? (profile.email || '<i>ไม่มี</i>') : '<i>ซ่อน</i>'}</div>`;
+      <div class="small mt-8">${profile.bio ? profile.bio : '<i>ยังไม่มีข้อมูล</i>'}</div>
+      <div class="small mt-10">เข้าร่วมเมื่อ: ${new Date(profile.createdAt).toLocaleDateString()}</div>
+      <div class="small mt-8"><strong>อีเมล:</strong> ${profile.showEmail ? (profile.email || '<i>ไม่มี</i>') : '<i>ซ่อน</i>'}</div>`;
     document.getElementById('aboutArea').innerHTML = aboutHtml;
 
     // posts
@@ -74,7 +74,7 @@ async function renderProfile() {
       const postsData = await pr2.json();
       const posts = postsData.posts || [];
       let postlist = '<div class="section-title"><span>โพสต์ของสมาชิกนี้</span></div>';
-      postlist += posts.length ? posts.map(p=>`<div class="post" style="padding:10px 12px;margin-bottom:8px;"><div style="flex:1"><h4 style="margin:0"><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div><div style="margin-top:6px">${p.content.slice(0,140)}${p.content.length>140?'...':''}</div></div></div>`).join('') : '<i class="small">ยังไม่มีโพสต์</i>';
+      postlist += posts.length ? posts.map(p=>`<div class="post" style="padding:10px 12px;margin-bottom:8px;"><div style="flex:1"><h4 style="margin:0"><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div></div></div>`).join('') : '<i class="small">ยังไม่มีโพสต์</i>';
       document.getElementById('userPosts').innerHTML = postlist;
     }
 }
