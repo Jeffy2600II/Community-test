@@ -618,9 +618,9 @@ img { max-width: 100%; height: auto; display: block; }
   .logo .tagline { display:none; }
 
   /* header-bottom collapsed by default */
-  .header-bottom { max-height: 0; opacity: 0; pointer-events: none; transform: translateY(-100%);
+  .header-bottom { opacity: 0; pointer-events: none; transform: translateY(-100%);
     background: #ffffff; }
-  .header-bottom.open { max-height: 999px; opacity: 1; pointer-events: auto; transform: translateY(100%); }
+  .header-bottom.open { opacity: 1; pointer-events: auto; transform: translateY(100%); }
 
   /* show mobile toggle button */
   #mobileMenuToggle { display: inline-flex; }
