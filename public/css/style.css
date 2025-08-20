@@ -2,10 +2,12 @@
 
 /* ========================================================================
    Updated design system (responsive & touch-friendly)
-   - Kept original palette, refined spacing and scale
-   - Improved responsive behaviors for mobile/tablet
-   - Removed unnecessary hover effects on non-interactive elements
-   - Added accessible focus states and reduced-motion support
+   - Baseline taken from the provided authoritative stylesheet.
+   - Extended to support stacked header (header-top / header-bottom),
+     a mobile menu toggle, and behavior for header-bottom.open.
+   - All existing class names kept; new rules are additive and scoped so
+     existing pages continue to work while enabling the new header layout.
+   - Accessibility: ARIA-friendly, keyboard focus, reduced-motion support.
    ======================================================================== */
 
 :root{
@@ -92,7 +94,13 @@ main {
   box-shadow: 0 10px 30px rgba(29,41,56,0.06);
 }
 
-/* Header */
+/* ==========================================================================
+   HEADER (STACKED on mobile)
+   - New structure uses header-inner (wrap), header-top (logo + toggle),
+     header-bottom (search + nav/actions). This is additive so older
+     selectors still function.
+   ========================================================================== */
+
 .site-header {
   background: white;
   border-bottom: 1px solid rgba(15,23,42,0.04);
@@ -102,6 +110,10 @@ main {
   box-shadow: 0 1px 0 rgba(16,24,40,0.02);
 }
 
+/* container / header-inner
+   - Keep the original .site-header .container rules for compatibility,
+     but prefer using .header-inner in markup to enable stacked layout.
+*/
 .site-header .container {
   display: flex;
   align-items: center;
@@ -109,6 +121,25 @@ main {
   height: 68px;
   padding-left: var(--space-md);
   padding-right: var(--space-md);
+}
+
+/* New: header-inner is a thin wrapper to allow stacking behavior */
+.header-inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-md);
+  width: 100%;
+}
+
+/* header-top: logo + mobile toggle */
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  height: 68px;
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 /* Logo */
@@ -130,7 +161,37 @@ main {
   color: var(--muted);
 }
 
-/* Primary nav (left) */
+/* mobile toggle button (hamburger), hidden on wide screens */
+#mobileMenuToggle {
+  display: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+/* header-bottom: search + nav + account actions
+   - collapsible on mobile (use .open to show)
+*/
+.header-bottom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  justify-content: space-between;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  transition: max-height 220ms ease, opacity 180ms ease, transform 180ms ease;
+  overflow: hidden;
+  width: 100%;
+  max-height: 999px; /* default for wide screens (overridden on mobile) */
+}
+
+/* When header-bottom is collapsed on mobile we'll set max-height:0; when open add class .open */
+.header-bottom.collapsed { max-height: 0; opacity: 0; pointer-events: none; transform: translateY(-6px); }
+.header-bottom.open { max-height: 999px; opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+/* Primary nav (left) - legacy class kept */
 .header-left {
   display:flex;
   align-items:center;
@@ -515,7 +576,6 @@ a { color: var(--accent); text-decoration: none; }
   .btn { padding: 12px 14px; font-size: 0.95rem; border-radius: 12px; }
   .avatar-circle { width: 96px; height: 96px; }
   .profile-hero .avatar { width: 120px; height: 120px; }
-  .header-search { display:none; }
   .card { padding: 12px; }
 }
 
@@ -534,130 +594,66 @@ img { max-width: 100%; height: auto; display: block; }
 
 /* ========================================================================
    Mobile-First Media Query
-   - เน้นการจัดวางสำหรับหน้าจอขนาดเล็ก (< 768px)
-   - ปรับปรุง Navbar, main content, และ card layouts
+   - Emphasize stacked header behavior: on small screens header-bottom
+     collapses beneath the logo; toggle shows/hides it. This prevents
+     crowding in the header row and moves controls (search, actions) below.
    ======================================================================== */
 
 /* Mobile Devices (Portrait and Landscape) */
-@media (max-width: 768px) {
+@media (max-width: 800px) {
 
   :root {
-    /* ปรับขนาด spacing และ font size ให้เหมาะกับมือถือ */
+    /* adjust spacing for mobile */
     --space-sm: 10px;
-    --space-md: 16px;
+    --space-md: 14px;
     --space-lg: 20px;
   }
 
-  /*
-    * ปรับปรุง Header (แถบนำทางด้านบน)
-    */
-  .site-header .container {
-    height: 60px; /* ลดความสูงของ header */
-    padding: 0 var(--space-md);
-    gap: var(--space-md);
-  }
+  /* Use header-inner to stack header-top + header-bottom */
+  .header-inner { display:flex; flex-direction:column; gap:8px; align-items:stretch; padding: 8px var(--space-sm); }
+  .header-top { height: 56px; }
 
-  .site-header .header-left nav {
-    /* ซ่อนเมนูนำทางหลักบนหน้าจอมือถือ */
-    display: none;
-  }
-  
-  .header-search {
-    /* ซ่อนแถบ Search บนหน้าจอมือถือ */
-    display: none;
-  }
+  /* smaller brand */
+  .logo .brand { font-size: 1rem; }
+  .logo .tagline { display:none; }
 
-  /* เพิ่มปุ่มเมนูสำหรับมือถือ (Hamburger Icon) */
-  .site-header .container::before {
-    content: '\2630'; /* Unicode สำหรับ Hamburger icon */
-    font-size: 24px;
-    cursor: pointer;
-    color: var(--text);
-  }
+  /* header-bottom collapsed by default */
+  .header-bottom { max-height: 0; opacity: 0; pointer-events: none; transform: translateY(-6px); }
+  .header-bottom.open { max-height: 999px; opacity: 1; pointer-events: auto; transform: translateY(0); }
 
-  /*
-    * ปรับปรุง Main Content
-    */
-  main {
-    margin: var(--space-lg) auto;
-    padding: 0 var(--space-sm); /* เพิ่ม padding ด้านข้างเล็กน้อย */
-  }
-  
-  /*
-    * ปรับปรุง Card และ Feed
-    */
-  .card, .post {
-    padding: var(--space-md); /* เพิ่ม padding ด้านใน card */
-    margin-bottom: var(--space-md); /* ลดระยะห่างระหว่าง card */
-    flex-direction: column; /* เปลี่ยน post layout ให้เป็นคอลัมน์เดียว */
-    gap: var(--space-md);
-  }
-  
-  .post .post-left {
-    width: 100%; /* ทำให้ส่วน avatar เต็มความกว้าง */
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  
-  .post .post-body {
-    order: 2; /* จัดลำดับ body ให้อยู่ด้านล่าง */
-  }
+  /* show mobile toggle button */
+  #mobileMenuToggle { display: inline-flex; }
 
-  .post .post-excerpt {
-    display: none; /* ซ่อนบทสรุปย่อบนมือถือเพื่อลดความซับซ้อน */
-  }
+  /* header-search becomes full width when visible */
+  .header-search { width: 100%; min-width: auto; order: 1; }
 
-  .post .post-img {
-    max-width: 100%; /* ทำให้รูปภาพเต็มความกว้าง */
-    height: auto;
-    margin-top: var(--space-sm);
-  }
+  /* nav/actions stacked below search */
+  #navBar { order: 2; display:flex; width:100%; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
 
-  .post-actions {
-    justify-content: flex-start; /* จัดปุ่ม action ให้อยู่ทางซ้าย */
-    margin-top: var(--space-md);
-  }
-  
-  /*
-    * ปรับปรุง Grid Layout
-    */
-  .grid-2 {
-    grid-template-columns: 1fr; /* เปลี่ยนเป็น 1 คอลัมน์ */
-    gap: var(--space-md);
-  }
-  
-  /*
-    * ปรับปรุง Footer
-    */
-  .site-footer .footer-inner {
-    flex-direction: column; /* เปลี่ยนเป็นคอลัมน์เดียว */
-    text-align: center;
-    gap: var(--space-sm);
-  }
-  
-  .footer-links {
-    flex-direction: column;
-    gap: 8px;
-  }
+  /* Make posts stack vertically */
+  .card, .post { padding: var(--space-md); margin-bottom: var(--space-md); flex-direction: column; gap: var(--space-md); }
+  .post .post-left { width: 100%; display:flex; align-items:center; gap:12px; }
+  .post .post-body { order: 2; }
+  .post .post-excerpt { display:none; }
+  .post .post-img { max-width: 100%; height: auto; margin-top: var(--space-sm); }
+
+  /* Footer stack */
+  .site-footer .footer-inner { flex-direction: column; text-align: center; gap: var(--space-sm); }
+  .footer-links { flex-direction: column; gap: 8px; }
 }
 
 /* Medium Screens and Tablets */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .site-header .header-left nav {
-    /* บน tablet ยังคงแสดงเมนูนำทางได้ */
-    display: block;
-  }
-
-  .header-search {
-    min-width: 200px;
-    width: 30%;
-  }
-
-  .grid-2 {
-    grid-template-columns: 1fr; /* ยังคงใช้คอลัมน์เดียวเพื่อให้ layout ดูดีบน tablet */
-  }
+@media (min-width: 801px) and (max-width: 1100px) {
+  .header-search { min-width: 200px; width: 30%; }
+  .header-inner { padding: 0 var(--space-md); }
+  .header-bottom { max-height: none; opacity: 1; pointer-events: auto; transform: none; }
+  #mobileMenuToggle { display: none; }
 }
 
+/* Desktop: header bottom always visible, toggle hidden */
+@media (min-width: 1101px) {
+  .header-bottom { max-height: none; opacity: 1; pointer-events: auto; transform: none; }
+  #mobileMenuToggle { display: none; }
+}
 
 /* End of stylesheet */
