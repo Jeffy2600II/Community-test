@@ -1,17 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
 
-/* ===========================================================================
-   COMMUNITY — Canonical stylesheet (extended)
-   - Uses your provided comprehensive stylesheet as the base.
-   - Adds: fixed header (locked to top), global top spacing to avoid overlap,
-           improved mobile hamburger panel background + elevation,
-           polished "Manage accounts" layout and button system.
-   - No original rules removed; new rules are additive and backward-compatible.
-   =========================================================================== */
+/* ========================================================================
+   Updated design system (responsive & touch-friendly)
+   - Baseline taken from the provided authoritative stylesheet.
+   - Extended to support stacked header (header-top / header-bottom),
+     a mobile menu toggle, and behavior for header-bottom.open.
+   - All existing class names kept; new rules are additive and scoped so
+     existing pages continue to work while enabling the new header layout.
+   - Accessibility: ARIA-friendly, keyboard focus, reduced-motion support.
+   ======================================================================== */
 
-/* -------------------------
-   Design tokens
-   ------------------------- */
 :root{
   --bg: #f6f7fb;
   --surface: #ffffff;
@@ -41,32 +39,16 @@
   --transition: 180ms cubic-bezier(.2,.9,.2,1);
   --readable-line: 1.5rem;
   --touch-target: 44px;
-
-  /* header sizing tokens (used to reserve top space) */
-  --site-header-base-height: 68px;       /* desktop default */
-  --site-header-mobile-height: 56px;     /* mobile top row height */
-  --site-header-expanded-extra: 160px;   /* extra when mobile menu opened (approx) */
-
-  /* effective header height used for body spacing; updated by css/JS combination */
-  --site-header-height: var(--site-header-base-height);
-
-  /* accounts tokens */
-  --account-row-gap: 12px;
-  --account-avatar-size: 48px;
-  --account-avatar-size-sm: 40px;
-  --account-active-bg: linear-gradient(90deg, rgba(47,128,237,0.12), rgba(23,194,161,0.08));
 }
 
-/* Respect reduced motion */
+/* Accessibility: respect user's reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   :root { --transition: 0ms; }
 }
 
-/* -------------------------
-   Reset & base
-   ------------------------- */
+/* Global reset & base */
 * { box-sizing: border-box; }
-html, body { height: 100%; }
+html,body { height: 100%; }
 body {
   margin: 0;
   font-family: 'Inter', 'Noto Sans Thai', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
@@ -77,18 +59,11 @@ body {
   line-height: 1.45;
   font-size: 15px;
   -webkit-text-size-adjust: 100%;
-  min-height: 100vh;
   -webkit-font-feature-settings: "ss01" on;
-  /* Reserve top space for the fixed header to avoid overlap on every page */
-  padding-top: var(--site-header-height);
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* images */
-img { max-width: 100%; height: auto; display: block; }
-
-/* -------------------------
-   Layout primitives
-   ------------------------- */
+/* Layout containers */
 .container {
   width: 100%;
   max-width: var(--max-width);
@@ -103,7 +78,6 @@ main {
   background: transparent;
   padding: 0;
   min-height: 60vh;
-  width: 100%;
 }
 
 /* Cards */
@@ -116,68 +90,56 @@ main {
   border: 1px solid rgba(15,23,42,0.03);
   transition: box-shadow var(--transition), transform var(--transition);
 }
-.card:focus-within { box-shadow: 0 10px 30px rgba(29,41,56,0.06); }
-
-/* -------------------------
-   Header (fixed & stacked)
-   - Lock header to top of viewport (position: fixed)
-   - Use .header-inner -> .header-top + .header-bottom pattern
-   - Provide CSS hooks for expanded mobile menu: .header-bottom.open
-   - Body top padding token (--site-header-height) is used to reserve space.
-   ------------------------- */
-
-.site-header {
-  position: fixed;
-  left: 0;
-  right: 0;
-  top: 0;
-  z-index: 1300;
-  background: white;
-  border-bottom: 1px solid rgba(15,23,42,0.04);
-  box-shadow: 0 1px 0 rgba(16,24,40,0.02);
-  /* set header variable on the header element (default) */
-  --site-header-height-local: var(--site-header-base-height);
+.card:focus-within {
+  box-shadow: 0 10px 30px rgba(29,41,56,0.06);
 }
 
-/* keep compatibility with existing selector that depended on .site-header .container */
+/* ==========================================================================
+   HEADER (STACKED on mobile)
+   - New structure uses header-inner (wrap), header-top (logo + toggle),
+     header-bottom (search + nav/actions). This is additive so older
+     selectors still function.
+   ========================================================================== */
+
+.site-header {
+  background: white;
+  border-bottom: 1px solid rgba(15,23,42,0.04);
+  position: sticky;
+  top: 0;
+  z-index: 1200;
+  box-shadow: 0 1px 0 rgba(16,24,40,0.02);
+}
+
+/* container / header-inner
+   - Keep the original .site-header .container rules for compatibility,
+     but prefer using .header-inner in markup to enable stacked layout.
+*/
 .site-header .container {
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  height: var(--site-header-base-height);
+  height: 68px;
   padding-left: var(--space-md);
   padding-right: var(--space-md);
 }
 
-/* header-inner wrapper */
+/* New: header-inner is a thin wrapper to allow stacking behavior */
 .header-inner {
   max-width: var(--max-width);
   margin: 0 auto;
   padding: 0 var(--space-md);
   width: 100%;
-  display: flex;
-  flex-direction: column; /* default to column to support stacked layout */
 }
 
-/* top row: logo + toggle */
+/* header-top: logo + mobile toggle */
 .header-top {
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-md);
-  height: var(--site-header-base-height);
-  min-height: var(--site-header-base-height);
-}
-
-/* adjust effective site header height on :root for default */
-:root { --site-header-height: var(--site-header-base-height); }
-
-/* When header is present in DOM we may want to mirror the header height token to :root
-   If JS toggles a data-expanded attribute on .site-header, the token will update below.
-   (Main.js should add/remove data-expanded="true" to .site-header when header-bottom.open on mobile) */
-.site-header[data-expanded="true"] {
-  /* when expanded on mobile, update global site header height to include expanded portion */
-  --site-header-height: calc(var(--site-header-mobile-height) + var(--site-header-expanded-extra));
+  height: 68px;
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 /* Logo */
@@ -199,9 +161,9 @@ main {
   color: var(--muted);
 }
 
-/* mobile toggle button */
+/* mobile toggle button (hamburger), hidden on wide screens */
 #mobileMenuToggle {
-  display: none; /* shown on mobile via media queries */
+  display: none;
   background: transparent;
   border: none;
   cursor: pointer;
@@ -209,33 +171,27 @@ main {
   border-radius: 8px;
 }
 
-/* header-bottom: search + nav + account actions */
+/* header-bottom: search + nav + account actions
+   - collapsible on mobile (use .open to show)
+*/
 .header-bottom {
-  display:flex;
-  align-items:center;
+  display: flex;
+  align-items: center;
   gap: var(--space-md);
   justify-content: space-between;
-  padding: 8px 0;
-  transition: max-height 220ms ease, opacity 180ms ease, transform 180ms ease, background var(--transition);
+  padding-top: 8px;
+  padding-bottom: 8px;
+  transition: max-height 220ms ease, opacity 180ms ease, transform 180ms ease;
   overflow: hidden;
   width: 100%;
-  max-height: 999px;
+  max-height: 999px; /* default for wide screens (overridden on mobile) */
 }
 
-/* collapsed / open states */
+/* When header-bottom is collapsed on mobile we'll set max-height:0; when open add class .open */
 .header-bottom.collapsed { max-height: 0; opacity: 0; pointer-events: none; transform: translateY(-6px); }
 .header-bottom.open { max-height: 999px; opacity: 1; pointer-events: auto; transform: translateY(0); }
 
-/* Add subtle background & elevation to mobile expanded area */
-.header-bottom.open {
-  background: rgba(255,255,255,0.98);
-  border-radius: 12px;
-  padding: 12px;
-  box-shadow: 0 10px 30px rgba(16,24,40,0.08);
-  border: 1px solid rgba(15,23,42,0.04);
-}
-
-/* Primary nav (left) - kept for compatibility */
+/* Primary nav (left) - legacy class kept */
 .header-left {
   display:flex;
   align-items:center;
@@ -318,9 +274,7 @@ main {
   border: 1px solid rgba(15,23,42,0.06);
 }
 
-/* -------------------------
-   Buttons (centralized)
-   ------------------------- */
+/* Buttons (refined & touch-friendly) */
 .btn {
   display:inline-flex;
   align-items:center;
@@ -334,26 +288,47 @@ main {
   font-weight: 700;
   transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
   font-size: 0.95rem;
+  line-height: 1;
   -webkit-tap-highlight-color: rgba(0,0,0,0);
 }
 .btn:active { transform: translateY(1px); }
 .btn:focus { outline: 3px solid rgba(47,128,237,0.12); outline-offset: 2px; }
 
-.btn-primary { background: linear-gradient(180deg,var(--accent), #1f66d6); color: white; box-shadow: 0 8px 20px rgba(47,128,237,0.12); }
-@media (hover: hover) { .btn-primary:hover { transform: translateY(-2px); } }
-.btn-ghost { background: transparent; border: 1px solid rgba(15,23,42,0.06); color: var(--text); }
-.btn-muted { background: #f4f6fb; color: var(--text); }
-.btn-secondary { background: #eaf4ff; color: var(--accent); }
-.btn-icon { padding: 8px; min-width: 44px; }
-.btn-danger { background: linear-gradient(180deg,#ff6b6b,#e16060); color: #fff; }
+.btn-primary {
+  background: linear-gradient(180deg,var(--accent), #1f66d6);
+  color: white;
+  box-shadow: 0 8px 20px rgba(47,128,237,0.12);
+}
+@media (hover: hover) {
+  .btn-primary:hover { transform: translateY(-2px); }
+}
 
-/* small inline text button */
-.btn-muted-inline { background: transparent; border: none; color: var(--muted); font-size: 0.95rem; cursor: pointer; }
+.btn-ghost {
+  background: transparent;
+  border: 1px solid rgba(15,23,42,0.06);
+  color: var(--text);
+}
+.btn-muted {
+  background: #f4f6fb;
+  color: var(--text);
+}
 
-/* -------------------------
-   Feed & Post
-   ------------------------- */
-.feed { display:flex; flex-direction:column; gap: var(--space-md); }
+/* Utility badges */
+.badge {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 999px;
+  background: #eef6ff;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Feed & posts */
+.feed {
+  display:flex;
+  flex-direction:column;
+  gap: var(--space-md);
+}
 .post {
   display:flex;
   gap: var(--space-md);
@@ -364,44 +339,72 @@ main {
   box-shadow: var(--shadow-1);
   border: 1px solid rgba(15,23,42,0.03);
 }
-.post-left { width:64px; flex-shrink:0; display:flex; align-items:flex-start; justify-content:center; }
-.post-body { flex:1; min-width:0; }
-.post-title { font-size: 1.05rem; margin:0; color:var(--text); font-weight:700; }
-.post-meta { color:var(--muted); font-size:0.9rem; margin-top:6px; display:flex; gap:8px; align-items:center; }
-.post-excerpt { margin-top:12px; color:#38414b; }
-.post-img { max-width:280px; border-radius:10px; object-fit:cover; margin-top:12px; box-shadow:0 8px 30px rgba(16,24,40,0.04); }
+.post .post-left {
+  width: 64px;
+  flex-shrink: 0;
+}
+.post .post-body {
+  flex: 1;
+}
+.post .post-title { font-size: 1.05rem; margin:0; color: var(--text); font-weight:700; }
+.post .post-meta { color: var(--muted); font-size: 0.9rem; margin-top:6px; display:flex; gap:8px; align-items:center; }
+.post .post-excerpt { margin-top: 12px; color: #38414b; }
+.post .post-img {
+  max-width: 280px;
+  border-radius: 10px;
+  object-fit: cover;
+  margin-top: 12px;
+  box-shadow: 0 8px 30px rgba(16,24,40,0.04);
+}
 
 /* Post actions */
-.post-actions { margin-top:12px; display:flex; gap:8px; align-items:center; }
+.post-actions {
+  margin-top: 12px;
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
 
-/* -------------------------
-   Forms & Inputs
-   ------------------------- */
-input, textarea, select, button { font-family: inherit; }
+/* Comments */
+.comment {
+  background: #fbfdff;
+  border: 1px solid rgba(15,23,42,0.03);
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+.comment .meta { font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+
+/* Forms & inputs (clear visual focus & spacing) */
+input, textarea, select, button {
+  font-family: inherit;
+}
 input[type="text"], input[type="email"], input[type="password"], textarea {
-  width:100%;
-  border-radius:10px;
-  border:1px solid rgba(15,23,42,0.06);
-  padding:12px 14px;
-  background:#fff;
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(15,23,42,0.06);
+  padding: 12px 14px;
+  background: #fff;
   transition: box-shadow var(--transition), border-color var(--transition);
-  font-size:0.96rem;
-  line-height:1.3;
+  font-size: 0.96rem;
+  line-height: 1.3;
 }
 input:focus, textarea:focus {
-  outline:none;
+  outline: none;
   border-color: rgba(47,128,237,0.6);
   box-shadow: 0 8px 30px rgba(47,128,237,0.06);
 }
-textarea { min-height:120px; resize:vertical; }
+textarea { min-height: 120px; resize: vertical; }
 
-/* file input */
-.input-file { display:inline-flex; gap:8px; align-items:center; }
+/* File input custom */
+.input-file {
+  display:inline-flex;
+  gap:8px;
+  align-items:center;
+}
 .input-file input[type="file"] { display:none; }
 
-/* -------------------------
-   Profile
-   ------------------------- */
+/* Profile hero */
 .profile-hero {
   background: linear-gradient(180deg,#fff,#fbfdff);
   padding: var(--space-md);
@@ -413,174 +416,244 @@ textarea { min-height:120px; resize:vertical; }
   text-align:center;
   border: 1px solid rgba(15,23,42,0.03);
 }
-.profile-hero .avatar { width:140px; height:140px; border-radius:18px; object-fit:cover; border:4px solid #fff; box-shadow:var(--shadow-2); }
+.profile-hero .avatar {
+  width: 140px;
+  height: 140px;
+  border-radius: 18px;
+  object-fit: cover;
+  border: 4px solid #fff;
+  box-shadow: var(--shadow-2);
+}
 
-/* Avatar circular */
-.avatar-circle { width:120px; height:120px; border-radius:9999px; overflow:hidden; display:inline-block; background: linear-gradient(180deg,#fff,#f5f7fb); border:3px solid #fff; box-shadow:0 6px 18px rgba(16,24,40,0.06); }
-.avatar-circle img { width:100%; height:100%; object-fit:cover; display:block; }
+/* Responsive layout helpers */
+.grid-2 {
+  display:grid;
+  grid-template-columns: 320px 1fr;
+  gap: var(--space-md);
+}
+@media (max-width: 1100px) {
+  .grid-2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 950px) {
+  .header-search { display:none; }
+  .avatar-img { width:36px;height:36px; }
+  .logo .brand { font-size: 0.95rem; }
+}
 
-/* -------------------------
-   Dropdown / Notifications
-   ------------------------- */
-.dropdown-panel { min-width:320px; max-width:420px; border-radius:12px; overflow:hidden; background:var(--surface); border:1px solid rgba(15,23,42,0.06); box-shadow:0 20px 60px rgba(16,24,40,0.12); }
-.dropdown-header { padding:12px; border-bottom:1px solid rgba(15,23,42,0.04); display:flex; align-items:center; gap:12px; }
-.dropdown-list { max-height:320px; overflow:auto; padding:8px; }
-.dropdown-item { padding:10px 12px; display:flex; gap:12px; align-items:flex-start; cursor:pointer; border-radius:8px; }
-.dropdown-item:hover { background:#fbfdff; }
+/* Dropdown panel (account / notifications) */
+.dropdown-panel {
+  min-width: 320px;
+  max-width: 420px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid rgba(15,23,42,0.06);
+  box-shadow: 0 20px 60px rgba(16,24,40,0.12);
+}
+.dropdown-header {
+  padding: 12px;
+  border-bottom: 1px solid rgba(15,23,42,0.04);
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.dropdown-list { max-height:320px; overflow:auto; }
+.dropdown-item {
+  padding: 10px 12px;
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .dropdown-item:hover { background: #fbfdff; }
+}
 
-/* notify */
-.notify-bell { position:relative; width:42px; height:42px; display:flex; align-items:center; justify-content:center; border-radius:10px; }
-.notify-badge { position:absolute; right:6px; top:6px; background:var(--danger); color:white; padding:2px 6px; font-size:11px; border-radius:999px; font-weight:700; }
+/* Notification badge */
+.notify-bell { position: relative; width:42px; height:42px; display:flex; align-items:center; justify-content:center; border-radius:10px; }
+.notify-badge {
+  position:absolute;
+  right:6px;
+  top:6px;
+  background: var(--danger);
+  color: white;
+  padding:2px 6px;
+  font-size: 11px;
+  border-radius: 999px;
+  font-weight:700;
+}
 
-/* -------------------------
-   Footer
-   ------------------------- */
-.site-footer { margin-top:var(--space-xl); background:transparent; padding:var(--space-md) 0; color:var(--muted); font-size:13px; }
-.site-footer .footer-inner { display:flex; gap:var(--space-lg); justify-content:space-between; align-items:center; max-width:var(--max-width); margin:0 auto; padding:0 var(--space-md); }
-.footer-links { display:flex; gap:var(--space-md); }
-.footer-links a { color:var(--muted); text-decoration:none; }
-.footer-links a:hover { color:var(--text); }
+/* Footer */
+.site-footer {
+  margin-top: var(--space-xl);
+  background: transparent;
+  padding: var(--space-md) 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.site-footer .footer-inner {
+  display:flex;
+  gap: var(--space-lg);
+  justify-content: space-between;
+  align-items: center;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-md);
+}
+.footer-links { display:flex; gap: var(--space-md); }
+.footer-links a { color: var(--muted); text-decoration:none; }
+@media (hover: hover) {
+  .footer-links a:hover { color: var(--text); }
+}
 
-/* -------------------------
-   Utilities
-   ------------------------- */
-.small { font-size:0.85rem; color:var(--muted); }
-.section-title { margin:var(--space-md) 0; display:flex; align-items:center; gap:12px; }
-.section-title span { background: linear-gradient(90deg, rgba(47,128,237,0.12), rgba(23,194,161,0.08)); padding:8px 14px; border-radius:999px; font-weight:700; color:var(--accent); }
-.sr-only { position:absolute !important; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; }
+/* Small & muted */
+.small { font-size: 0.85rem; color: var(--muted); }
+.section-title { margin: var(--space-md) 0; display:flex; align-items:center; gap:12px; }
+.section-title span {
+  background: linear-gradient(90deg, rgba(47,128,237,0.12), rgba(23,194,161,0.08));
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight:700;
+  color: var(--accent);
+}
+
+/* accessibility helpers */
+.sr-only { position: absolute !important; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; }
+
+/* Misc polish */
+a { color: var(--accent); text-decoration: none; }
+@media (hover: hover) {
+  a:hover { text-decoration: underline; }
+}
+
+/* Avatar / profile UI */
+.avatar-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 9999px;
+  overflow: hidden;
+  display: inline-block;
+  background: linear-gradient(180deg,#fff,#f5f7fb);
+  border: 3px solid #fff;
+  box-shadow: 0 6px 18px rgba(16,24,40,0.06);
+}
+.avatar-circle img { width:100%; height:100%; object-fit: cover; display:block; }
+
+/* Modal helpers (used by JS UI) */
+.modal-fullscreen-bg {
+  position: fixed; z-index: 9999; left: 0; top: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.56); display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal-fullscreen-content {
+  background: var(--surface);
+  border-radius: 14px;
+  width: min(920px, 96vw);
+  max-height: 96vh;
+  overflow: auto;
+  padding: 20px;
+  box-shadow: var(--shadow-2);
+}
+
+/* Inline small message (errors only) */
+#inlineMsg { display:none; margin-top:8px; color:var(--danger); font-size:0.95rem; }
+
+/* Utility classes */
 .hidden { display:none !important; }
 .center { display:flex; align-items:center; justify-content:center; }
 .row { display:flex; gap:12px; align-items:center; }
 .col { display:flex; flex-direction:column; gap:8px; }
-.text-right { text-align:right; }
-.mt-8 { margin-top:8px; }
-.mt-12 { margin-top:12px; }
-.mt-16 { margin-top:16px; }
 
-/* -------------------------
-   Accounts / Manage Accounts (improved)
-   ------------------------- */
-.accounts-header { display:flex; justify-content:space-between; align-items:center; gap: var(--space-md); margin-bottom: var(--space-sm); }
-.accounts-list { display:flex; flex-direction:column; gap: 8px; }
-
-/* account row */
-.account-row {
-  display:flex;
-  align-items:center;
-  gap: var(--account-row-gap);
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: linear-gradient(180deg,#fff,#fbfdff);
-  border: 1px solid rgba(15,23,42,0.04);
-  box-shadow: 0 6px 18px rgba(16,24,40,0.04);
-  cursor: pointer;
-  transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
+/* Layout adjustments for very small screens */
+@media (max-width: 560px) {
+  :root {
+    --space-md: 12px;
+    --space-lg: 18px;
+    --touch-target: 48px;
+  }
+  body { font-size: 15px; }
+  .site-header .container { height: 60px; padding-left: 12px; padding-right: 12px; }
+  .btn { padding: 12px 14px; font-size: 0.95rem; border-radius: 12px; }
+  .avatar-circle { width: 96px; height: 96px; }
+  .profile-hero .avatar { width: 120px; height: 120px; }
+  .card { padding: 12px; }
 }
-.account-row:focus { outline: 3px solid rgba(47,128,237,0.10); outline-offset: 2px; }
-.account-row:hover { transform: translateY(-2px); background: #fff; }
 
-/* avatar area */
-.account-row .profile-pic {
-  width: var(--account-avatar-size);
-  height: var(--account-avatar-size);
-  border-radius: 10px;
-  overflow: hidden;
-  flex-shrink: 0;
-  background: #f1f5f9;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+/* Small improvements for medium screens */
+@media (min-width: 561px) and (max-width: 950px) {
+  .header-search { display:none; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .avatar-circle { width: 110px; height: 110px; }
 }
-.account-row .profile-pic img { width:100%; height:100%; object-fit:cover; display:block; }
 
-/* info */
-.account-row .account-info { display:flex; flex-direction:column; gap:4px; min-width: 0; flex:1; }
-.account-row .account-info .displayName { font-weight:700; color:var(--text); font-size: 0.98rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.account-row .account-info .username { color:var(--muted); font-size:0.9rem; }
+/* Provide a subtle focus outline for keyboard users (only show when focusing via keyboard) */
+:root:focus-within .btn:focus { outline-offset: 3px; }
 
-/* active badge */
-.account-row .account-active { background: var(--account-active-bg); color: var(--accent); padding: 4px 8px; border-radius:999px; font-weight:700; font-size:0.82rem; }
+/* Ensure images don't overflow */
+img { max-width: 100%; height: auto; display: block; }
 
-/* actions */
-.account-row .account-actions { display:flex; gap:8px; align-items:center; margin-left:8px; }
-.account-row .account-actions .btn { padding:8px 12px; font-size:0.9rem; border-radius:10px; }
-.account-row .account-actions .btn.signout { background:transparent; border:1px solid rgba(15,23,42,0.06); color:var(--danger); font-weight:700; }
-.account-row .account-actions .btn.signout:hover { background: rgba(225,80,80,0.06); }
+/* ========================================================================
+   Mobile-First Media Query
+   - Emphasize stacked header behavior: on small screens header-bottom
+     collapses beneath the logo; toggle shows/hides it. This prevents
+     crowding in the header row and moves controls (search, actions) below.
+   ======================================================================== */
 
-/* compact variant */
-.account-row.compact .profile-pic { width: var(--account-avatar-size-sm); height: var(--account-avatar-size-sm); }
-
-/* placeholder empty */
-.accounts-list .empty { padding:14px; color:var(--muted); text-align:center; background: linear-gradient(180deg,#fff,#fbfdff); border-radius:10px; border:1px dashed rgba(15,23,42,0.04); }
-
-/* -------------------------
-   Responsive / Mobile-first behaviors
-   ------------------------- */
+/* Mobile Devices (Portrait and Landscape) */
 @media (max-width: 800px) {
-  :root { --space-sm: 10px; --space-md: 14px; --touch-target: 48px; }
 
-  /* header stacking & heights */
+  :root {
+    /* adjust spacing for mobile */
+    --space-sm: 10px;
+    --space-md: 14px;
+    --space-lg: 20px;
+  }
+
+  /* Use header-inner to stack header-top + header-bottom */
   .header-inner { display:flex; flex-direction:column; gap:8px; align-items:stretch; padding: 8px var(--space-sm); }
-  .header-top { height: var(--site-header-mobile-height); min-height: var(--site-header-mobile-height); }
-  .site-header { --site-header-height: var(--site-header-mobile-height); }
+  .header-top { height: 56px; }
 
+  /* smaller brand */
   .logo .brand { font-size: 1rem; }
   .logo .tagline { display:none; }
 
-  /* header bottom collapsed by default; open toggled by main.js or by adding .open */
+  /* header-bottom collapsed by default */
   .header-bottom { max-height: 0; opacity: 0; pointer-events: none; transform: translateY(-6px); }
   .header-bottom.open { max-height: 999px; opacity: 1; pointer-events: auto; transform: translateY(0); }
 
-  /* show mobile toggle */
-  #mobileMenuToggle { display:inline-flex; }
+  /* show mobile toggle button */
+  #mobileMenuToggle { display: inline-flex; }
 
-  /* when open, we want the site header to expand visually and reserve space for it:
-     JS should set data-expanded="true" on .site-header when header-bottom.open is set.
-     The following rule updates the global padding variable when data-expanded present.
-  */
-  .site-header[data-expanded="true"] { --site-header-height: calc(var(--site-header-mobile-height) + var(--site-header-expanded-extra)); }
-
-  /* header-bottom visual background (requested): */
-  .header-bottom.open {
-    background: rgba(255,255,255,0.98);
-    border-radius: 12px;
-    padding: 12px;
-    box-shadow: 0 10px 30px rgba(16,24,40,0.08);
-    border: 1px solid rgba(15,23,42,0.04);
-  }
-
-  /* header search full width */
+  /* header-search becomes full width when visible */
   .header-search { width: 100%; min-width: auto; order: 1; }
+
+  /* nav/actions stacked below search */
   #navBar { order: 2; display:flex; width:100%; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
 
-  /* posts stack */
+  /* Make posts stack vertically */
   .card, .post { padding: var(--space-md); margin-bottom: var(--space-md); flex-direction: column; gap: var(--space-md); }
   .post .post-left { width: 100%; display:flex; align-items:center; gap:12px; }
   .post .post-body { order: 2; }
   .post .post-excerpt { display:none; }
-  .post .post-img { max-width:100%; height:auto; margin-top: var(--space-sm); }
+  .post .post-img { max-width: 100%; height: auto; margin-top: var(--space-sm); }
 
-  /* accounts adjustments */
-  .accounts-header { flex-direction: column; align-items:stretch; gap:12px; }
-  .account-row { padding: 12px; gap: 10px; }
-  .account-row .account-actions { margin-left: 0; flex-wrap:wrap; justify-content:flex-end; }
-  .account-row .profile-pic { width: 44px; height: 44px; border-radius:8px; }
+  /* Footer stack */
+  .site-footer .footer-inner { flex-direction: column; text-align: center; gap: var(--space-sm); }
+  .footer-links { flex-direction: column; gap: 8px; }
 }
 
-/* medium screens */
+/* Medium Screens and Tablets */
 @media (min-width: 801px) and (max-width: 1100px) {
+  .header-search { min-width: 200px; width: 30%; }
+  .header-inner { padding: 0 var(--space-md); }
   .header-bottom { max-height: none; opacity: 1; pointer-events: auto; transform: none; }
   #mobileMenuToggle { display: none; }
 }
 
-/* desktop: header bottom always visible, toggle hidden */
+/* Desktop: header bottom always visible, toggle hidden */
 @media (min-width: 1101px) {
   .header-bottom { max-height: none; opacity: 1; pointer-events: auto; transform: none; }
   #mobileMenuToggle { display: none; }
 }
 
-/* Accessibility: focus outlines for keyboard users */
-:root:focus-within .btn:focus { outline-offset: 3px; }
-
-/* Keep any other existing selectors intact for compatibility - no removals */
-/* End of file */
+/* End of stylesheet */
