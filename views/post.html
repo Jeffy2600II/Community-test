@@ -2,6 +2,7 @@
 <html lang="th">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>ดูโพสต์</title>
     <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -13,11 +14,10 @@
         <div id="postBox"></div>
         <hr style="margin:16px 0;">
         <div id="commentBox"></div>
-
-        <form id="commentForm" style="display:none;margin-top:12px;">
+        <form id="commentForm" class="mt-16 hidden">
           <label class="small">แสดงความคิดเห็น</label>
           <textarea name="content" placeholder="แสดงความคิดเห็น" required></textarea>
-          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+          <div class="text-right mt-16">
             <button type="submit" class="btn btn-primary">แสดงความคิดเห็น</button>
           </div>
         </form>
@@ -36,17 +36,17 @@ async function loadPost() {
     if (!data.success) return document.getElementById('postBox').innerText = 'ไม่พบโพสต์';
     const { post, comments, owner, myUsername: apiUsername } = data;
     myUsername = apiUsername;
-    let html = `<header style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+    let html = `<header class="row" style="justify-content:space-between;align-items:flex-start;">
       <div>
         <h2 style="margin:0 0 6px 0">${post.title}</h2>
         <div class="small">โดย <a href="/user/${post.username}">${post.username}</a> • ${new Date(post.createdAt).toLocaleString()}</div>
       </div>
-      <div style="display:flex;gap:8px;">
+      <div class="row">
         ${myUsername === post.username ? `<a class="btn btn-ghost" href="/post/${post.id}/edit">แก้ไข</a> <button class="btn btn-ghost" id="delBtn">ลบ</button>` : ''}
       </div>
     </header>
     ${post.image ? `<img src="${post.image}" class="post-img" alt="post image" loading="lazy">` : ''}
-    <div style="margin-top:12px">${post.content}</div>`;
+    <div class="mt-16">${post.content}</div>`;
     document.getElementById('postBox').innerHTML = html;
 
     if (myUsername === post.username) {
@@ -66,11 +66,11 @@ async function loadPost() {
         cHtml += `<div class="comment">
             <div class="meta"><strong><a href="/user/${c.username}">${c.username}</a></strong> • ${new Date(c.createdAt).toLocaleString()}</div>
             <div>${c.content}</div>
-            ${myUsername === c.username ? `<div style="margin-top:8px;"><button class="btn btn-ghost" onclick="deleteComment('${c.id}')">ลบ</button></div>` : ''}
+            ${myUsername === c.username ? `<div class="mt-16"><button class="btn btn-ghost" onclick="deleteComment('${c.id}')">ลบ</button></div>` : ''}
         </div>`;
     }
     document.getElementById('commentBox').innerHTML = cHtml;
-    if (myUsername) document.getElementById('commentForm').style.display = '';
+    if (myUsername) document.getElementById('commentForm').classList.remove("hidden");
 }
 loadPost();
 
