@@ -610,7 +610,8 @@ img { max-width: 100%; height: auto; display: block; }
   }
 
   /* Use header-inner to stack header-top + header-bottom */
-  .header-inner { display:flex; flex-direction:column; gap:8px; align-items:stretch; padding: 8px var(--space-sm); }
+  .header-inner { display:flex; flex-direction:column; gap:8px; align-items:stretch; padding: 8px var(--space-sm); 
+    background: #ffffff; }
   .header-top { height: 56px; }
 
   /* smaller brand */
