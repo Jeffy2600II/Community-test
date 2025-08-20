@@ -1,47 +1,63 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="utf-8">
-    <title>สมัครสมาชิก - Community</title>
-    <link rel="stylesheet" href="/css/style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>สมัครสมาชิก — Community</title>
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <div id="headerSlot"></div>
   <main>
-    <div class="container" style="max-width:480px;margin:2rem auto;">
+    <div class="container" style="max-width:420px;margin-top:40px;">
       <div class="card">
-        <div class="section-title"><span>สมัครสมาชิกใหม่</span></div>
-        <form id="registerForm">
-            <label class="small">ชื่อผู้ใช้</label>
-            <input type="text" name="username" placeholder="ชื่อผู้ใช้" required>
-            <label class="small">อีเมล</label>
-            <input type="email" name="email" placeholder="อีเมล" required>
-            <label class="small">รหัสผ่าน</label>
-            <input type="password" name="password" placeholder="รหัสผ่าน" required>
-            <div style="text-align:right;margin-top:8px">
-              <button type="submit" class="btn btn-primary">สมัคร</button>
-            </div>
-            <p id="msg" class="small" style="margin-top:8px"></p>
+        <h2 class="text-center" style="margin-bottom:20px;">สมัครสมาชิก</h2>
+        <form id="registerForm" autocomplete="on">
+          <label class="small" for="inputUsername">ชื่อผู้ใช้</label>
+          <input type="text" id="inputUsername" name="username" placeholder="ชื่อผู้ใช้" required autocomplete="username">
+          <label class="small" for="inputEmail">อีเมล</label>
+          <input type="email" id="inputEmail" name="email" placeholder="อีเมล" required autocomplete="email">
+          <label class="small" for="inputPassword">รหัสผ่าน</label>
+          <input type="password" id="inputPassword" name="password" placeholder="รหัสผ่าน" required autocomplete="new-password">
+          <div class="text-right mt-16">
+            <button type="submit" class="btn btn-primary">สมัครสมาชิก</button>
+          </div>
+          <p id="msg" class="small" style="margin-top:10px"></p>
         </form>
-        <p style="margin-top:12px;"><a href="/login">มีบัญชีอยู่แล้ว? เข้าสู่ระบบ</a></p>
+        <div class="small text-center" style="margin-top:18px;">
+          <a href="/login">เข้าสู่ระบบ</a>
+        </div>
       </div>
     </div>
   </main>
   <div id="footerSlot"></div>
-<script src="/js/main.js"></script>
-<script>
-document.getElementById('registerForm').onsubmit = async e => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const res = await fetch('/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(Object.fromEntries(fd.entries()))
-    });
-    const data = await res.json();
-    document.getElementById('msg').innerText = data.success ? 'สำเร็จ! ไปล็อกอิน...' : data.msg;
-    if (data.success) setTimeout(() => location.replace('/login'), 1200);
-};
-</script>
+  <script src="/js/main.js"></script>
+  <script>
+    document.getElementById('registerForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('msg');
+      msg.style.color = '#d00';
+      msg.innerText = '';
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      try {
+        const res = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!data || !data.success) {
+          msg.innerText = data && data.msg ? data.msg : 'ไม่สำเร็จ ลองอีกครั้ง';
+          return;
+        }
+        msg.style.color = '#080';
+        msg.innerText = 'สมัครสมาชิกสำเร็จ กำลังนำไปเข้าสู่ระบบ...';
+        setTimeout(() => { location.href = '/login'; }, 1000);
+      } catch (err) {
+        msg.innerText = 'เกิดข้อผิดพลาดเครือข่าย';
+      }
+    };
+  </script>
 </body>
 </html>
