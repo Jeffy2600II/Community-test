@@ -503,28 +503,231 @@ a { color: var(--accent); text-decoration: none; }
 .row { display:flex; gap:12px; align-items:center; }
 .col { display:flex; flex-direction:column; gap:8px; }
 
-/* Layout adjustments for very small screens */
-@media (max-width: 560px) {
+/* Mobile-first redesign overrides
+   Breakpoints:
+     - <=600px : phone / small tablets in portrait
+     - <=420px : small phones (compact)
+   Goal: full reflow for mobile UX — stacked layout, larger touch targets,
+         simplified header, bottom navigation, FAB, readable type scale,
+         accessible focus states, reduced visual noise.
+*/
+
+/* Base mobile variables */
+@media (max-width: 600px) {
   :root {
-    --space-md: 12px;
-    --space-lg: 18px;
-    --touch-target: 48px;
+    --space-xxs: 6px;
+    --space-xs: 10px;
+    --space-sm: 14px;
+    --space-md: 18px;
+    --space-lg: 22px;
+    --space-xl: 28px;
+    --touch-target: 56px;
+    --radius: 12px;
+    --radius-sm: 10px;
+    --max-width: 100%;
+    --max-width-narrow: 100%;
+    --readable-line: 1.6rem;
+    --shadow-1: 0 8px 26px rgba(29,41,56,0.06);
+    --shadow-2: 0 18px 46px rgba(29,41,56,0.08);
+    font-size: 16px; /* slightly larger base for readability */
   }
-  body { font-size: 15px; }
-  .site-header .container { height: 60px; padding-left: 12px; padding-right: 12px; }
-  .btn { padding: 12px 14px; font-size: 0.95rem; border-radius: 12px; }
-  .avatar-circle { width: 96px; height: 96px; }
-  .profile-hero .avatar { width: 120px; height: 120px; }
-  .header-search { display:none; }
-  .card { padding: 12px; }
+
+  /* Page layout: remove horizontal container padding and make content edge-to-edge */
+  .container {
+    padding-left: var(--space-sm);
+    padding-right: var(--space-sm);
+  }
+  main { margin: calc(var(--space-lg)) auto; padding-bottom: 84px; } /* space for bottom nav/FAB */
+
+  /* Header: compact, left-aligned logo, hide search and non-essential nav */
+  .site-header {
+    height: 56px;
+    box-shadow: 0 1px 0 rgba(16,24,40,0.03);
+    padding: 0;
+  }
+  .site-header .container {
+    height: 56px;
+    padding-left: var(--space-sm);
+    padding-right: var(--space-sm);
+    gap: 8px;
+  }
+  .logo .brand { font-size: 0.98rem; font-weight: 800; letter-spacing: 0.4px; }
+  .logo .tagline { display:none; }
+
+  /* hide desktop nav and search to simplify header */
+  .header-left { display:none !important; }
+  .header-search { display:none !important; }
+
+  /* header actions compact */
+  .header-actions { gap: 8px; align-items:center; }
+
+  /* Card: full width, increased radius and spacing for touch */
+  .card {
+    padding: var(--space-md);
+    margin-bottom: var(--space-md);
+    border-radius: var(--radius);
+    border: none;
+    box-shadow: var(--shadow-1);
+  }
+
+  /* Feed & posts: vertical stacking, simplified metadata */
+  .feed { gap: var(--space-md); }
+  .post {
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--space-sm);
+    gap: var(--space-sm);
+  }
+  .post .post-left { width: 100%; display:flex; justify-content:center; }
+  .post .post-left .avatar-img { width:72px; height:72px; border-radius:12px; }
+  .post .post-body { width:100%; }
+  .post .post-title { font-size: 1.05rem; margin-bottom:6px; }
+  .post .post-meta { font-size: 0.9rem; color: var(--muted); }
+  .post .post-excerpt { color: #2f3b45; font-size: 0.98rem; line-height:1.5; }
+  .post .post-img { width:100%; max-width:100%; border-radius:10px; margin-top: 10px; }
+
+  /* Buttons: full-width primary actions where appropriate, larger tap area */
+  .post .post-actions { display:flex; gap:10px; flex-wrap:wrap; }
+  .post .post-actions .btn { flex:1 1 auto; min-width: 0; padding: 12px; font-weight:700; border-radius:10px; }
+  .btn { padding: 12px 14px; min-height: var(--touch-target); border-radius: 12px; font-size: 1rem; }
+
+  /* Forms: single-column, larger inputs */
+  input[type="text"], input[type="email"], textarea {
+    padding: 14px 12px;
+    font-size: 1rem;
+    border-radius: 12px;
+  }
+  textarea { min-height: 160px; }
+
+  /* Profile hero: center, compact stats */
+  .profile-hero {
+    padding: var(--space-md);
+    border-radius: 14px;
+    text-align:center;
+  }
+  .profile-hero .avatar { width:120px; height:120px; border-radius:20px; }
+
+  /* Avatar circle (profile) smaller and centered */
+  .avatar-circle { width:96px; height:96px; margin: 0 auto; }
+
+  /* Dropdowns: full width card under header */
+  .dropdown-panel {
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    margin: 0 auto;
+    width: 100% !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    border-left: none !important;
+    border-right: none !important;
+  }
+
+  /* Notifications: enlarge rows */
+  .dropdown-item { padding: 12px !important; border-radius: 0 !important; }
+
+  /* Footer: compact */
+  .site-footer { padding: var(--space-md) 0; font-size: 13px; }
+
+  /* Utility: stack rows into columns for mobile */
+  .row { flex-direction: column; align-items: stretch; gap: 12px; }
+  .col { gap: 12px; }
+
+  /* Make images crisp on mobile */
+  img { height: auto; width: 100%; }
+
+  /* Bottom navigation (mobile-specific) */
+  .mobile-bottom-nav {
+    position: fixed;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 28px);
+    max-width: 720px;
+    background: linear-gradient(180deg, #fff, #fcfdff);
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(16,24,40,0.12);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    z-index: 2000;
+    border: 1px solid rgba(15,23,42,0.04);
+    gap: 6px;
+  }
+  .mobile-bottom-nav a, .mobile-bottom-nav button {
+    flex: 1 1 auto;
+    min-height: 48px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    color: var(--text);
+    text-decoration:none;
+    font-weight:700;
+  }
+
+  /* Floating action button for create-post */
+  .fab-create {
+    position: fixed;
+    right: 18px;
+    bottom: 84px;
+    width: 64px;
+    height: 64px;
+    border-radius: 9999px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(180deg,var(--accent), #1f66d6);
+    color: #fff;
+    box-shadow: 0 16px 36px rgba(47,128,237,0.18);
+    z-index: 2200;
+    border: none;
+  }
+
+  /* Accessibility: larger focus outlines */
+  .btn:focus, .avatar-btn:focus, .mobile-bottom-nav a:focus {
+    outline: 3px solid rgba(47,128,237,0.14);
+    outline-offset: 2px;
+  }
+
+  /* Reduce non-essential decorations */
+  .section-title span { padding: 8px 12px; font-size: 0.95rem; }
 }
 
-/* Small improvements for medium screens */
-@media (min-width: 561px) and (max-width: 950px) {
-  .header-search { display:none; }
-  .grid-2 { grid-template-columns: 1fr; }
-  .avatar-circle { width: 110px; height: 110px; }
+/* Extra compact phones — further simplify and scale down where needed */
+@media (max-width: 420px) {
+  :root {
+    --space-md: 14px;
+    --space-lg: 18px;
+    --touch-target: 56px;
+    font-size: 15px;
+  }
+
+  .site-header .container { height: 52px; }
+  .logo .brand { font-size: 0.95rem; }
+  .profile-hero .avatar { width:110px; height:110px; }
+
+  .mobile-bottom-nav { bottom: 12px; padding: 6px; }
+  .mobile-bottom-nav a { font-size: 0.88rem; padding: 8px 6px; }
+
+  .fab-create { width: 56px; height: 56px; right: 14px; bottom: 78px; }
+  .post .post-left .avatar-img { width:64px; height:64px; }
+  .post .post-title { font-size: 1rem; }
+  input[type="text"], input[type="email"], textarea { font-size: 0.98rem; padding: 12px; border-radius: 10px; }
 }
+
+/* Helper: add mobile bottom nav to pages by adding this markup near end of <body>:
+   <nav class="mobile-bottom-nav" aria-hidden="false">
+     <a href="/">หน้าแรก</a>
+     <a href="/search">ค้นหา</a>
+     <a href="/post/create">โพสต์</a>
+     <a href="/accounts">บัญชี</a>
+   </nav>
+   <button class="fab-create" onclick="location.href='/post/create'" aria-label="สร้างโพสต์">＋</button>
+*/
 
 /* Provide a subtle focus outline for keyboard users (only show when focusing via keyboard) */
 :root:focus-within .btn:focus { outline-offset: 3px; }
