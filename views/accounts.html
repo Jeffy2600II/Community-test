@@ -42,8 +42,7 @@
       <h3>บัญชีที่ใช้งานอยู่ (Active)</h3>
       <div id="activeAccountInfo">...</div>
       <div style="margin-top:.8rem;">
-        <a id="linkToProfile" href="/profile">ไปที่โปรไฟล์</a> •
-        <a href="#" id="btnViewSettings">ดูการตั้งค่าบัญชี</a>
+        <a id="linkToProfile" href="/profile">ดูโปรไฟล์</a>
       </div>
     </div>
 
@@ -178,8 +177,9 @@
                   <div class="small">${act.username}</div>
                 </div>
               </div>`;
+            // ปุ่มดูโปรไฟล์: ลิงก์ไป /profile เสมอ
             const link = document.getElementById('linkToProfile');
-            if (link) link.href = `/user/${encodeURIComponent(act.username)}`;
+            if (link) link.href = "/profile";
           } else {
             document.getElementById('activeAccountInfo').textContent = 'ไม่พบข้อมูลบัญชีที่ใช้งาน';
           }
@@ -192,20 +192,6 @@
         console.error('loadAccounts error', err);
       }
     }
-
-    document.getElementById('btnViewSettings').onclick = async (e) => {
-      e.preventDefault();
-      try {
-        const r = await fetch('/api/account/settings');
-        if (!r.ok) throw new Error();
-        const d = await r.json();
-        if (d.success) {
-          alert('Account settings:\n' + JSON.stringify(d.settings, null, 2));
-        } else alert('ไม่สามารถโหลดการตั้งค่าได้');
-      } catch {
-        alert('เกิดข้อผิดพลาด');
-      }
-    };
 
     (async ()=> {
       await loadAccounts();
