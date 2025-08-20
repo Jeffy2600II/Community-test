@@ -619,9 +619,8 @@ img { max-width: 100%; height: auto; display: block; }
 
  /* header-bottom collapsed by default */
 .header-bottom {
-  position: relative; /* กลับมาใช้ relative แทน fixed */
   width: 100%;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.9); /* glass effect */
   backdrop-filter: blur(10px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
@@ -633,12 +632,11 @@ img { max-width: 100%; height: auto; display: block; }
   transition: 
     transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
     opacity 0.3s ease;
-  z-index: 1000;
 }
 
 /* เมื่อเปิด */
 .header-bottom.open {
-  transform: translateY(0); /* เลื่อนลงมาเต็มๆ */
+  transform: translateY(0);
   opacity: 1;
   pointer-events: auto;
 }
