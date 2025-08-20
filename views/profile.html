@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>โปรไฟล์ของฉัน — Community</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .profile-header { display:flex; align-items:center; gap:1.2rem; margin-bottom:2rem; }
+    .profile-avatar { width:90px; height:90px; border-radius:50%; object-fit:cover; }
+    .profile-meta { flex:1; }
+    .profile-section { margin-bottom:2.2rem; }
+    .btn { padding:6px 14px; border-radius:7px; border:1px solid #ddd; background:#fff; cursor:pointer; }
+    .btn-secondary { background:#f9f9f9; color:#333; }
+  </style>
+</head>
+<body>
+  <div id="headerSlot"></div>
+  <main>
+    <div class="profile-header">
+      <img id="profileAvatar" class="profile-avatar" src="/img/default_profile.png" alt="avatar">
+      <div class="profile-meta">
+        <div id="profileDisplayName" style="font-size:1.5rem;font-weight:700;">ชื่อผู้ใช้</div>
+        <div id="profileUsername" style="color:#888;margin-top:0.2rem;">@username</div>
+        <div id="profileBio" class="small" style="margin-top:.6rem;"></div>
+        <div style="margin-top:1rem;">
+          <!-- ปุ่มดูโปรไฟล์สาธารณะ -->
+          <button id="btnViewPublic" class="btn btn-secondary">ดูโปรไฟล์สาธารณะ</button>
+        </div>
+      </div>
+    </div>
+    <div class="profile-section">
+      <strong>บทความของฉัน</strong>
+      <div id="myPosts"></div>
+    </div>
+  </main>
+  <div id="footerSlot"></div>
+  <script src="/js/main.js"></script>
+  <script>
+    // โหลดข้อมูลโปรไฟล์ผู้ใช้ที่ล็อกอิน
+    async function loadProfile() {
+      try {
+        const res = await fetch('/api/account/profile');
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        document.getElementById('profileAvatar').src = data.profilePic||'/img/default_profile.png';
+        document.getElementById('profileDisplayName').textContent = data.displayName||data.username;
+        document.getElementById('profileUsername').textContent = '@' + data.username;
+        document.getElementById('profileBio').textContent = data.bio||'';
+        // ปุ่มดูโปรไฟล์สาธารณะ
+        document.getElementById('btnViewPublic').onclick = function() {
+          window.location.href = '/user/' + encodeURIComponent(data.username);
+        };
+        // โหลดโพสต์
+        if (Array.isArray(data.posts)) {
+          const posts = data.posts.map(
+            p => `<div style="margin-top:10px;"><a href="/post/${p.id}">${p.title}</a></div>`
+          ).join('');
+          document.getElementById('myPosts').innerHTML = posts || '<i>ยังไม่มีโพสต์</i>';
+        }
+      } catch (e) {
+        document.getElementById('profileDisplayName').textContent = 'ไม่พบข้อมูล';
+        document.getElementById('profileUsername').textContent = '';
+      }
+    }
+    loadProfile();
+  </script>
+</body>
+</html>
