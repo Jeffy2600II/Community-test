@@ -2,6 +2,7 @@
 <html lang="th">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>แก้ไขโพสต์</title>
     <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -16,10 +17,12 @@
             <input type="text" name="title" placeholder="หัวข้อ">
             <label class="small">เนื้อหา</label>
             <textarea name="content" placeholder="เนื้อหา"></textarea>
-            <div style="margin-top:8px" class="input-file">
-              <label class="btn btn-ghost">เปลี่ยนรูป: <input type="file" name="postImage"></label>
+            <div class="input-file mt-16">
+              <label class="btn btn-ghost">
+                เปลี่ยนรูป <input type="file" name="postImage">
+              </label>
             </div>
-            <div style="text-align:right;margin-top:12px">
+            <div class="text-right mt-16">
               <button type="submit" class="btn btn-primary">อัปเดต</button>
             </div>
             <p id="msg" class="small" style="margin-top:8px"></p>
