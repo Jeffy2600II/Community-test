@@ -618,7 +618,8 @@ img { max-width: 100%; height: auto; display: block; }
   .logo .tagline { display:none; }
 
   /* header-bottom collapsed by default */
-  .header-bottom { max-height: 0; opacity: 0; pointer-events: none; transform: translateY(-6px); }
+  .header-bottom { max-height: 0; opacity: 0; pointer-events: none; transform: translateY(-6px);
+    background: #ffffff; }
   .header-bottom.open { max-height: 999px; opacity: 1; pointer-events: auto; transform: translateY(0); }
 
   /* show mobile toggle button */
