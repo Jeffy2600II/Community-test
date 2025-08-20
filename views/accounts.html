@@ -7,7 +7,8 @@
   <style>
     .accounts-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
     .accounts-list { display:flex; flex-direction:column; gap:0.6rem; }
-    .account-row { display:flex; align-items:center; gap:0.8rem; padding:0.8rem; border:1px solid #eee; border-radius:8px; background:#fff; }
+    .account-row { display:flex; align-items:center; gap:0.8rem; padding:0.8rem; border:1px solid #eee; border-radius:8px; background:#fff; cursor:pointer; transition:background 0.2s; }
+    .account-row:hover { background: #f2f8ff; }
     .account-info { flex:1; }
     .account-actions { display:flex; gap:0.5rem; }
     .account-active { font-size:0.9rem; color:#27ae60; font-weight:700; padding:.2em .5em; border-radius:6px; background:#e8f8f1; }
@@ -26,12 +27,10 @@
     <div class="accounts-header">
       <div>
         <h2>บัญชีที่บันทึกไว้</h2>
-        <div class="small">คุณสามารถเพิ่ม, สลับ หรือเอาบัญชีออกจากรายการได้ที่นี่</div>
+        <div class="small">คุณสามารถเพิ่ม, สลับ หรือออกจากบัญชีได้ที่นี่</div>
       </div>
       <div style="display:flex;gap:0.6rem;align-items:center;">
-        <!-- เปลี่ยนพฤติกรรม: ไปที่หน้า /login?add=1 เพื่อเพิ่มบัญชี -->
         <button id="btnAddAccount" class="btn">เพิ่มบัญชี</button>
-        <button id="btnSignOutAll" class="btn-muted">ออกจากระบบ (active)</button>
       </div>
     </div>
 
@@ -48,8 +47,6 @@
       </div>
     </div>
 
-    <!-- Notifications: replace old inline rendering with a container that the account-notifications.js will populate.
-         This ensures notifications in the account page behave like the new system (clickable -> mark-read -> navigate). -->
     <div class="section-small" id="notificationsPanel" style="display:block;margin-top:1rem;">
       <h3>การแจ้งเตือน</h3>
       <section id="accountNotifications" class="account-notifications" aria-live="polite" style="background:#fff;border-radius:8px;padding:0;margin-top:.6rem;">
@@ -61,16 +58,13 @@
   <div id="footerSlot"></div>
 
   <script src="/js/main.js"></script>
-  <!-- Script that enhances the account page notifications (mark-read + navigate) -->
   <script src="/js/account-notifications.js"></script>
-
   <script>
-    // ปรับให้ปุ่ม Add account พาไปที่ /login?add=1
+    // ปุ่มเพิ่มบัญชี
     document.getElementById('btnAddAccount').onclick = (e) => {
       location.href = '/login?add=1';
     };
 
-    // Reload accounts list when accountsChanged event fires (nav / global account switch)
     window.addEventListener('accountsChanged', async () => {
       await loadAccounts();
     });
@@ -90,6 +84,7 @@
           for (let acc of accounts) {
             const row = document.createElement('div');
             row.className = 'account-row';
+            row.tabIndex = 0;
             row.innerHTML = `
               <img src="${acc.profilePic||'/img/default_profile.png'}" class="profile-pic" width="48" height="48">
               <div class="account-info">
@@ -101,69 +96,66 @@
               </div>
               <div class="account-actions">
                 ${active === acc.username
-                  ? `<button class="btn-muted" data-username="${acc.username}" data-action="signout">Sign out</button>`
-                  : `<button class="btn" data-username="${acc.username}" data-action="use">Use</button>
-                     <button class="btn-muted" data-username="${acc.username}" data-action="remove">Remove</button>`}
+                  ? ''
+                  : `<button class="btn-muted" data-username="${acc.username}" data-action="signout">Sign out</button>`
+                }
               </div>
             `;
+            // คลิกที่ทั้งแถวเพื่อเปลี่ยนบัญชี (ถ้าไม่ใช่ active)
+            if (active !== acc.username) {
+              row.addEventListener('click', async (e) => {
+                // ไม่สลับถ้ากดที่ปุ่ม signout
+                if (e.target.tagName === 'BUTTON') return;
+                if (!confirm(`สลับไปใช้บัญชี ${acc.username} ?`)) return;
+                try {
+                  const r = await fetch('/api/accounts/switch', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ username: acc.username })
+                  });
+                  const d = await r.json();
+                  if (d.success) {
+                    window.dispatchEvent(new Event('accountsChanged'));
+                    await loadAccounts();
+                  } else alert(d.msg || 'ไม่สำเร็จ');
+                } catch (err) {
+                  console.error(err);
+                  alert('เกิดข้อผิดพลาดขณะสลับบัญชี');
+                }
+              });
+              // รองรับ Enter/Space สำหรับ accessibility
+              row.addEventListener('keydown', async (e) => {
+                if ((e.key === 'Enter' || e.key === ' ') && active !== acc.username) {
+                  e.preventDefault();
+                  row.click();
+                }
+              });
+            }
+            // ปุ่ม sign out (remove)
+            row.querySelectorAll('button[data-action="signout"]').forEach(b => {
+              b.onclick = async (e) => {
+                e.stopPropagation();
+                const un = b.getAttribute('data-username');
+                if (!confirm(`Sign out from ${un}?`)) return;
+                try {
+                  const r = await fetch('/api/accounts/remove', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ username: un })
+                  });
+                  const d = await r.json();
+                  if (d.success) {
+                    window.dispatchEvent(new Event('accountsChanged'));
+                    await loadAccounts();
+                  } else alert(d.msg || 'ไม่สำเร็จ');
+                } catch (err) {
+                  console.error(err);
+                  alert('เกิดข้อผิดพลาดขณะออกจากบัญชี');
+                }
+              };
+            });
             container.appendChild(row);
           }
-          // attach handlers
-          container.querySelectorAll('button[data-action="use"]').forEach(b => {
-            b.onclick = async (e) => {
-              const un = b.getAttribute('data-username');
-              if (!confirm(`สลับไปใช้บัญชี ${un} ?`)) return;
-              try {
-                const r = await fetch('/api/accounts/switch', {
-                  method: 'POST',
-                  headers: {'Content-Type':'application/json'},
-                  body: JSON.stringify({ username: un })
-                });
-                const d = await r.json();
-                if (d.success) {
-                  // รีเฟรช header ทันทีโดยไม่ต้อง reload หน้า
-                  window.dispatchEvent(new Event('accountsChanged'));
-                  await loadAccounts();
-                } else alert(d.msg || 'ไม่สำเร็จ');
-              } catch (err) {
-                console.error(err);
-                alert('เกิดข้อผิดพลาดขณะสลับบัญชี');
-              }
-            };
-          });
-          container.querySelectorAll('button[data-action="remove"]').forEach(b => {
-            b.onclick = async (e) => {
-              const un = b.getAttribute('data-username');
-              if (!confirm(`ลบบัญชี ${un} จากรายการ?`)) return;
-              try {
-                const r = await fetch('/api/accounts/remove', {
-                  method: 'POST',
-                  headers: {'Content-Type':'application/json'},
-                  body: JSON.stringify({ username: un })
-                });
-                const d = await r.json();
-                if (d.success) {
-                  window.dispatchEvent(new Event('accountsChanged'));
-                  await loadAccounts();
-                } else alert(d.msg || 'ไม่สำเร็จ');
-              } catch (err) {
-                console.error(err);
-                alert('เกิดข้อผิดพลาดขณะลบบัญชี');
-              }
-            };
-          });
-          container.querySelectorAll('button[data-action="signout"]').forEach(b => {
-            b.onclick = async (e) => {
-              if (!confirm('ยืนยันออกจากระบบบัญชีปัจจุบัน?')) return;
-              try {
-                await fetch('/api/logout', { method: 'POST' });
-                window.dispatchEvent(new Event('accountsChanged'));
-                await loadAccounts();
-              } catch (err) {
-                console.error(err);
-              }
-            };
-          });
         }
 
         // active panel
@@ -179,7 +171,6 @@
                   <div class="small">${act.username}</div>
                 </div>
               </div>`;
-            // update profile link if possible
             const link = document.getElementById('linkToProfile');
             if (link) link.href = `/user/${encodeURIComponent(act.username)}`;
           } else {
@@ -195,17 +186,6 @@
       }
     }
 
-    document.getElementById('btnSignOutAll').onclick = async (e) => {
-      if (!confirm('ยืนยันออกจากระบบบัญชีปัจจุบัน?')) return;
-      try {
-        await fetch('/api/logout', { method: 'POST' });
-        window.dispatchEvent(new Event('accountsChanged'));
-        await loadAccounts();
-      } catch (err) {
-        console.error(err);
-      }
-    };
-
     document.getElementById('btnViewSettings').onclick = async (e) => {
       e.preventDefault();
       try {
@@ -220,10 +200,8 @@
       }
     };
 
-    // init: load accounts; notifications handled by account-notifications.js
     (async ()=> {
       await loadAccounts();
-      // account-notifications.js auto-inits itself and populates #accountNotifications
     })();
   </script>
 </body>
