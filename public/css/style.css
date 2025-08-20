@@ -532,4 +532,132 @@ a { color: var(--accent); text-decoration: none; }
 /* Ensure images don't overflow */
 img { max-width: 100%; height: auto; display: block; }
 
+/* ========================================================================
+   Mobile-First Media Query
+   - เน้นการจัดวางสำหรับหน้าจอขนาดเล็ก (< 768px)
+   - ปรับปรุง Navbar, main content, และ card layouts
+   ======================================================================== */
+
+/* Mobile Devices (Portrait and Landscape) */
+@media (max-width: 768px) {
+
+  :root {
+    /* ปรับขนาด spacing และ font size ให้เหมาะกับมือถือ */
+    --space-sm: 10px;
+    --space-md: 16px;
+    --space-lg: 20px;
+  }
+
+  /*
+    * ปรับปรุง Header (แถบนำทางด้านบน)
+    */
+  .site-header .container {
+    height: 60px; /* ลดความสูงของ header */
+    padding: 0 var(--space-md);
+    gap: var(--space-md);
+  }
+
+  .site-header .header-left nav {
+    /* ซ่อนเมนูนำทางหลักบนหน้าจอมือถือ */
+    display: none;
+  }
+  
+  .header-search {
+    /* ซ่อนแถบ Search บนหน้าจอมือถือ */
+    display: none;
+  }
+
+  /* เพิ่มปุ่มเมนูสำหรับมือถือ (Hamburger Icon) */
+  .site-header .container::before {
+    content: '\2630'; /* Unicode สำหรับ Hamburger icon */
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text);
+  }
+
+  /*
+    * ปรับปรุง Main Content
+    */
+  main {
+    margin: var(--space-lg) auto;
+    padding: 0 var(--space-sm); /* เพิ่ม padding ด้านข้างเล็กน้อย */
+  }
+  
+  /*
+    * ปรับปรุง Card และ Feed
+    */
+  .card, .post {
+    padding: var(--space-md); /* เพิ่ม padding ด้านใน card */
+    margin-bottom: var(--space-md); /* ลดระยะห่างระหว่าง card */
+    flex-direction: column; /* เปลี่ยน post layout ให้เป็นคอลัมน์เดียว */
+    gap: var(--space-md);
+  }
+  
+  .post .post-left {
+    width: 100%; /* ทำให้ส่วน avatar เต็มความกว้าง */
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .post .post-body {
+    order: 2; /* จัดลำดับ body ให้อยู่ด้านล่าง */
+  }
+
+  .post .post-excerpt {
+    display: none; /* ซ่อนบทสรุปย่อบนมือถือเพื่อลดความซับซ้อน */
+  }
+
+  .post .post-img {
+    max-width: 100%; /* ทำให้รูปภาพเต็มความกว้าง */
+    height: auto;
+    margin-top: var(--space-sm);
+  }
+
+  .post-actions {
+    justify-content: flex-start; /* จัดปุ่ม action ให้อยู่ทางซ้าย */
+    margin-top: var(--space-md);
+  }
+  
+  /*
+    * ปรับปรุง Grid Layout
+    */
+  .grid-2 {
+    grid-template-columns: 1fr; /* เปลี่ยนเป็น 1 คอลัมน์ */
+    gap: var(--space-md);
+  }
+  
+  /*
+    * ปรับปรุง Footer
+    */
+  .site-footer .footer-inner {
+    flex-direction: column; /* เปลี่ยนเป็นคอลัมน์เดียว */
+    text-align: center;
+    gap: var(--space-sm);
+  }
+  
+  .footer-links {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+/* Medium Screens and Tablets */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .site-header .header-left nav {
+    /* บน tablet ยังคงแสดงเมนูนำทางได้ */
+    display: block;
+  }
+
+  .header-search {
+    min-width: 200px;
+    width: 30%;
+  }
+
+  .grid-2 {
+    grid-template-columns: 1fr; /* ยังคงใช้คอลัมน์เดียวเพื่อให้ layout ดูดีบน tablet */
+  }
+}
+
+
 /* End of stylesheet */
