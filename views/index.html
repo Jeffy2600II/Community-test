@@ -1,355 +1,13 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Community Home</title>
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
-    :root {
-      --bg: #f6f7fb;
-      --surface: #fff;
-      --muted: #97a0b3;
-      --text: #1f2a37;
-      --accent: #2f80ed;
-      --accent-2: #17c2a1;
-      --danger: #e16060;
-      --radius: 12px;
-      --shadow-1: 0 6px 24px rgba(29, 41, 56, 0.08);
-      --space-xs: 6px;
-      --space-sm: 12px;
-      --space-md: 20px;
-      --space-lg: 32px;
-      --max-width: 1000px;
-      --main-width: 100%;
-      --transition: 170ms cubic-bezier(.2,.9,.2,1);
-      --touch-target: 46px;
-    }
-    html, body {
-      height: 100%;
-      margin: 0;
-      font-family: 'Inter', 'Noto Sans Thai', system-ui, sans-serif;
-      background: linear-gradient(180deg, var(--bg), #f4f6fa 120px);
-      color: var(--text);
-      font-size: 16px;
-      -webkit-font-smoothing: antialiased;
-      -webkit-text-size-adjust: 100%;
-      min-height: 100vh;
-    }
-    body {
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-    .container {
-      width: 100%;
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: 0 var(--space-md);
-      box-sizing: border-box;
-    }
-    header.site-header {
-      background: var(--surface);
-      border-bottom: 1px solid rgba(15,23,42,0.06);
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      box-shadow: 0 1px 0 rgba(16,24,40,0.04);
-    }
-    .header-inner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 60px;
-      gap: var(--space-md);
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: 0 var(--space-md);
-    }
-    .logo {
-      font-weight: 700;
-      font-size: 1.10rem;
-      color: var(--text);
-      letter-spacing: 0.6px;
-      text-decoration: none;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .brand {
-      color: var(--text);
-      font-size: 1.1rem;
-      margin-right: 2px;
-    }
-    .tagline {
-      color: var(--muted);
-      font-size: 0.85rem;
-      font-weight: 400;
-    }
-    nav.primary-nav {
-      display: flex;
-      gap: var(--space-md);
-    }
-    nav.primary-nav a {
-      color: var(--muted);
-      text-decoration: none;
-      font-weight: 600;
-      border-radius: 8px;
-      padding: 6px 10px;
-      transition: color var(--transition), background var(--transition);
-    }
-    nav.primary-nav a:hover {
-      background: rgba(47,128,237,0.08);
-      color: var(--accent);
-    }
-    .header-actions {
-      display: flex;
-      gap: var(--space-xs);
-      align-items: center;
-    }
-    .avatar-btn {
-      background: transparent;
-      border: none;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      border-radius: 8px;
-      padding: 3px 6px;
-      transition: background var(--transition);
-    }
-    .avatar-btn:hover { background: rgba(47,128,237,0.08);}
-    .avatar-img {
-      width: 40px;
-      height: 40px;
-      object-fit: cover;
-      border-radius: 10px;
-      border: 1px solid rgba(15,23,42,0.08);
-      background: #fff;
-    }
-    main {
-      width: var(--main-width);
-      margin: var(--space-lg) auto 0 auto;
-      flex: 1 1 auto;
-    }
-    .card {
-      background: var(--surface);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow-1);
-      padding: var(--space-md);
-      margin-bottom: var(--space-lg);
-      border: 1px solid rgba(15,23,42,0.03);
-      transition: box-shadow var(--transition), transform var(--transition);
-    }
-    .section-title {
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: var(--accent);
-      margin-bottom: var(--space-md);
-      letter-spacing: 0.05em;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-    .feed {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-md);
-    }
-    .post {
-      display: flex;
-      gap: var(--space-md);
-      align-items: flex-start;
-      background: linear-gradient(180deg,#fff,#fcfdff);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow-1);
-      border: 1px solid rgba(15,23,42,0.03);
-      padding: var(--space-md);
-      transition: box-shadow var(--transition);
-    }
-    .post-left {
-      width: 58px;
-      flex-shrink: 0;
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-    }
-    .post-body {
-      flex: 1;
-      min-width: 0;
-    }
-    .post-title {
-      font-size: 1.07rem;
-      font-weight: bold;
-      margin: 0;
-      color: var(--text);
-      line-height: 1.25;
-    }
-    .post-title a {
-      color: var(--text);
-      text-decoration: none;
-    }
-    .post-title a:hover {
-      color: var(--accent);
-      text-decoration: underline;
-    }
-    .post-meta {
-      color: var(--muted);
-      font-size: 0.93rem;
-      margin-top: 6px;
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .post-excerpt {
-      margin-top: 10px;
-      margin-bottom: 8px;
-      color: #38414b;
-      font-size: 0.97rem;
-      line-height: 1.52;
-      word-break: break-word;
-    }
-    .post-img {
-      max-width: 280px;
-      border-radius: 10px;
-      object-fit: cover;
-      margin-top: 10px;
-      box-shadow: 0 8px 30px rgba(16,24,40,0.06);
-      display: block;
-    }
-    .post-actions {
-      margin-top: 12px;
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      padding: 9px 18px;
-      min-height: var(--touch-target);
-      border-radius: 8px;
-      border: none;
-      cursor: pointer;
-      font-weight: 700;
-      font-size: 0.98rem;
-      background: #f7fafd;
-      color: var(--text);
-      transition: background var(--transition), transform var(--transition);
-    }
-    .btn-primary {
-      background: linear-gradient(180deg,var(--accent), #1f66d6);
-      color: #fff;
-      box-shadow: 0 8px 20px rgba(47,128,237,0.10);
-    }
-    .btn-ghost {
-      background: transparent;
-      border: 1px solid rgba(15,23,42,0.08);
-      color: var(--text);
-    }
-    .btn-muted {
-      background: #f4f6fb;
-      color: var(--muted);
-    }
-    .btn:active { transform: translateY(1px);}
-    .btn:focus { outline: 2px solid var(--accent);}
-    .small { font-size: 0.91rem; color: var(--muted);}
-    .hidden { display: none !important;}
-    footer.site-footer {
-      margin-top: var(--space-lg);
-      background: transparent;
-      padding: var(--space-md) 0;
-      color: var(--muted);
-      font-size: 14px;
-    }
-    .footer-inner {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      max-width: var(--max-width);
-      margin: 0 auto;
-      gap: var(--space-md);
-      padding: 0 var(--space-md);
-    }
-    .footer-links {
-      display: flex;
-      gap: var(--space-sm);
-    }
-    .footer-links a {
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 1em;
-    }
-    .footer-links a:hover { color: var(--accent);}
-    /* Responsive: Mobile First */
-    @media (max-width: 800px) {
-      .container, .footer-inner, .header-inner {
-        padding: 0 var(--space-sm);
-      }
-      main {
-        margin: var(--space-md) auto 0 auto;
-      }
-      .card, .post {
-        padding: var(--space-sm);
-      }
-      .post {
-        flex-direction: column;
-        gap: var(--space-sm);
-      }
-      .post-left {
-        width: 100%;
-        justify-content: flex-start;
-        margin-bottom: var(--space-xs);
-      }
-      .post-img {
-        max-width: 100%;
-      }
-      .footer-inner {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: var(--space-xs);
-      }
-    }
-    @media (max-width: 500px) {
-      :root {
-        --space-md: 12px;
-        --space-lg: 16px;
-        --touch-target: 44px;
-      }
-      .post-title { font-size: 1rem;}
-      .post-meta { font-size: 0.89rem;}
-      .footer-inner {
-        font-size: 13px;
-      }
-      .avatar-img { width: 34px; height: 34px;}
-    }
-    /* Accessibility: reduced motion */
-    @media (prefers-reduced-motion: reduce) {
-      * { transition: none !important;}
-    }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Community Home</title>
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <header class="site-header">
-    <div class="header-inner">
-      <a class="logo" href="/">
-        <span class="brand">Community</span>
-        <span class="tagline">แชร์เรื่องราวของคุณ</span>
-      </a>
-      <nav class="primary-nav">
-        <a href="/">หน้าหลัก</a>
-        <a href="/post/create">สร้างโพสต์</a>
-      </nav>
-      <div class="header-actions">
-        <button class="avatar-btn" id="profileBtn" title="บัญชีของฉัน" onclick="window.location='/profile'">
-          <img src="/img/default_profile.png" alt="โปรไฟล์" class="avatar-img" id="avatarImg">
-        </button>
-      </div>
-    </div>
-  </header>
+  <div id="headerSlot"></div>
   <main>
     <div class="container">
       <div class="card">
@@ -360,77 +18,59 @@
       </div>
     </div>
   </main>
-  <footer class="site-footer">
-    <div class="footer-inner">
-      <span>&copy; 2025 Community App</span>
-      <nav class="footer-links">
-        <a href="/">หน้าหลัก</a>
-        <a href="/profile">โปรไฟล์</a>
-        <a href="/post/create">สร้างโพสต์</a>
-      </nav>
-    </div>
-  </footer>
-<script>
-let myUsername = null;
-
-// เติมรูปโปรไฟล์ถ้ามีการล็อกอิน
-(async () => {
-  try {
-    const res = await fetch('/api/profile');
-    const data = await res.json();
-    if (data && data.success && data.profile) {
-      myUsername = data.profile.username;
-      if (data.profile.profilePic) {
-        document.getElementById('avatarImg').src = data.profile.profilePic;
+  <div id="footerSlot"></div>
+  <script src="/js/main.js"></script>
+  <script>
+  let myUsername = null;
+  (async () => {
+    try {
+      const pr = await fetch('/api/profile');
+      const data = await pr.json();
+      if (data && data.success && data.profile) {
+        myUsername = data.profile.username;
       }
-    }
-  } catch(e){}
-})();
-
-// แสดง feed
-(async () => {
+    } catch(e){}
     const res = await fetch('/api/posts');
     const data = await res.json();
     const posts = (data && data.posts) || [];
     let feedHtml = '';
     for (let post of posts) {
-        feedHtml += `<article class="post" aria-labelledby="title-${post.id}">
-            <div class="post-left">
-              <a href="/user/${post.username}">
-                <img src="/img/default_profile.png" class="avatar-img" alt="${post.username}" id="avatar-${post.username}">
-              </a>
-            </div>
-            <div class="post-body">
-              <h3 id="title-${post.id}" class="post-title"><a href="/post/${post.id}">${post.title}</a></h3>
-              <div class="post-meta">โดย <a href="/user/${post.username}">${post.username}</a> • ${new Date(post.createdAt).toLocaleString()}</div>
-              <div class="post-excerpt">${(post.content||'').slice(0, 220)}${(post.content||'').length>220?'...':''}</div>
-              ${post.image ? `<img src="${post.image}" class="post-img" alt="post image" loading="lazy">` : ''}
-              <div class="post-actions">
-                <a class="btn btn-ghost" href="/post/${post.id}">อ่านต่อ</a>
-                ${myUsername === post.username ? `<a class="btn btn-muted" href="/post/${post.id}/edit">แก้ไข</a> <button class="btn btn-ghost" onclick="deletePost('${post.id}')">ลบ</button>` : ''}
-              </div>
-            </div>
-        </article>`;
-        // ดึงรูปโปรไฟล์จริงทีหลังแบบ async (หากมี)
-        (async () => {
-          try {
-            const up = await fetch(`/api/user/${encodeURIComponent(post.username)}`);
-            const ud = await up.json();
-            if (ud && ud.success && ud.profile && ud.profile.profilePic) {
-              const imgElem = document.getElementById("avatar-"+post.username);
-              if (imgElem) imgElem.src = ud.profile.profilePic;
-            }
-          } catch(e){}
-        })();
+      feedHtml += `<article class="post" aria-labelledby="title-${post.id}">
+        <div class="post-left">
+          <a href="/user/${post.username}">
+            <img src="/img/default_profile.png" class="avatar-img" alt="${post.username}" id="avatar-${post.username}">
+          </a>
+        </div>
+        <div class="post-body">
+          <h3 id="title-${post.id}" class="post-title"><a href="/post/${post.id}">${post.title}</a></h3>
+          <div class="post-meta">โดย <a href="/user/${post.username}">${post.username}</a> • ${new Date(post.createdAt).toLocaleString()}</div>
+          <div class="post-excerpt">${(post.content||'').slice(0, 220)}${(post.content||'').length>220?'...':''}</div>
+          ${post.image ? `<img src="${post.image}" class="post-img" alt="post image" loading="lazy">` : ''}
+          <div class="post-actions">
+            <a class="btn btn-ghost" href="/post/${post.id}">อ่านต่อ</a>
+            ${myUsername === post.username ? `<a class="btn btn-muted" href="/post/${post.id}/edit">แก้ไข</a> <button class="btn btn-ghost" onclick="deletePost('${post.id}')">ลบ</button>` : ''}
+          </div>
+        </div>
+      </article>`;
+      (async () => {
+        try {
+          const up = await fetch(`/api/user/${encodeURIComponent(post.username)}`);
+          const ud = await up.json();
+          if (ud && ud.success && ud.profile && ud.profile.profilePic) {
+            const imgElem = document.getElementById("avatar-"+post.username);
+            if (imgElem) imgElem.src = ud.profile.profilePic;
+          }
+        } catch(e){}
+      })();
     }
     document.getElementById('feed').innerHTML = feedHtml || '<i class="small">ยังไม่มีโพสต์</i>';
-})();
-window.deletePost = async (postId) => {
+  })();
+  window.deletePost = async (postId) => {
     if (confirm('ลบโพสต์นี้?')) {
-        await fetch('/api/post/' + postId, {method:'DELETE'});
-        location.reload();
+      await fetch('/api/post/' + postId, {method:'DELETE'});
+      location.reload();
     }
-};
-</script>
+  };
+  </script>
 </body>
 </html>
