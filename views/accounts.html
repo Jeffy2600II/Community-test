@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>จัดการบัญชี — Community</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* Local additions for accounts page layout and notification controls.
+       Kept minimal and scoped to this page. Buttons can wrap onto next line
+       when space is constrained (flex-wrap). */
+    .accounts-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .accounts-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .account-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 10px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid rgba(15,23,42,0.04);
+      cursor: pointer;
+      transition: background 160ms ease, transform 120ms ease;
+    }
+    .account-row:focus { outline: 2px solid rgba(47,128,237,0.12); outline-offset: 2px; }
+    .account-row:hover { background: #fbfdff; transform: translateY(-1px); }
+    .account-row .profile-pic { border-radius: 8px; object-fit: cover; width:48px; height:48px; }
+    .account-info { display:flex; flex-direction:column; gap:4px; min-width:0; }
+    .account-active {
+      background: linear-gradient(90deg, rgba(47,128,237,0.12), rgba(23,194,161,0.06));
+      padding: 4px 8px;
+      border-radius: 999px;
+      color: var(--accent);
+      font-weight:700;
+      font-size: 0.85rem;
+    }
+    .account-actions { margin-left:auto; display:flex; gap:8px; align-items:center; }
+    .profile-pic-small { width:40px; height:40px; border-radius:8px; object-fit:cover; }
+
+    /* Notification panel */
+    .notif-card { display:flex; flex-direction:column; gap:8px; }
+    .notif-controls {
+      display:flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap; /* allow buttons to wrap and stack when narrow */
+    }
+    .notif-controls .small { margin-right:auto; color:var(--muted); }
+    .notif-list {
+      max-height: 420px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 8px 0;
+    }
+    .notif-item {
+      position: relative;
+      padding: 12px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid rgba(15,23,42,0.04);
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      cursor: pointer;
+    }
+    .notif-item.unread { background: #fffef6; }
+    .notif-item .meta { display:flex; justify-content:space-between; gap:8px; align-items:center; }
+    .notif-empty { padding: 12px; color:var(--muted); }
+
+    /* Kebab (three-dot) menu for per-notification actions */
+    .notif-kebab {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      width: 36px;
+      height: 36px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius: 8px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+    }
+    .notif-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
+    .kebab-dot { width:4px; height:4px; background:var(--muted); border-radius:50%; box-shadow: 0 8px 0 var(--muted), 0 -8px 0 var(--muted); }
+
+    /* tiny dropdown for kebab (positioned absolute inside item) */
+    .notif-dropdown {
+      position: absolute;
+      right: 10px;
+      top: 44px;
+      background: var(--surface);
+      border: 1px solid rgba(15,23,42,0.06);
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(16,24,40,0.08);
+      min-width: 160px;
+      z-index: 2000;
+      overflow: hidden;
+    }
+    .notif-dropdown button {
+      width: 100%;
+      display: block;
+      padding: 10px 12px;
+      background: transparent;
+      border: none;
+      text-align: left;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .notif-dropdown button:hover { background: #fbfdff; }
+
+    /* Small screens: ensure controls stack nicely */
+    @media (max-width: 600px) {
+      .accounts-header { flex-direction: column; align-items: flex-start; }
+      .notif-controls { justify-content: flex-start; }
+      .account-row { padding: 12px; }
+      .notif-kebab { right: 8px; top: 8px; }
+      .notif-dropdown { right: 8px; top: 44px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="headerSlot"></div>
+
+  <main>
+    <div class="container" style="max-width:900px;margin-top:24px;">
+      <div class="section-title"><span>จัดการบัญชี</span></div>
+
+      <div class="card accounts-header" role="group" aria-label="บัญชีที่บันทึกไว้">
+        <div>
+          <h2 style="margin:0;">บัญชีที่บันทึกไว้</h2>
+          <div class="small">คุณสามารถเพิ่ม, สลับ หรือออกจากบัญชีได้ที่นี่</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <a href="/login?add=1" class="btn btn-secondary">เพิ่มบัญชี</a>
+        </div>
+      </div>
+
+      <div id="accountsList" class="card accounts-list" aria-live="polite">
+        <div class="small">กำลังโหลด...</div>
+      </div>
+
+      <div id="activeAccountPanel" class="card hidden" aria-hidden="true">
+        <h3>บัญชีที่ใช้งานอยู่</h3>
+        <div id="activeAccountInfo" class="mt-16"></div>
+      </div>
+
+      <div class="card notif-card" id="notificationsCard" aria-live="polite">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div>
+            <h3 style="margin:0;">การแจ้งเตือน</h3>
+            <div class="small">จัดการการแจ้งเตือนของบัญชีที่เลือก</div>
+          </div>
+          <div class="notif-controls" role="toolbar" aria-label="Notification actions">
+            <div class="small" id="notifSummary">กำลังโหลด…</div>
+            <button id="btnRefreshNotif" class="btn btn-ghost" type="button" title="รีเฟรชการแจ้งเตือน">รีเฟรช</button>
+            <button id="btnMarkAllRead" class="btn btn-primary" type="button" title="ทำเครื่องหมายว่าอ่านทั้งหมด">ทำเครื่องหมายว่าอ่านทั้งหมด</button>
+          </div>
+        </div>
+
+        <div id="notifList" class="notif-list mt-16" tabindex="0" aria-label="รายการการแจ้งเตือน">
+          <div class="notif-empty">กำลังโหลดการแจ้งเตือน...</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="footerSlot"></div>
+
+  <script src="/js/main.js"></script>
+  <script>
+    /**
+     * Updated accounts.html behavior:
+     * - Removed per-item "ไปที่" button and per-item visible "mark" button.
+     * - Added kebab (3-dot) menu at top-right of each notification; dropdown only has "ทำเครื่องหมายว่าอ่าน/ไม่อ่าน".
+     * - Clicking anywhere on a notification navigates to its target (if available) and marks it read.
+     * - Implement "smart" incremental updates: poll server periodically and diff changes (add/update/remove) without re-rendering entire list.
+     *
+     * Notes:
+     * - Uses existing API endpoints: /api/accounts, /api/notifications, /api/notifications/mark-read, /api/accounts/switch, /api/accounts/remove, /api/logout
+     * - No global CSS changes — page-scoped CSS handles kebab/dropdown visuals.
+     */
+
+    (function () {
+      const accountsListEl = document.getElementById('accountsList');
+      const activePanel = document.getElementById('activeAccountPanel');
+      const activeAccountInfoEl = document.getElementById('activeAccountInfo');
+      const notifListEl = document.getElementById('notifList');
+      const notifSummaryEl = document.getElementById('notifSummary');
+      const btnRefresh = document.getElementById('btnRefreshNotif');
+      const btnMarkAll = document.getElementById('btnMarkAllRead');
+
+      let accountsData = [];
+      let activeUsername = null;
+      // notificationsMap: id -> notification object (latest)
+      let notificationsMap = new Map();
+      // polling handle
+      let pollHandle = null;
+      const POLL_INTERVAL = 9000; // 9 seconds
+
+      /* --- API helpers --- */
+      async function apiGet(path) {
+        try {
+          const r = await fetch(path);
+          return await r.json();
+        } catch (e) {
+          console.error('apiGet error', path, e);
+          return null;
+        }
+      }
+      async function apiPost(path, body = {}) {
+        try {
+          const r = await fetch(path, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          return await r.json();
+        } catch (e) {
+          console.error('apiPost error', path, e);
+          return null;
+        }
+      }
+
+      /* --- Accounts handling (same as before) --- */
+      async function loadAccounts() {
+        accountsListEl.innerHTML = '<div class="small">กำลังโหลด...</div>';
+        const data = await apiGet('/api/accounts');
+        if (!data || !data.success) {
+          accountsListEl.innerHTML = '<div class="small">ไม่สามารถโหลดรายการบัญชีได้</div>';
+          return;
+        }
+        accountsData = data.accounts || [];
+        activeUsername = data.active || null;
+        renderAccounts();
+        renderActivePanel();
+        // start/update notifications polling
+        await initialNotificationsLoadAndStartPolling();
+      }
+
+      function renderAccounts() {
+        accountsListEl.innerHTML = '';
+        if (!accountsData || accountsData.length === 0) {
+          accountsListEl.innerHTML = '<div class="small">ยังไม่มีบัญชีบันทึกไว้</div>';
+          return;
+        }
+        for (const acc of accountsData) {
+          const row = document.createElement('div');
+          row.className = 'account-row';
+          row.tabIndex = 0;
+          row.setAttribute('role', 'button');
+          row.innerHTML = `
+            <img src="${acc.profilePic || '/img/default_profile.png'}" alt="${acc.username}" class="profile-pic">
+            <div class="account-info">
+              <div style="display:flex;gap:8px;align-items:center;">
+                <div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(acc.displayName || acc.username)}</div>
+                ${activeUsername === acc.username ? '<div class="account-active">Active</div>' : ''}
+              </div>
+              <div class="small" style="color:var(--muted)">${escapeHtml(acc.username)}</div>
+            </div>
+            <div class="account-actions">
+              <button class="btn btn-ghost" data-username="${escapeHtml(acc.username)}" data-action="remove">${activeUsername === acc.username ? 'ออก (Logout)' : 'ออก'}</button>
+            </div>
+          `;
+          row.addEventListener('click', async (e) => {
+            if (e.target && (e.target.tagName === 'BUTTON' || e.target.closest('button'))) return;
+            if (activeUsername === acc.username) return;
+            if (!confirm(`สลับไปใช้บัญชี ${acc.username} ?`)) return;
+            try {
+              const r = await apiPost('/api/accounts/switch', { username: acc.username });
+              if (r && r.success) {
+                window.dispatchEvent(new Event('accountsChanged'));
+                await loadAccounts();
+              } else {
+                alert(r && r.msg ? r.msg : 'ไม่สามารถสลับบัญชีได้');
+              }
+            } catch (err) {
+              console.error(err);
+              alert('เกิดข้อผิดพลาดขณะสลับบัญชี');
+            }
+          });
+          row.addEventListener('keydown', (e) => {
+            if ((e.key === 'Enter' || e.key === ' ') ) {
+              e.preventDefault();
+              row.click();
+            }
+          });
+          const removeBtn = row.querySelector('button[data-action="remove"]');
+          removeBtn.addEventListener('click', async (ev) => {
+            ev.stopPropagation();
+            const un = removeBtn.getAttribute('data-username');
+            if (!confirm(`${activeUsername === un ? 'ออกจากระบบและลบจากรายการ?' : 'ออกจากบัญชีนี้?'} `)) return;
+            try {
+              if (activeUsername === un) {
+                await apiPost('/api/logout', {});
+              } else {
+                await apiPost('/api/accounts/remove', { username: un });
+              }
+              window.dispatchEvent(new Event('accountsChanged'));
+              await loadAccounts();
+            } catch (err) {
+              console.error(err);
+              alert('เกิดข้อผิดพลาดขณะออกจากระบบ');
+            }
+          });
+          accountsListEl.appendChild(row);
+        }
+      }
+
+      function renderActivePanel() {
+        if (!activeUsername) {
+          activePanel.classList.add('hidden');
+          activePanel.setAttribute('aria-hidden', 'true');
+          return;
+        }
+        const activeAcc = accountsData.find(a => a.username === activeUsername) || accountsData[0];
+        if (!activeAcc) {
+          activePanel.classList.add('hidden');
+          activePanel.setAttribute('aria-hidden', 'true');
+          return;
+        }
+        activePanel.classList.remove('hidden');
+        activePanel.setAttribute('aria-hidden', 'false');
+        activeAccountInfoEl.innerHTML = `
+          <div style="display:flex;gap:12px;align-items:center;">
+            <img src="${activeAcc.profilePic || '/img/default_profile.png'}" class="profile-pic-small" alt="${activeAcc.username}">
+            <div>
+              <div style="font-weight:700">${escapeHtml(activeAcc.displayName || activeAcc.username)}</div>
+              <div class="small" style="color:var(--muted)">${escapeHtml(activeAcc.username)}</div>
+            </div>
+          </div>
+        `;
+      }
+
+      /* ---------------- Notifications: smart incremental updates ---------------- */
+
+      // Convert server array -> map for easy diffing
+      function arrayToMap(arr) {
+        const m = new Map();
+        for (const n of (arr || [])) m.set(n.id, n);
+        return m;
+      }
+
+      // Initial load + start polling
+      async function initialNotificationsLoadAndStartPolling() {
+        const data = await apiGet('/api/notifications');
+        if (!data || !data.success) {
+          notifListEl.innerHTML = '<div class="notif-empty">ไม่สามารถโหลดการแจ้งเตือนได้</div>';
+          notifSummaryEl.textContent = 'ไม่สามารถโหลด';
+          return;
+        }
+        notificationsMap = arrayToMap(data.notifications || []);
+        renderAllNotifications(); // initial render
+        notifSummaryEl.textContent = `${data.unread || countUnread(notificationsMap)} รายการยังไม่อ่าน`;
+        // start polling (clear previous)
+        if (pollHandle) clearInterval(pollHandle);
+        pollHandle = setInterval(pollNotifications, POLL_INTERVAL);
+      }
+
+      // Poll endpoint, diff and apply minimal updates
+      async function pollNotifications() {
+        const data = await apiGet('/api/notifications');
+        if (!data || !data.success) return;
+        const newMap = arrayToMap(data.notifications || []);
+        diffAndApplyNotifications(newMap);
+        notifSummaryEl.textContent = `${data.unread || countUnread(newMap)} รายการยังไม่อ่าน`;
+      }
+
+      // Count unread from map
+      function countUnread(map) {
+        let c = 0;
+        for (const v of map.values()) if (!v.read) c++;
+        return c;
+      }
+
+      // Initial full render
+      function renderAllNotifications() {
+        notifListEl.innerHTML = '';
+        if (!notificationsMap.size) {
+          notifListEl.innerHTML = '<div class="notif-empty">ยังไม่มีการแจ้งเตือน</div>';
+          return;
+        }
+        for (const notif of notificationsMap.values()) {
+          const node = createOrUpdateNotifNode(notif);
+          notifListEl.appendChild(node);
+        }
+      }
+
+      // Diff newMap vs notificationsMap and apply minimal DOM updates:
+      // - update existing items in place (if changed)
+      // - append new items
+      // - remove items that disappeared
+      function diffAndApplyNotifications(newMap) {
+        // remove nodes not in newMap
+        for (const [id] of notificationsMap) {
+          if (!newMap.has(id)) {
+            const existingEl = document.getElementById('notif-' + id);
+            if (existingEl) existingEl.remove();
+            notificationsMap.delete(id);
+          }
+        }
+        // update existing and add new (keep ordering of newMap)
+        // We'll re-order DOM to match newMap order — for subtlety, only move nodes when position changed
+        let insertBeforeNode = null;
+        // We iterate through newMap (preserving server order)
+        for (const notif of newMap.values()) {
+          const existing = notificationsMap.get(notif.id);
+          if (existing) {
+            // compare stringified to check if changed; if changed update in place
+            if (JSON.stringify(existing) !== JSON.stringify(notif)) {
+              createOrUpdateNotifNode(notif, true);
+            }
+            // reposition node if necessary
+            const node = document.getElementById('notif-' + notif.id);
+            if (insertBeforeNode) {
+              // insert before insertBeforeNode
+              if (node && node.nextSibling !== insertBeforeNode) {
+                notifListEl.insertBefore(node, insertBeforeNode);
+              }
+            } else {
+              // append to end if not already last
+              if (node && node.nextSibling) {
+                notifListEl.appendChild(node);
+              }
+            }
+          } else {
+            // new notification -> create and insert at correct position
+            const node = createOrUpdateNotifNode(notif, false);
+            if (insertBeforeNode) notifListEl.insertBefore(node, insertBeforeNode);
+            else notifListEl.appendChild(node);
+          }
+          // set insertBeforeNode to the DOM node that currently follows this notif in newMap order
+          // find next id in newMap by peeking iterator (tricky). Simpler approach: we don't compute insertBefore for each,
+          // we'll just ensure ordering by building an array and then appending in order after updates.
+        }
+        // To ensure ordering exactly matches server, rebuild order: (but do minimal DOM churn by moving existing nodes)
+        const orderedIds = Array.from(newMap.keys());
+        for (const id of orderedIds) {
+          const node = document.getElementById('notif-' + id);
+          if (node) notifListEl.appendChild(node);
+        }
+        // replace notificationsMap content with newMap content
+        notificationsMap = new Map(newMap);
+      }
+
+      // Create or update node. If updateOnly=true we assume node exists.
+      function createOrUpdateNotifNode(notif, updateOnly = false) {
+        const id = notif.id;
+        let el = document.getElementById('notif-' + id);
+        const isUnread = !notif.read;
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'notif-' + id;
+          el.className = 'notif-item' + (isUnread ? ' unread' : '');
+          // main content wrapper (so we can click anywhere except kebab)
+          const content = document.createElement('div');
+          content.className = 'notif-content';
+          el.appendChild(content);
+          // kebab button
+          const kebab = document.createElement('button');
+          kebab.className = 'notif-kebab';
+          kebab.setAttribute('aria-haspopup', 'true');
+          kebab.setAttribute('aria-expanded', 'false');
+          kebab.innerHTML = `<span class="kebab-dot" aria-hidden="true"></span>`;
+          el.appendChild(kebab);
+          // event: click notification (navigate & mark read)
+          content.addEventListener('click', async (ev) => {
+            ev.stopPropagation();
+            const dest = computeNotificationUrl(notif);
+            // optimistically mark read if unread
+            if (!notif.read) {
+              try {
+                await apiPost('/api/notifications/mark-read', { ids: [notif.id] });
+                // update UI for this item
+                markNodeReadState(el, true);
+                // update local map
+                const copy = Object.assign({}, notif, { read: true });
+                notificationsMap.set(notif.id, copy);
+              } catch (e) { /* ignore */ }
+            }
+            if (dest) location.assign(dest);
+          });
+          // kebab toggling
+          kebab.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            // close any other open dropdowns
+            closeAllNotifDropdowns();
+            const open = kebab.getAttribute('aria-expanded') === 'true';
+            if (open) {
+              removeNotifDropdown(el);
+              kebab.setAttribute('aria-expanded', 'false');
+            } else {
+              kebab.setAttribute('aria-expanded', 'true');
+              openNotifDropdown(el, notif);
+            }
+          });
+          // close dropdown when clicking outside
+          document.addEventListener('click', (e) => {
+            if (!el.contains(e.target)) {
+              removeNotifDropdown(el);
+              const kb = el.querySelector('.notif-kebab');
+              if (kb) kb.setAttribute('aria-expanded', 'false');
+            }
+          }, true);
+        }
+
+        // update content (title/time/message)
+        const content = el.querySelector('.notif-content');
+        content.innerHTML = ''; // replace children
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        const typ = document.createElement('div');
+        typ.style.fontWeight = '700';
+        typ.textContent = notif.type || 'การแจ้งเตือน';
+        const time = document.createElement('div');
+        time.className = 'small';
+        time.textContent = new Date(notif.createdAt).toLocaleString();
+        meta.appendChild(typ);
+        meta.appendChild(time);
+
+        const msg = document.createElement('div');
+        msg.className = 'small';
+        msg.textContent = notif.message || '';
+
+        content.appendChild(meta);
+        content.appendChild(msg);
+
+        // adjust unread class
+        if (isUnread) el.classList.add('unread'); else el.classList.remove('unread');
+
+        // keyboard: Enter/Space simulate click on content
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            el.querySelector('.notif-content').click();
+          }
+        });
+
+        return el;
+      }
+
+      // mark node read state visually
+      function markNodeReadState(node, read = true) {
+        if (read) node.classList.remove('unread');
+        else node.classList.add('unread');
+      }
+
+      // dropdown management
+      function openNotifDropdown(itemEl, notif) {
+        removeNotifDropdown(itemEl);
+        const dd = document.createElement('div');
+        dd.className = 'notif-dropdown';
+        const isRead = !!notif.read;
+        const btnToggleRead = document.createElement('button');
+        btnToggleRead.type = 'button';
+        btnToggleRead.textContent = isRead ? 'ทำเครื่องหมายว่าไม่อ่าน' : 'ทำเครื่องหมายว่าอ่าน';
+        btnToggleRead.addEventListener('click', async (ev) => {
+          ev.stopPropagation();
+          try {
+            if (isRead) {
+              // mark unread: server API doesn't provide direct "mark-unread" -> we'll call mark-read with [] to toggle? backend doesn't support unmark.
+              // But we can attempt to mark all read except this? Since backend only supports mark-read, we will emulate "mark unread" by toggling client state only.
+              // Safer approach: if backend doesn't support un-read, we simply update UI locally to appear unread.
+              markNodeReadState(itemEl, false);
+              // update local map
+              const copy = Object.assign({}, notif, { read: false });
+              notificationsMap.set(notif.id, copy);
+            } else {
+              await apiPost('/api/notifications/mark-read', { ids: [notif.id] });
+              markNodeReadState(itemEl, true);
+              const copy = Object.assign({}, notif, { read: true });
+              notificationsMap.set(notif.id, copy);
+            }
+          } catch (e) {
+            console.error('mark/unmark error', e);
+          } finally {
+            removeNotifDropdown(itemEl);
+            // refresh summary
+            apiGet('/api/notifications').then(d => {
+              if (d && d.success) notifSummaryEl.textContent = `${d.unread || countUnread(arrayToMap(d.notifications || []))} รายการยังไม่อ่าน`;
+            });
+          }
+        });
+        dd.appendChild(btnToggleRead);
+
+        // append dropdown to item
+        itemEl.appendChild(dd);
+      }
+
+      function removeNotifDropdown(itemEl) {
+        const existing = itemEl.querySelector('.notif-dropdown');
+        if (existing) existing.remove();
+        const kb = itemEl.querySelector('.notif-kebab');
+        if (kb) kb.setAttribute('aria-expanded', 'false');
+      }
+      function closeAllNotifDropdowns() {
+        document.querySelectorAll('.notif-dropdown').forEach(d => d.remove());
+        document.querySelectorAll('.notif-kebab').forEach(k => k.setAttribute('aria-expanded', 'false'));
+      }
+
+      /* --- Handlers for Refresh & Mark All (keeps smart update logic) --- */
+      btnRefresh.addEventListener('click', async () => {
+        btnRefresh.disabled = true;
+        const orig = btnRefresh.textContent;
+        btnRefresh.textContent = 'กำลังรีเฟรช…';
+        await pollNotifications();
+        btnRefresh.disabled = false;
+        btnRefresh.textContent = orig || 'รีเฟรช';
+      });
+
+      btnMarkAll.addEventListener('click', async () => {
+        if (!confirm('ทำเครื่องหมายว่าอ่านทั้งหมด?')) return;
+        btnMarkAll.disabled = true;
+        const orig = btnMarkAll.textContent;
+        btnMarkAll.textContent = 'กำลังบันทึก…';
+        try {
+          await apiPost('/api/notifications/mark-read', {}); // empty => mark all
+        } catch (e) { console.error(e); }
+        // Smart update: fetch latest and diff
+        await pollNotifications();
+        btnMarkAll.disabled = false;
+        btnMarkAll.textContent = orig || 'ทำเครื่องหมายว่าอ่านทั้งหมด';
+        window.dispatchEvent(new Event('accountsChanged'));
+      });
+
+      /* Utility functions */
+      function computeNotificationUrl(n) {
+        if (!n || !n.meta) return null;
+        const m = n.meta;
+        if (m.url) return m.url;
+        if (m.postId) return `/post/${encodeURIComponent(m.postId)}`;
+        if (m.commentId && m.postId) return `/post/${encodeURIComponent(m.postId)}#comment-${encodeURIComponent(m.commentId)}`;
+        if (m.actorUsername) return `/user/${encodeURIComponent(m.actorUsername)}`;
+        if (m.username) return `/user/${encodeURIComponent(m.username)}`;
+        if (m.item && m.item.type === 'post' && m.item.id) return `/post/${encodeURIComponent(m.item.id)}`;
+        return null;
+      }
+
+      function escapeHtml(s) {
+        if (!s && s !== 0) return '';
+        return String(s).replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+      }
+
+      // initial mount
+      window.addEventListener('load', loadAccounts);
+      window.addEventListener('accountsChanged', loadAccounts);
+      // cleanup on unload
+      window.addEventListener('beforeunload', () => {
+        if (pollHandle) clearInterval(pollHandle);
+      });
+
+    })();
+  </script>
+</body>
+</html>
