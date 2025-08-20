@@ -4,6 +4,9 @@
     <meta charset="utf-8">
     <title>แก้ไขโปรไฟล์</title>
     <link rel="stylesheet" href="/css/style.css">
+    <style>
+      #avatarPreview { max-width:100px; max-height:100px; border-radius:50%; display: block; margin: 10px 0; }
+    </style>
 </head>
 <body>
   <div id="headerSlot"></div>
@@ -30,10 +33,11 @@
         <form id="picForm" enctype="multipart/form-data">
             <label class="small">รูปโปรไฟล์</label>
             <div style="display:flex;gap:8px;align-items:center;">
-              <label class="btn btn-ghost">เลือกไฟล์ <input type="file" name="profilePic"></label>
+              <label class="btn btn-ghost">เลือกไฟล์ <input type="file" id="avatarInput" name="profilePic" accept="image/*"></label>
               <button type="submit" class="btn btn-primary">อัปโหลด</button>
               <button id="removePicBtn" type="button" class="btn btn-ghost">ลบรูป</button>
             </div>
+            <canvas id="avatarPreview" width="100" height="100" style="display:none;"></canvas>
         </form>
       </div>
     </div>
@@ -53,6 +57,7 @@
     document.getElementById('showEmail').checked = !!profile.showEmail;
 })();
 
+// --------- PROFILE FORM ---------
 document.getElementById('editProfileForm').onsubmit = async e => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -71,12 +76,48 @@ document.getElementById('editProfileForm').onsubmit = async e => {
     if (data.success) setTimeout(() => location.replace('/profile'), 800);
 };
 
+// --------- PROFILE PIC CROP + UPLOAD ---------
+let croppedBlob = null;
+document.getElementById('avatarInput').addEventListener('change', function(e) {
+  const file = this.files[0];
+  if (!file) return;
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = function() {
+    const min = Math.min(img.width, img.height);
+    const sx = (img.width - min) / 2;
+    const sy = (img.height - min) / 2;
+    const canvas = document.getElementById('avatarPreview');
+    canvas.width = canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img, sx, sy, min, min, 0, 0, canvas.width, canvas.height);
+    canvas.style.display = 'block';
+    // สร้าง blob สำหรับอัปโหลดจริง
+    canvas.toBlob(function(blob){
+      croppedBlob = blob;
+    }, 'image/jpeg', 0.92);
+    URL.revokeObjectURL(url);
+  };
+  img.src = url;
+});
+
 document.getElementById('picForm').onsubmit = async e => {
     e.preventDefault();
-    const fd = new FormData(e.target);
+    const fd = new FormData();
+    if (croppedBlob) {
+      fd.append('profilePic', croppedBlob, 'avatar.jpg');
+    } else {
+      // fallback: ยังไม่ได้เลือกหรือ crop
+      const fileInput = document.getElementById('avatarInput');
+      if (fileInput.files[0]) {
+        fd.append('profilePic', fileInput.files[0]);
+      }
+    }
     const res = await fetch('/api/profile/upload-pic', { method: 'POST', body: fd });
     const data = await res.json();
     if (data.success) alert('อัปโหลดสำเร็จ!'); else alert('ผิดพลาด');
+    if (data.success) location.reload();
 };
 
 document.getElementById('removePicBtn').onclick = async () => {
