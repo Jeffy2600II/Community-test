@@ -11,13 +11,13 @@
     <div class="container">
       <div class="card" id="postCard">
         <div id="postBox"></div>
-        <hr class="divider">
+        <hr style="margin:16px 0;">
         <div id="commentBox"></div>
 
-        <form id="commentForm" class="hidden mt-12">
+        <form id="commentForm" style="display:none;margin-top:12px;">
           <label class="small">แสดงความคิดเห็น</label>
           <textarea name="content" placeholder="แสดงความคิดเห็น" required></textarea>
-          <div class="row" style="justify-content:flex-end;margin-top:8px;">
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
             <button type="submit" class="btn btn-primary">แสดงความคิดเห็น</button>
           </div>
         </form>
@@ -36,7 +36,7 @@ async function loadPost() {
     if (!data.success) return document.getElementById('postBox').innerText = 'ไม่พบโพสต์';
     const { post, comments, owner, myUsername: apiUsername } = data;
     myUsername = apiUsername;
-    let html = `<header class="post-header">
+    let html = `<header style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
       <div>
         <h2 style="margin:0 0 6px 0">${post.title}</h2>
         <div class="small">โดย <a href="/user/${post.username}">${post.username}</a> • ${new Date(post.createdAt).toLocaleString()}</div>
@@ -66,11 +66,11 @@ async function loadPost() {
         cHtml += `<div class="comment">
             <div class="meta"><strong><a href="/user/${c.username}">${c.username}</a></strong> • ${new Date(c.createdAt).toLocaleString()}</div>
             <div>${c.content}</div>
-            ${myUsername === c.username ? `<div class="mt-8"><button class="btn btn-ghost" onclick="deleteComment('${c.id}')">ลบ</button></div>` : ''}
+            ${myUsername === c.username ? `<div style="margin-top:8px;"><button class="btn btn-ghost" onclick="deleteComment('${c.id}')">ลบ</button></div>` : ''}
         </div>`;
     }
     document.getElementById('commentBox').innerHTML = cHtml;
-    if (myUsername) document.getElementById('commentForm').classList.remove('hidden');
+    if (myUsername) document.getElementById('commentForm').style.display = '';
 }
 loadPost();
 
