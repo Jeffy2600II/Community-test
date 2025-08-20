@@ -1,15 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
 
-/* ========================================================================
-   COMMUNITY — Centralized, Reusable, Mobile-first CSS
-   Base taken from the project's authoritative stylesheet and extended:
-   - Full feature set retained (no removals)
-   - Improved "Manage accounts" layout & controls styling
-   - Mobile header (hamburger) gets a proper background + elevation when opened
-   - Extra utility classes & button variants for consistent, professional UI
-   - Accessibility focus states and reduced-motion preserved
-   ======================================================================== */
+/* ===========================================================================
+   COMMUNITY — Canonical stylesheet (extended)
+   - Uses your provided comprehensive stylesheet as the base.
+   - Adds: fixed header (locked to top), global top spacing to avoid overlap,
+           improved mobile hamburger panel background + elevation,
+           polished "Manage accounts" layout and button system.
+   - No original rules removed; new rules are additive and backward-compatible.
+   =========================================================================== */
 
+/* -------------------------
+   Design tokens
+   ------------------------- */
 :root{
   --bg: #f6f7fb;
   --surface: #ffffff;
@@ -40,7 +42,15 @@
   --readable-line: 1.5rem;
   --touch-target: 44px;
 
-  /* new tokens for accounts UI */
+  /* header sizing tokens (used to reserve top space) */
+  --site-header-base-height: 68px;       /* desktop default */
+  --site-header-mobile-height: 56px;     /* mobile top row height */
+  --site-header-expanded-extra: 160px;   /* extra when mobile menu opened (approx) */
+
+  /* effective header height used for body spacing; updated by css/JS combination */
+  --site-header-height: var(--site-header-base-height);
+
+  /* accounts tokens */
   --account-row-gap: 12px;
   --account-avatar-size: 48px;
   --account-avatar-size-sm: 40px;
@@ -53,10 +63,10 @@
 }
 
 /* -------------------------
-   Global Reset & Base
+   Reset & base
    ------------------------- */
 * { box-sizing: border-box; }
-html,body { height: 100%; }
+html, body { height: 100%; }
 body {
   margin: 0;
   font-family: 'Inter', 'Noto Sans Thai', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
@@ -69,10 +79,12 @@ body {
   -webkit-text-size-adjust: 100%;
   min-height: 100vh;
   -webkit-font-feature-settings: "ss01" on;
+  /* Reserve top space for the fixed header to avoid overlap on every page */
+  padding-top: var(--site-header-height);
 }
 
 /* images */
-img { max-width:100%; height:auto; display:block; }
+img { max-width: 100%; height: auto; display: block; }
 
 /* -------------------------
    Layout primitives
@@ -84,12 +96,14 @@ img { max-width:100%; height:auto; display:block; }
   padding: 0 var(--space-md);
 }
 
+/* Page content */
 main {
   max-width: var(--max-width-narrow);
   margin: calc(var(--space-lg) + 8px) auto;
   background: transparent;
   padding: 0;
   min-height: 60vh;
+  width: 100%;
 }
 
 /* Cards */
@@ -105,33 +119,44 @@ main {
 .card:focus-within { box-shadow: 0 10px 30px rgba(29,41,56,0.06); }
 
 /* -------------------------
-   Header (stacked + hamburger)
+   Header (fixed & stacked)
+   - Lock header to top of viewport (position: fixed)
+   - Use .header-inner -> .header-top + .header-bottom pattern
+   - Provide CSS hooks for expanded mobile menu: .header-bottom.open
+   - Body top padding token (--site-header-height) is used to reserve space.
    ------------------------- */
+
 .site-header {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 1300;
   background: white;
   border-bottom: 1px solid rgba(15,23,42,0.04);
-  position: sticky;
-  top: 0;
-  z-index: 1200;
   box-shadow: 0 1px 0 rgba(16,24,40,0.02);
+  /* set header variable on the header element (default) */
+  --site-header-height-local: var(--site-header-base-height);
 }
 
-/* maintain previous container behavior for compatibility */
+/* keep compatibility with existing selector that depended on .site-header .container */
 .site-header .container {
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  height: 68px;
+  height: var(--site-header-base-height);
   padding-left: var(--space-md);
   padding-right: var(--space-md);
 }
 
-/* header-inner wrapper for stacking */
+/* header-inner wrapper */
 .header-inner {
   max-width: var(--max-width);
   margin: 0 auto;
   padding: 0 var(--space-md);
   width: 100%;
+  display: flex;
+  flex-direction: column; /* default to column to support stacked layout */
 }
 
 /* top row: logo + toggle */
@@ -140,8 +165,22 @@ main {
   align-items:center;
   justify-content:space-between;
   gap: var(--space-md);
-  height: 68px;
+  height: var(--site-header-base-height);
+  min-height: var(--site-header-base-height);
 }
+
+/* adjust effective site header height on :root for default */
+:root { --site-header-height: var(--site-header-base-height); }
+
+/* When header is present in DOM we may want to mirror the header height token to :root
+   If JS toggles a data-expanded attribute on .site-header, the token will update below.
+   (Main.js should add/remove data-expanded="true" to .site-header when header-bottom.open on mobile) */
+.site-header[data-expanded="true"] {
+  /* when expanded on mobile, update global site header height to include expanded portion */
+  --site-header-height: calc(var(--site-header-mobile-height) + var(--site-header-expanded-extra));
+}
+
+/* Logo */
 .logo {
   display:flex;
   align-items:center;
@@ -149,12 +188,20 @@ main {
   text-decoration: none;
   color: var(--text);
 }
-.logo .brand { font-weight:700; letter-spacing:0.6px; font-size:1.05rem; color:var(--text); }
-.logo .tagline { font-size:0.78rem; color:var(--muted); }
+.logo .brand {
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+.logo .tagline {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
 
 /* mobile toggle button */
 #mobileMenuToggle {
-  display: none;
+  display: none; /* shown on mobile via media queries */
   background: transparent;
   border: none;
   cursor: pointer;
@@ -162,24 +209,56 @@ main {
   border-radius: 8px;
 }
 
-/* bottom row: search + nav + actions (collapsible on mobile) */
+/* header-bottom: search + nav + account actions */
 .header-bottom {
   display:flex;
-  gap: var(--space-md);
   align-items:center;
+  gap: var(--space-md);
   justify-content: space-between;
   padding: 8px 0;
-  transition: max-height 220ms ease, opacity 180ms ease, transform 180ms ease;
+  transition: max-height 220ms ease, opacity 180ms ease, transform 180ms ease, background var(--transition);
   overflow: hidden;
   width: 100%;
-  max-height: 999px; /* default for wide screens */
+  max-height: 999px;
 }
 
-/* collapsed state for mobile, add .open to show */
+/* collapsed / open states */
 .header-bottom.collapsed { max-height: 0; opacity: 0; pointer-events: none; transform: translateY(-6px); }
 .header-bottom.open { max-height: 999px; opacity: 1; pointer-events: auto; transform: translateY(0); }
 
-/* search */
+/* Add subtle background & elevation to mobile expanded area */
+.header-bottom.open {
+  background: rgba(255,255,255,0.98);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 10px 30px rgba(16,24,40,0.08);
+  border: 1px solid rgba(15,23,42,0.04);
+}
+
+/* Primary nav (left) - kept for compatibility */
+.header-left {
+  display:flex;
+  align-items:center;
+  gap: var(--space-md);
+  margin-right: auto;
+}
+.header-left nav a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: color var(--transition), background var(--transition), transform var(--transition);
+}
+@media (hover: hover) {
+  .header-left nav a:hover {
+    color: var(--text);
+    background: var(--glass);
+    transform: translateY(-1px);
+  }
+}
+
+/* Search */
 .header-search {
   display:flex;
   align-items:center;
@@ -208,12 +287,36 @@ main {
   width: 100%;
 }
 
-/* account actions */
-.header-actions { display:flex; align-items:center; gap: var(--space-sm); }
+/* Right account area */
+.header-actions {
+  display:flex;
+  align-items:center;
+  gap: var(--space-sm);
+}
 
-/* avatar */
-.avatar-btn { display:flex; align-items:center; gap:10px; background:transparent; border:none; cursor:pointer; padding:8px; border-radius:8px; }
-.avatar-img { width:40px; height:40px; border-radius:10px; object-fit:cover; border:1px solid rgba(15,23,42,0.06); }
+/* Avatar button */
+.avatar-btn {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text);
+  padding: 8px;
+  border-radius: 8px;
+  transition: background var(--transition);
+}
+@media (hover: hover) {
+  .avatar-btn:hover { background: var(--glass); }
+}
+.avatar-img {
+  width:40px;
+  height:40px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(15,23,42,0.06);
+}
 
 /* -------------------------
    Buttons (centralized)
@@ -236,15 +339,16 @@ main {
 .btn:active { transform: translateY(1px); }
 .btn:focus { outline: 3px solid rgba(47,128,237,0.12); outline-offset: 2px; }
 
-.btn-primary { background: linear-gradient(180deg,var(--accent), #1f66d6); color: #fff; box-shadow: 0 8px 20px rgba(47,128,237,0.12); }
+.btn-primary { background: linear-gradient(180deg,var(--accent), #1f66d6); color: white; box-shadow: 0 8px 20px rgba(47,128,237,0.12); }
+@media (hover: hover) { .btn-primary:hover { transform: translateY(-2px); } }
 .btn-ghost { background: transparent; border: 1px solid rgba(15,23,42,0.06); color: var(--text); }
 .btn-muted { background: #f4f6fb; color: var(--text); }
 .btn-secondary { background: #eaf4ff; color: var(--accent); }
-.btn-icon { padding: 8px; min-width:44px; }
+.btn-icon { padding: 8px; min-width: 44px; }
 .btn-danger { background: linear-gradient(180deg,#ff6b6b,#e16060); color: #fff; }
 
-/* small inline */
-.btn-muted-inline { background:transparent; border:none; color:var(--muted); font-size:0.95rem; cursor:pointer; }
+/* small inline text button */
+.btn-muted-inline { background: transparent; border: none; color: var(--muted); font-size: 0.95rem; cursor: pointer; }
 
 /* -------------------------
    Feed & Post
@@ -260,14 +364,14 @@ main {
   box-shadow: var(--shadow-1);
   border: 1px solid rgba(15,23,42,0.03);
 }
-.post-left { width: 64px; flex-shrink:0; }
+.post-left { width:64px; flex-shrink:0; display:flex; align-items:flex-start; justify-content:center; }
 .post-body { flex:1; min-width:0; }
-.post-title { font-size:1.05rem; margin:0; color:var(--text); font-weight:700; }
+.post-title { font-size: 1.05rem; margin:0; color:var(--text); font-weight:700; }
 .post-meta { color:var(--muted); font-size:0.9rem; margin-top:6px; display:flex; gap:8px; align-items:center; }
 .post-excerpt { margin-top:12px; color:#38414b; }
 .post-img { max-width:280px; border-radius:10px; object-fit:cover; margin-top:12px; box-shadow:0 8px 30px rgba(16,24,40,0.04); }
 
-/* post actions */
+/* Post actions */
 .post-actions { margin-top:12px; display:flex; gap:8px; align-items:center; }
 
 /* -------------------------
@@ -284,7 +388,11 @@ input[type="text"], input[type="email"], input[type="password"], textarea {
   font-size:0.96rem;
   line-height:1.3;
 }
-input:focus, textarea:focus { outline:none; border-color: rgba(47,128,237,0.6); box-shadow: 0 8px 30px rgba(47,128,237,0.06); }
+input:focus, textarea:focus {
+  outline:none;
+  border-color: rgba(47,128,237,0.6);
+  box-shadow: 0 8px 30px rgba(47,128,237,0.06);
+}
 textarea { min-height:120px; resize:vertical; }
 
 /* file input */
@@ -306,6 +414,10 @@ textarea { min-height:120px; resize:vertical; }
   border: 1px solid rgba(15,23,42,0.03);
 }
 .profile-hero .avatar { width:140px; height:140px; border-radius:18px; object-fit:cover; border:4px solid #fff; box-shadow:var(--shadow-2); }
+
+/* Avatar circular */
+.avatar-circle { width:120px; height:120px; border-radius:9999px; overflow:hidden; display:inline-block; background: linear-gradient(180deg,#fff,#f5f7fb); border:3px solid #fff; box-shadow:0 6px 18px rgba(16,24,40,0.06); }
+.avatar-circle img { width:100%; height:100%; object-fit:cover; display:block; }
 
 /* -------------------------
    Dropdown / Notifications
@@ -346,25 +458,12 @@ textarea { min-height:120px; resize:vertical; }
 .mt-16 { margin-top:16px; }
 
 /* -------------------------
-   Accounts / Manage Accounts (NEW improved styles)
-   - Professional visual hierarchy and touch-friendly actions
-   - Structured rows, clear action area, accessible focus states
+   Accounts / Manage Accounts (improved)
    ------------------------- */
+.accounts-header { display:flex; justify-content:space-between; align-items:center; gap: var(--space-md); margin-bottom: var(--space-sm); }
+.accounts-list { display:flex; flex-direction:column; gap: 8px; }
 
-.accounts-header {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap: var(--space-md);
-  margin-bottom: var(--space-sm);
-}
-.accounts-list {
-  display:flex;
-  flex-direction:column;
-  gap: 8px;
-}
-
-/* each account row */
+/* account row */
 .account-row {
   display:flex;
   align-items:center;
@@ -380,7 +479,7 @@ textarea { min-height:120px; resize:vertical; }
 .account-row:focus { outline: 3px solid rgba(47,128,237,0.10); outline-offset: 2px; }
 .account-row:hover { transform: translateY(-2px); background: #fff; }
 
-/* left: avatar */
+/* avatar area */
 .account-row .profile-pic {
   width: var(--account-avatar-size);
   height: var(--account-avatar-size);
@@ -394,106 +493,54 @@ textarea { min-height:120px; resize:vertical; }
 }
 .account-row .profile-pic img { width:100%; height:100%; object-fit:cover; display:block; }
 
-/* center: profile info */
-.account-row .account-info {
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-  min-width: 0;
-  flex:1;
-}
-.account-row .account-info .displayName {
-  font-weight:700;
-  color:var(--text);
-  font-size: 0.98rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.account-row .account-info .username {
-  color:var(--muted);
-  font-size: 0.9rem;
-}
+/* info */
+.account-row .account-info { display:flex; flex-direction:column; gap:4px; min-width: 0; flex:1; }
+.account-row .account-info .displayName { font-weight:700; color:var(--text); font-size: 0.98rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.account-row .account-info .username { color:var(--muted); font-size:0.9rem; }
 
 /* active badge */
-.account-row .account-active {
-  background: var(--account-active-bg);
-  color: var(--accent);
-  padding: 4px 8px;
-  border-radius: 999px;
-  font-weight:700;
-  font-size: 0.82rem;
-}
+.account-row .account-active { background: var(--account-active-bg); color: var(--accent); padding: 4px 8px; border-radius:999px; font-weight:700; font-size:0.82rem; }
 
-/* right: actions */
-.account-row .account-actions {
-  display:flex;
-  gap:8px;
-  align-items:center;
-  margin-left: 8px;
-}
-.account-row .account-actions .btn {
-  padding: 8px 12px;
-  font-size: 0.9rem;
-  border-radius: 10px;
-}
-.account-row .account-actions .btn.signout {
-  background: transparent;
-  border: 1px solid rgba(15,23,42,0.06);
-  color: var(--danger);
-  font-weight:700;
-}
-.account-row .account-actions .btn.signout:hover {
-  background: rgba(225,80,80,0.06);
-}
+/* actions */
+.account-row .account-actions { display:flex; gap:8px; align-items:center; margin-left:8px; }
+.account-row .account-actions .btn { padding:8px 12px; font-size:0.9rem; border-radius:10px; }
+.account-row .account-actions .btn.signout { background:transparent; border:1px solid rgba(15,23,42,0.06); color:var(--danger); font-weight:700; }
+.account-row .account-actions .btn.signout:hover { background: rgba(225,80,80,0.06); }
 
-/* compact row variant for small screens */
+/* compact variant */
 .account-row.compact .profile-pic { width: var(--account-avatar-size-sm); height: var(--account-avatar-size-sm); }
 
-/* placeholder / empty */
-.accounts-list .empty {
-  padding: 14px;
-  color: var(--muted);
-  text-align:center;
-  background: linear-gradient(180deg,#fff,#fbfdff);
-  border-radius:10px;
-  border:1px dashed rgba(15,23,42,0.04);
-}
-
-/* active account panel */
-#activeAccountPanel { margin-top: 12px; }
-#activeAccountPanel .profile-pic { width: 64px; height: 64px; border-radius: 10px; }
-
-/* notifications area in accounts view */
-.account-notifications { display:block; }
+/* placeholder empty */
+.accounts-list .empty { padding:14px; color:var(--muted); text-align:center; background: linear-gradient(180deg,#fff,#fbfdff); border-radius:10px; border:1px dashed rgba(15,23,42,0.04); }
 
 /* -------------------------
-   Mobile / Responsive
+   Responsive / Mobile-first behaviors
    ------------------------- */
 @media (max-width: 800px) {
-  :root {
-    --space-sm: 10px;
-    --space-md: 14px;
-    --touch-target: 48px;
-  }
+  :root { --space-sm: 10px; --space-md: 14px; --touch-target: 48px; }
 
-  /* header stacking */
+  /* header stacking & heights */
   .header-inner { display:flex; flex-direction:column; gap:8px; align-items:stretch; padding: 8px var(--space-sm); }
-  .header-top { height: 56px; }
+  .header-top { height: var(--site-header-mobile-height); min-height: var(--site-header-mobile-height); }
+  .site-header { --site-header-height: var(--site-header-mobile-height); }
+
   .logo .brand { font-size: 1rem; }
   .logo .tagline { display:none; }
 
-  /* header-bottom collapsed default */
+  /* header bottom collapsed by default; open toggled by main.js or by adding .open */
   .header-bottom { max-height: 0; opacity: 0; pointer-events: none; transform: translateY(-6px); }
   .header-bottom.open { max-height: 999px; opacity: 1; pointer-events: auto; transform: translateY(0); }
 
-  /* show toggle */
+  /* show mobile toggle */
   #mobileMenuToggle { display:inline-flex; }
 
-  /* header-bottom background when open (this is the requested change):
-     - add a surface background, slight rounding and elevation so the mobile
-       burger area has clear separation and doesn't look like floating text.
+  /* when open, we want the site header to expand visually and reserve space for it:
+     JS should set data-expanded="true" on .site-header when header-bottom.open is set.
+     The following rule updates the global padding variable when data-expanded present.
   */
+  .site-header[data-expanded="true"] { --site-header-height: calc(var(--site-header-mobile-height) + var(--site-header-expanded-extra)); }
+
+  /* header-bottom visual background (requested): */
   .header-bottom.open {
     background: rgba(255,255,255,0.98);
     border-radius: 12px;
@@ -502,43 +549,38 @@ textarea { min-height:120px; resize:vertical; }
     border: 1px solid rgba(15,23,42,0.04);
   }
 
-  /* header-search expands full width */
+  /* header search full width */
   .header-search { width: 100%; min-width: auto; order: 1; }
   #navBar { order: 2; display:flex; width:100%; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
 
-  /* accounts layout adjustments on small screens */
+  /* posts stack */
+  .card, .post { padding: var(--space-md); margin-bottom: var(--space-md); flex-direction: column; gap: var(--space-md); }
+  .post .post-left { width: 100%; display:flex; align-items:center; gap:12px; }
+  .post .post-body { order: 2; }
+  .post .post-excerpt { display:none; }
+  .post .post-img { max-width:100%; height:auto; margin-top: var(--space-sm); }
+
+  /* accounts adjustments */
   .accounts-header { flex-direction: column; align-items:stretch; gap:12px; }
-  .accounts-header h2 { margin: 0; }
   .account-row { padding: 12px; gap: 10px; }
-  .account-row .account-actions { margin-left: 0; }
-
-  /* stack buttons in actions on tiny screens */
-  .account-row .account-actions { flex-wrap:wrap; justify-content:flex-end; }
-  .account-row .account-actions .btn { width: auto; }
-
-  /* compact avatars for very small screens */
-  .account-row .profile-pic { width: 44px; height: 44px; border-radius: 8px; }
+  .account-row .account-actions { margin-left: 0; flex-wrap:wrap; justify-content:flex-end; }
+  .account-row .profile-pic { width: 44px; height: 44px; border-radius:8px; }
 }
 
-/* medium screens tweaks */
+/* medium screens */
 @media (min-width: 801px) and (max-width: 1100px) {
   .header-bottom { max-height: none; opacity: 1; pointer-events: auto; transform: none; }
   #mobileMenuToggle { display: none; }
-  .account-row { align-items:center; }
 }
 
-/* desktop: header-bottom always visible, toggle hidden */
+/* desktop: header bottom always visible, toggle hidden */
 @media (min-width: 1101px) {
   .header-bottom { max-height: none; opacity: 1; pointer-events: auto; transform: none; }
   #mobileMenuToggle { display: none; }
-  .accounts-list { gap: 12px; }
 }
 
 /* Accessibility: focus outlines for keyboard users */
 :root:focus-within .btn:focus { outline-offset: 3px; }
 
-/* -------------------------
-   Keep any other existing selectors intact (no removals) - compatibility
-   ------------------------- */
-
+/* Keep any other existing selectors intact for compatibility - no removals */
 /* End of file */
