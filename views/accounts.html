@@ -95,16 +95,12 @@
                 <div class="small">${acc.username}</div>
               </div>
               <div class="account-actions">
-                ${active === acc.username
-                  ? ''
-                  : `<button class="btn-muted" data-username="${acc.username}" data-action="signout">Sign out</button>`
-                }
+                <button class="btn-muted" data-username="${acc.username}" data-action="signout">Sign out</button>
               </div>
             `;
-            // คลิกที่ทั้งแถวเพื่อเปลี่ยนบัญชี (ถ้าไม่ใช่ active)
+            // คลิกเปลี่ยนบัญชี (ยกเว้นกดที่ปุ่ม signout)
             if (active !== acc.username) {
               row.addEventListener('click', async (e) => {
-                // ไม่สลับถ้ากดที่ปุ่ม signout
                 if (e.target.tagName === 'BUTTON') return;
                 if (!confirm(`สลับไปใช้บัญชี ${acc.username} ?`)) return;
                 try {
@@ -123,7 +119,7 @@
                   alert('เกิดข้อผิดพลาดขณะสลับบัญชี');
                 }
               });
-              // รองรับ Enter/Space สำหรับ accessibility
+              // รองรับ Enter/Space
               row.addEventListener('keydown', async (e) => {
                 if ((e.key === 'Enter' || e.key === ' ') && active !== acc.username) {
                   e.preventDefault();
@@ -136,21 +132,32 @@
               b.onclick = async (e) => {
                 e.stopPropagation();
                 const un = b.getAttribute('data-username');
-                if (!confirm(`Sign out from ${un}?`)) return;
-                try {
-                  const r = await fetch('/api/accounts/remove', {
-                    method: 'POST',
-                    headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({ username: un })
-                  });
-                  const d = await r.json();
-                  if (d.success) {
+                // ถ้าเป็น active จะ logout, ถ้าไม่ใช่จะ remove
+                if (active === un) {
+                  if (!confirm(`Sign out from ${un}?`)) return;
+                  try {
+                    await fetch('/api/logout', { method: 'POST' });
                     window.dispatchEvent(new Event('accountsChanged'));
                     await loadAccounts();
-                  } else alert(d.msg || 'ไม่สำเร็จ');
-                } catch (err) {
-                  console.error(err);
-                  alert('เกิดข้อผิดพลาดขณะออกจากบัญชี');
+                  } catch (err) {
+                    alert('เกิดข้อผิดพลาดขณะออกจากระบบ');
+                  }
+                } else {
+                  if (!confirm(`Sign out from ${un}?`)) return;
+                  try {
+                    const r = await fetch('/api/accounts/remove', {
+                      method: 'POST',
+                      headers: {'Content-Type':'application/json'},
+                      body: JSON.stringify({ username: un })
+                    });
+                    const d = await r.json();
+                    if (d.success) {
+                      window.dispatchEvent(new Event('accountsChanged'));
+                      await loadAccounts();
+                    } else alert(d.msg || 'ไม่สำเร็จ');
+                  } catch (err) {
+                    alert('เกิดข้อผิดพลาดขณะออกจากบัญชี');
+                  }
                 }
               };
             });
