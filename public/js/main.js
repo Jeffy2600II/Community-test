@@ -1,18 +1,22 @@
-// public/js/main.js (updated: header mobile toggle + original nav logic)
+// public/js/main.js (refactored + improved UX helpers)
 //
-// - เพิ่มการจัดการ mobile menu toggle (id: mobileMenuToggle) เพื่อเปิด/ปิด headerBottom
-// - เมื่่อเปิด mobile menu จะปิด dropdowns อื่น ๆ เพื่อหลีกเลี่ยงการทับกัน
-// - บังคับให้ headerBottom เปิดบนหน้าจอกว้าง และปิดบนมือถือตามค่าเริ่มต้น
-// - เรียก setupHeaderInteractions() หลังจากโหลด partials
+// - รวม helper functions (escapeHtml, fetchJson, elFrom) และ dropdown/overlay management
+// - ชัดเจนขึ้นสำหรับ header mobile toggle, positioning ของ dropdown, และการจัดการ notifications
+// - ลดซ้ำซ้อนของ computeNotificationUrl / isNotificationFromActive
+// - ปรับปรุง accessibility: aria-expanded, focus handling, keyboard support
+// - รักษา API ที่มีอยู่และใช้แนวทางที่เข้ากันกับโค้ดเดิม
 
 /* -------------------- Utilities -------------------- */
 async function loadPartial(id, file) {
   try {
     const resp = await fetch(file);
     const html = await resp.text();
-    document.getElementById(id).innerHTML = html;
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = html;
+    return html;
   } catch (e) {
     console.error('loadPartial error', e && e.message);
+    return null;
   }
 }
 
@@ -20,6 +24,21 @@ function elFrom(html) {
   const div = document.createElement('div');
   div.innerHTML = html.trim();
   return div.firstChild;
+}
+
+function escapeHtml(s) {
+  if (s === undefined || s === null) return '';
+  return String(s).replace(/[&<>"']/g, function (m) {
+    return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m]);
+  });
+}
+
+async function fetchJson(url, opts) {
+  try {
+    const r = await fetch(url, opts);
+    const tx = await r.text();
+    try { return JSON.parse(tx); } catch { return null; }
+  } catch (err) { console.warn('fetchJson error', url, err && err.message); return null; }
 }
 
 /* -------------------- Globals -------------------- */
@@ -36,16 +55,12 @@ function setupHeaderInteractions() {
   const headerBottom = document.getElementById('headerBottom');
   if (!toggle || !headerBottom) return;
 
-  // On small screens headerBottom is hidden by default (CSS). Toggle adds/removes 'open' class.
   toggle.addEventListener('click', (ev) => {
     ev.stopPropagation();
     const isOpen = headerBottom.classList.toggle('open');
     toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-
-    // when opening the mobile header area, close other dropdowns/overlays to avoid stacking
-    if (isOpen) {
-      hideDropdown();
-    }
+    // close other dropdowns
+    if (isOpen) hideDropdown();
   });
 
   // close headerBottom if clicked outside (mobile)
@@ -63,47 +78,17 @@ function setupHeaderInteractions() {
   function headerResizeHandler() {
     const w = window.innerWidth;
     if (w > 800) {
-      // on desktop/tablet show headerBottom
       headerBottom.classList.add('open');
       toggle.setAttribute('aria-expanded', 'true');
       toggle.style.display = 'none';
     } else {
-      // on small screens hide headerBottom by default, show toggle
       headerBottom.classList.remove('open');
       toggle.setAttribute('aria-expanded', 'false');
       toggle.style.display = '';
     }
   }
   window.addEventListener('resize', headerResizeHandler);
-  // initial call
   headerResizeHandler();
-}
-
-/* -------------------- Fetch helpers -------------------- */
-async function fetchAccounts() {
-  try {
-    const r = await fetch('/api/accounts');
-    if (!r.ok) return null;
-    const data = await r.json();
-    if (data && data.success) return data;
-    return null;
-  } catch (err) {
-    console.warn('fetchAccounts error', err && err.message);
-    return null;
-  }
-}
-
-async function fetchNotifications() {
-  try {
-    const r = await fetch('/api/notifications');
-    if (!r.ok) return null;
-    const data = await r.json();
-    if (data && data.success) return data;
-    return null;
-  } catch (err) {
-    console.warn('fetchNotifications error', err && err.message);
-    return null;
-  }
 }
 
 /* -------------------- Dropdown + Overlay -------------------- */
@@ -184,6 +169,7 @@ function isNotificationFromActive(n, activeUsername) {
   if (n.item && n.item.owner && String(n.item.owner) === a) return false;
   return true;
 }
+
 function computeNotificationUrl(n) {
   if (!n || !n.meta) return null;
   const m = n.meta;
@@ -208,12 +194,39 @@ async function positionDropdownRelativeTo(anchorEl) {
     dd.style.top = (top + 8) + 'px';
   } else {
     const rect = anchorEl.getBoundingClientRect();
-    const ddWidth = Math.min(420, Math.max(320, rect.width * 2));
+    const ddWidth = Math.min(460, Math.max(320, rect.width * 2));
     dd.style.width = ddWidth + 'px';
     const right = window.innerWidth - rect.right - 12;
     dd.style.right = Math.max(12, right) + 'px';
     dd.style.left = '';
     dd.style.top = (rect.bottom + window.scrollY + 8) + 'px';
+  }
+}
+
+/* -------------------- Fetch helpers -------------------- */
+async function fetchAccounts() {
+  try {
+    const r = await fetch('/api/accounts');
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (data && data.success) return data;
+    return null;
+  } catch (err) {
+    console.warn('fetchAccounts error', err && err.message);
+    return null;
+  }
+}
+
+async function fetchNotifications() {
+  try {
+    const r = await fetch('/api/notifications');
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (data && data.success) return data;
+    return null;
+  } catch (err) {
+    console.warn('fetchNotifications error', err && err.message);
+    return null;
   }
 }
 
@@ -246,7 +259,8 @@ async function renderNav() {
   bell.setAttribute('aria-label','Notifications');
   bell.style.cursor = 'pointer';
   bell.style.position = 'relative';
-  bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 01-3.46 0"></path></svg>`;
+  bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 01-3.46 0"></path></svg>`;
+
   let badgeCount = 0;
   if (notifData && notifData.notifications) {
     let activeName = accData && accData.active ? accData.active : null;
@@ -291,7 +305,9 @@ async function renderNav() {
     avatarBtn.style.background = 'transparent';
     avatarBtn.style.padding = '6px';
     avatarBtn.style.cursor = 'pointer';
-    avatarBtn.innerHTML = `<img src="${avatarUrl}" class="avatar-img" alt="${activeAcc.username}" style="width:32px;height:32px;border-radius:8px;object-fit:cover"> <span style="color:#1f2a37;font-weight:700">${activeAcc.username}</span>`;
+    avatarBtn.setAttribute('aria-haspopup', 'true');
+    avatarBtn.setAttribute('aria-expanded', 'false');
+    avatarBtn.innerHTML = `<img src="${avatarUrl}" class="avatar-img" alt="${escapeHtml(activeAcc.username)}" style="width:32px;height:32px;border-radius:8px;object-fit:cover"> <span style="color:#1f2a37;font-weight:700">${escapeHtml(activeAcc.displayName || activeAcc.username)}</span>`;
     accountArea.appendChild(avatarBtn);
 
     const dd = ensureDropdown();
@@ -299,11 +315,12 @@ async function renderNav() {
 
     avatarBtn.onclick = async (ev) => {
       ev.stopPropagation();
-      if (dropdownVisible) { hideDropdown(); return; }
+      const open = dropdownVisible && dd && dd.parentElement;
+      if (open) { hideDropdown(); avatarBtn.setAttribute('aria-expanded', 'false'); return; }
       dd.innerHTML = '';
       const header = document.createElement('div');
       header.className = 'dropdown-header';
-      header.innerHTML = `<img src="${avatarUrl}" class="avatar-img" style="width:48px;height:48px;border-radius:8px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${activeAcc.displayName || activeAcc.username}</div><div class="small">${activeAcc.username}</div></div>`;
+      header.innerHTML = `<img src="${avatarUrl}" class="avatar-img" style="width:48px;height:48px;border-radius:8px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${escapeHtml(activeAcc.displayName || activeAcc.username)}</div><div class="small">${escapeHtml(activeAcc.username)}</div></div>`;
       dd.appendChild(header);
 
       const list = document.createElement('div');
@@ -318,7 +335,8 @@ async function renderNav() {
         if (acc.username === globalActive) continue;
         const item = document.createElement('div');
         item.className = 'dropdown-item';
-        item.innerHTML = `<img src="${acc.profilePic || '/img/default_profile.png'}" class="avatar-img" style="width:36px;height:36px;border-radius:6px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${acc.displayName||acc.username}</div><div class="small">${acc.username}</div></div>`;
+        item.innerHTML = `<img src="${acc.profilePic || '/img/default_profile.png'}" class="avatar-img" style="width:36px;height:36px;border-radius:6px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${escapeHtml(acc.displayName || acc.username)}</div><div class="small" style="color:var(--muted)">${escapeHtml(acc.username)}</div></div>`;
+        item.tabIndex = 0;
         item.onclick = async () => {
           const confirmSwitch = confirm(`สลับไปใช้บัญชี ${acc.username} ?`);
           if (!confirmSwitch) return;
@@ -351,6 +369,7 @@ async function renderNav() {
 
       await positionDropdownRelativeTo(avatarBtn);
       showDropdown();
+      avatarBtn.setAttribute('aria-expanded', 'true');
     };
 
     // Notification bell handling
@@ -369,7 +388,7 @@ async function renderNav() {
       const unreadCount = visibleNotifs && visibleNotifs.length > 0 && Object.prototype.hasOwnProperty.call(visibleNotifs[0], 'read')
         ? visibleNotifs.filter(n => !n.read).length
         : (nd ? (nd.unread || 0) : 0);
-      header.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>การแจ้งเตือน</strong><div class="small">${unreadCount} รายการ</div></div></div>`;
+      header.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>การแจ้งเตือน</strong><div class="small">${unreadCount} รายการยังไม่อ่าน</div></div><div><button class="btn btn-ghost" id="notifRefreshSmall">รีเฟรช</button></div></div>`;
       dd.appendChild(header);
 
       const list = document.createElement('div');
@@ -399,7 +418,7 @@ async function renderNav() {
           const title = document.createElement('div');
           title.style.display = 'flex';
           title.style.justifyContent = 'space-between';
-          title.innerHTML = `<div style="font-weight:700">${n.type || 'การแจ้งเตือน'}</div><div class="small">${new Date(n.createdAt).toLocaleString()}</div>`;
+          title.innerHTML = `<div style="font-weight:700">${escapeHtml(n.type || 'การแจ้งเตือน')}</div><div class="small">${new Date(n.createdAt).toLocaleString()}</div>`;
           const msg = document.createElement('div');
           msg.className = 'small';
           msg.textContent = n.message || '';
@@ -447,19 +466,20 @@ async function renderNav() {
           await renderNav();
         };
       }
+
+      const smallRef = dd.querySelector('#notifRefreshSmall');
+      if (smallRef) smallRef.addEventListener('click', async (e) => { e.preventDefault(); await renderNav(); hideDropdown(); });
     };
 
   } else {
     accountArea.appendChild(elFrom('<a href="/login" class="btn btn-ghost">เข้าสู่ระบบ</a>'));
-    accountArea.appendChild(elFrom('<a href="/register" class="btn">สมัครสมาชิก</a>'));
+    accountArea.appendChild(elFrom('<a href="/register" class="btn btn-primary">สมัครสมาชิก</a>'));
   }
 
   nav.appendChild(accountArea);
 
   // click outside to close dropdown
-  document.addEventListener('click', function () {
-    if (dropdownVisible) hideDropdown();
-  }, true);
+  document.addEventListener('click', function () { if (dropdownVisible) hideDropdown(); }, true);
 }
 
 /* -------------------- Events -------------------- */
