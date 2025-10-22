@@ -2,45 +2,66 @@
 <html lang="th">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>โปรไฟล์สมาชิก</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <link rel="stylesheet" href="/css/style.css">
     <style>
-      /* Page-specific responsive tweaks for user profile */
+      /* หน้า user profile: ปรับให้รองรับมือถือ โดยไม่เปลี่ยนโครงสร้าง */
+      /* บันทึก: ใช้ตัวแปรของ style.css หลักได้ (เช่น --space-md) */
       .profile-hero {
-        padding-top: 18px;
-        padding-bottom: 18px;
+        padding: 18px;
       }
-      #heroPic {
+      .profile-hero .avatar {
         width: 140px;
         height: 140px;
-        border-radius: 18px;
-        object-fit: cover;
-        display: block;
+        border-radius: 18px; /* เก็บคอนเซปเดิมบน desktop */
       }
-      #followArea .btn {
-        min-width: 160px;
+      /* ปุ่ม follow ปรับให้เป็นปุ่มแบบ responsively friendly */
+      .follow-btn {
+        min-width: 140px;
+        white-space: nowrap;
       }
-      /* Make follow / action buttons stack on small screens and be full width */
+      /* บนมือถือ ให้ปุ่มเต็มความกว้างและจัดเรียงใหม่ */
       @media (max-width: 800px) {
-        .grid-2 { grid-template-columns: 1fr; }
-        .profile-hero { align-items: center; padding: 18px; }
-        #heroPic { width: 120px; height: 120px; }
-        .profile-hero .row { flex-direction: column; gap: 10px; }
-        .profile-hero .row .btn { width: 100%; }
-        #counts { text-align: center; }
-        .profile-main { margin-top: 12px; }
-        .card#aboutArea, .card#userPosts { padding: 12px; }
-        /* Better spacing for small avatars in lists */
-        .post { padding: 12px; gap: 12px; }
+        .profile-hero {
+          padding: 14px;
+          align-items: center;
+          text-align: center;
+        }
+        .profile-hero .avatar {
+          width: 110px;
+          height: 110px;
+          border-radius: 9999px; /* วงกลมบนมือถือ */
+        }
+        /* ทำให้ปุ่ม follow / view public เต็มความกว้าง */
+        .profile-hero .row {
+          display: flex;
+          gap: 8px;
+          flex-direction: column;
+          width: 100%;
+        }
+        .follow-btn, .profile-hero .row a.btn {
+          width: 100%;
+          box-sizing: border-box;
+        }
+        /* ปรับ card ภายใน profile-main ให้มี spacing ที่เหมาะสม */
+        .profile-main .card {
+          padding: 14px;
+        }
+        /* posts ให้มี spacing เหมาะกับหน้าจอเล็ก */
+        #userPosts .post {
+          padding: 10px;
+          margin-bottom: 10px;
+        }
+        /* ย่อข้อมูล meta เล็กลง */
+        .small { font-size: 0.82rem; }
       }
-      /* Minor polish on desktop */
-      @media (min-width: 801px) {
-        #followArea .btn { min-width: 130px; }
+      /* ปรับให้ counts ห่อคำได้ดีขึ้น */
+      #counts { word-break: keep-all; white-space: normal; }
+      /* ให้ post title เล็กลงบนหน้าจอเล็ก */
+      @media (max-width: 560px) {
+        .post .post-title { font-size: 1rem; }
       }
-
-      /* Ensure long texts don't overflow */
-      .profile-hero div { word-break: break-word; }
     </style>
 </head>
 <body>
@@ -48,28 +69,19 @@
   <main>
     <div class="container">
       <div class="grid-2">
-        <aside class="profile-hero card" id="hero" aria-labelledby="profileHeading">
-          <img id="heroPic" src="/img/default_profile.png" alt="รูปโปรไฟล์" class="profile-hero avatar">
-          <div class="text-center" style="width:100%;">
-            <div id="displayName" style="font-size:1.2rem;font-weight:700" id="profileHeading"></div>
+        <aside class="profile-hero card" id="hero">
+          <img id="heroPic" src="/img/default_profile.png" alt="profile" class="profile-hero avatar">
+          <div style="text-align:center;">
+            <div id="displayName" style="font-size:1.2rem;font-weight:700"></div>
             <div id="usernameLine" class="small mt-8"></div>
           </div>
-
-          <div class="row mt-12" style="justify-content:center; width:100%;">
-            <a id="editProfileBtn" href="/profile/edit" class="btn btn-primary">แก้ไขโปรไฟล์</a>
-            <a id="createPostBtn" href="/post/create" class="btn btn-ghost">สร้างโพสต์</a>
-          </div>
-
-          <div class="text-center mt-12" style="width:100%;">
-            <button id="btnViewPublic" class="btn btn-secondary" type="button" aria-label="ดูโปรไฟล์สาธารณะ">ดูโปรไฟล์สาธารณะ</button>
-          </div>
-
-          <div class="small mt-12" id="counts" aria-live="polite"></div>
+          <div id="followArea" class="mt-8"></div>
+          <div class="small mt-8" id="counts"></div>
         </aside>
 
         <section class="profile-main">
-          <div class="card" id="aboutArea" aria-live="polite"></div>
-          <div class="card mt-16" id="userPosts" aria-live="polite"></div>
+          <div class="card" id="aboutArea"></div>
+          <div class="card" id="userPosts" style="margin-top:12px"></div>
         </section>
       </div>
     </div>
@@ -78,23 +90,16 @@
 
 <script src="/js/main.js"></script>
 <script>
-/*
-  Responsive user profile page script.
-  - loads public user profile data and posts.
-  - ensures buttons and links encode the username safely.
-*/
 const username = decodeURIComponent(location.pathname.split('/')[2] || '');
 
 async function renderProfile() {
-  try {
     const pr = await fetch('/api/user/' + encodeURIComponent(username));
     const resp = await pr.json();
     if(!resp || !resp.success) {
       document.getElementById('aboutArea').innerHTML = '<b>ไม่พบผู้ใช้</b>';
-      document.getElementById('userPosts').innerHTML = '';
       return;
     }
-    const { profile, followersCount = 0, followingCount = 0, isFollowing = false, myUsername } = resp;
+    const { profile, followersCount, followingCount, isFollowing, myUsername } = resp;
 
     document.getElementById('heroPic').src = profile.profilePic || '/img/default_profile.png';
     document.getElementById('displayName').innerText = profile.displayName || profile.username;
@@ -102,54 +107,68 @@ async function renderProfile() {
     document.getElementById('counts').innerHTML = `ติดตาม: ${followingCount} • ผู้ติดตาม: ${followersCount}`;
 
     const followArea = document.getElementById('followArea');
-    if (followArea) followArea.innerHTML = '';
+    followArea.innerHTML = '';
+    if (myUsername && myUsername !== profile.username) {
+      // สร้างปุ่ม follow/เลิกติดตาม โดยใช้ข้อความภาษาไทย และ class follow-btn เพื่อให้ CSS หน้านี้จัดการได้
+      const btn = document.createElement('button');
+      btn.className = 'btn follow-btn ' + (isFollowing ? 'btn-ghost' : 'btn-primary');
+      btn.innerText = isFollowing ? 'เลิกติดตาม' : 'ติดตาม';
+      btn.onclick = async () => {
+        const url = isFollowing ? `/api/user/${encodeURIComponent(profile.username)}/unfollow` : `/api/user/${encodeURIComponent(profile.username)}/follow`;
+        try {
+          const r = await fetch(url, { method: 'POST' });
+          const d = await r.json();
+          if (d && d.success) {
+            // รีเรนเดอร์เพื่ออัปเดตสถานะ
+            await renderProfile();
+          } else {
+            alert(d && d.msg ? d.msg : 'ไม่สำเร็จ');
+          }
+        } catch (err) {
+          alert('เกิดข้อผิดพลาด');
+        }
+      };
+      followArea.appendChild(btn);
+    } else if (!myUsername) {
+      // ให้ลิงก์ไปยังหน้า login ถ้ายังไม่ล็อกอิน
+      followArea.appendChild(Object.assign(document.createElement('a'), { href: '/login', className: 'btn btn-ghost', innerText: 'เข้าสู่ระบบเพื่อติดตาม' }));
+    }
 
     // About area
     let aboutHtml = `<h3>เกี่ยวกับ</h3>
-      <div class="small mt-8">${profile.bio ? escapeHtml(profile.bio) : '<i>ยังไม่มีข้อมูล</i>'}</div>
+      <div class="small mt-8">${profile.bio ? profile.bio : '<i>ยังไม่มีข้อมูล</i>'}</div>
       <div class="small mt-10">เข้าร่วมเมื่อ: ${new Date(profile.createdAt).toLocaleDateString()}</div>
       <div class="small mt-8"><strong>อีเมล:</strong> ${profile.showEmail ? (profile.email || '<i>ไม่มี</i>') : '<i>ซ่อน</i>'}</div>`;
     document.getElementById('aboutArea').innerHTML = aboutHtml;
 
-    document.getElementById('btnViewPublic').onclick = function() {
-      window.location.href = '/user/' + encodeURIComponent(profile.username);
-    };
-
-    // Fetch and render posts
-    const pr2 = await fetch('/api/user/' + encodeURIComponent(profile.username) + '/posts');
+    // posts
+    const pr2 = await fetch('/api/user/' + encodeURIComponent(username) + '/posts');
     if (pr2.ok) {
       const postsData = await pr2.json();
-      const posts = postsData.posts || [];
+      const posts = (postsData && postsData.posts) ? postsData.posts : [];
       let postlist = '<div class="section-title"><span>โพสต์ของสมาชิกนี้</span></div>';
-      if (posts.length === 0) {
-        postlist += '<i class="small">ยังไม่มีโพสต์</i>';
-      } else {
+      if (posts.length) {
         postlist += posts.map(p => {
-          const truncated = (p.content || '').length > 200 ? escapeHtml((p.content || '').slice(0,200)) + '...' : escapeHtml(p.content || '');
-          return `<div class="post" style="padding:12px 14px; margin-bottom:10px;">
-            <div style="flex:1">
-              <h4 style="margin:0 0 6px 0;"><a href="/post/${encodeURIComponent(p.id)}">${escapeHtml(p.title)}</a></h4>
-              <div class="small" style="color:var(--muted); margin-bottom:8px;">${new Date(p.createdAt).toLocaleString()}</div>
-              <div>${truncated}</div>
+          // ย่อ content ในรายการ และให้รูปโหลดแบบ lazy
+          return `<div class="post" style="padding:10px 12px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start;">
+            <div style="width:72px;flex-shrink:0;">
+              <a href="/post/${p.id}">
+                <img src="${p.image ? p.image : '/img/default_profile.png'}" alt="post image" style="width:72px;height:72px;object-fit:cover;border-radius:8px" loading="lazy">
+              </a>
             </div>
-            ${p.image ? `<div style="margin-top:8px;"><a href="/post/${encodeURIComponent(p.id)}"><img src="${p.image}" alt="post image" style="max-width:160px;border-radius:8px;"></a></div>` : ''}
+            <div style="flex:1;">
+              <h4 style="margin:0 0 6px 0"><a href="/post/${p.id}">${p.title}</a></h4>
+              <div class="small" style="color:var(--muted)">${new Date(p.createdAt).toLocaleDateString()} • โดย <a href="/user/${p.username}">${p.username}</a></div>
+            </div>
           </div>`;
         }).join('');
+      } else {
+        postlist += '<i class="small">ยังไม่มีโพสต์</i>';
       }
       document.getElementById('userPosts').innerHTML = postlist;
     } else {
       document.getElementById('userPosts').innerHTML = '<i class="small">ไม่สามารถโหลดโพสต์ได้</i>';
     }
-  } catch (err) {
-    document.getElementById('aboutArea').innerHTML = '<div class="small">เกิดข้อผิดพลาดขณะโหลดข้อมูล</div>';
-    document.getElementById('userPosts').innerHTML = '';
-    console.error(err);
-  }
-}
-
-function escapeHtml(s) {
-  if (s === null || s === undefined) return '';
-  return String(s).replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 }
 
 renderProfile();
