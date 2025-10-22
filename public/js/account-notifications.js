@@ -1,12 +1,23 @@
-// public/js/account-notifications.js
-// สำหรับหน้า accounts (จัดการบัญชี): แสดงรายการแจ้งเตือนแบบใหม่
-// - คลิกที่แจ้งเตือนจะ mark-read และนำทางไปยังโพสต์/ยูสเซอร์ที่เกี่ยวข้อง
-// - รองรับปุ่ม "อ่านทั้งหมด" และรีเฟรช
+// public/js/account-notifications.js (refined + accessible)
+//
+// - Cleaner helper functions (escapeHtml, fmtDate, computeNotificationUrl)
+// - Render logic separated, mark-read behavior improved
+// - Keeps behavior: click notification -> mark-read -> navigate
+// - Graceful error handling and ARIA updates
 
 (function () {
   const CONTAINER_ID = "accountNotifications";
 
-  // สร้าง URL สำหรับการนำทางจาก notification.meta
+  function fmtDate(iso) {
+    try { return new Date(iso).toLocaleString(); } catch { return iso || ""; }
+  }
+  function escapeHtml(s) {
+    if (!s) return "";
+    return String(s).replace(/[&<>"']/g, function (m) {
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m]);
+    });
+  }
+
   function computeNotificationUrl(n) {
     if (!n || !n.meta) return null;
     const m = n.meta;
@@ -19,19 +30,14 @@
     return null;
   }
 
-  function fmtDate(iso) {
-    try { return new Date(iso).toLocaleString(); }
-    catch { return iso || ""; }
+  async function fetchJson(url, opts) {
+    try {
+      const r = await fetch(url, opts);
+      const tx = await r.text();
+      try { return JSON.parse(tx); } catch { return null; }
+    } catch (err) { return null; }
   }
 
-  function escapeHtml(s) {
-    if (!s) return "";
-    return String(s).replace(/[&<>"']/g, function (m) {
-      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m]);
-    });
-  }
-
-  // แสดงแจ้งเตือนทีละรายการ
   function renderNotificationItem(n) {
     const row = document.createElement("div");
     row.className = "notif-row";
@@ -47,6 +53,7 @@
     const top = document.createElement("div");
     top.style.display = "flex";
     top.style.justifyContent = "space-between";
+    top.style.alignItems = "center";
     top.innerHTML =
       `<div style="font-weight:700">${escapeHtml(n.type || "การแจ้งเตือน")}</div><div class="small">${fmtDate(n.createdAt)}</div>`;
 
@@ -57,7 +64,6 @@
     row.appendChild(top);
     row.appendChild(msg);
 
-    // คลิก -> mark-read + navigate
     row.addEventListener("click", async function (ev) {
       ev.preventDefault();
       ev.stopPropagation();
@@ -69,7 +75,7 @@
           body: JSON.stringify({ ids: [n.id] })
         });
       } catch (err) {
-        // เงียบ
+        // ignore
       }
       row.dataset.read = "1";
       const dest = computeNotificationUrl(n);
@@ -80,7 +86,6 @@
     return row;
   }
 
-  // render list ทั้งหมด
   async function renderContainer(container, data) {
     container.innerHTML = "";
 
@@ -145,15 +150,6 @@
     container.appendChild(list);
   }
 
-  async function fetchJson(url, opts) {
-    try {
-      const r = await fetch(url, opts);
-      const tx = await r.text();
-      try { return JSON.parse(tx); } catch { return null; }
-    } catch (err) { return null; }
-  }
-
-  // โหลดข้อมูล + render
   async function loadAndRender() {
     const container = document.getElementById(CONTAINER_ID);
     if (!container) return;
@@ -165,10 +161,8 @@
     await renderContainer(container, data);
   }
 
-  // expose manual refresh (ถ้าต้องเรียกจาก script อื่น)
-  window.accountNotifications = {
-    refresh: loadAndRender
-  };
+  // expose manual refresh
+  window.accountNotifications = { refresh: loadAndRender };
 
   // auto init
   if (document.readyState === "loading") {
