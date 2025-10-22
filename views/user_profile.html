@@ -2,8 +2,35 @@
 <html lang="th">
 <head>
     <meta charset="utf-8">
-    <title>โปรไฟล์สมาชิก</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>โปรไฟล์ของฉัน</title>
     <link rel="stylesheet" href="/css/style.css">
+    <style>
+      /* หน้าโปรไฟล์: ปรับปรุงสำหรับมือถือ */
+      /* เล็ก ๆ Scoped CSS เพื่อไม่ไปรบกวนส่วนอื่นของแอป */
+      @media (max-width: 900px) {
+        .grid-2 { grid-template-columns: 1fr; }
+        .profile-hero { padding: 16px; }
+        .profile-hero .avatar { width: 120px; height: 120px; border-radius: 9999px; }
+        .profile-hero .row { flex-direction: column; gap: 10px; }
+        .profile-hero .row a.btn, .profile-hero .row button.btn {
+          width: 100%;
+          box-sizing: border-box;
+        }
+        /* ให้ counts ห่อบรรทัดได้ ไม่ล้น */
+        #counts { word-break: break-word; }
+        /* ให้ about / posts มี padding น้อยลงเมื่อแคบ */
+        .profile-main .card { padding: 12px; }
+        /* โพสต์ในโปรไฟล์: ให้เป็นคอลัมน์เดียวและปุ่มเต็มความกว้าง */
+        .profile-main .post { padding: 10px; margin-bottom: 10px; }
+        .profile-main .post a.btn { display: inline-block; width: auto; }
+      }
+
+      /* 작은터치 개선 — ให้ปุ่มใน hero มีระยะสัมผัสใหญ่พอ */
+      .profile-hero .row a.btn, .profile-hero .row button.btn {
+        min-height: 44px;
+      }
+    </style>
 </head>
 <body>
   <div id="headerSlot"></div>
@@ -12,74 +39,126 @@
       <div class="grid-2">
         <aside class="profile-hero card" id="hero">
           <img id="heroPic" src="/img/default_profile.png" alt="profile" class="profile-hero avatar">
-          <div style="text-align:center;">
+          <div class="text-center">
             <div id="displayName" style="font-size:1.2rem;font-weight:700"></div>
-            <div id="usernameLine" class="small mt-8"></div>
+            <div id="usernameLine" class="small mt-16"></div>
           </div>
-          <div id="followArea" class="mt-8"></div>
-          <div class="small mt-8" id="counts"></div>
+          <div class="row mt-16" style="justify-content:center;gap:8px;flex-wrap:wrap;">
+            <a id="btnEditProfile" href="/profile/edit" class="btn btn-primary">แก้ไขโปรไฟล์</a>
+            <a id="btnCreatePost" href="/post/create" class="btn btn-ghost">สร้างโพสต์</a>
+          </div>
+          <div class="text-center mt-16">
+            <button id="btnViewPublic" class="btn btn-secondary" type="button" style="min-width:160px;">ดูโปรไฟล์สาธารณะ</button>
+          </div>
+          <div class="small mt-16" id="counts" aria-live="polite"></div>
         </aside>
 
         <section class="profile-main">
           <div class="card" id="aboutArea"></div>
-          <div class="card" id="userPosts" style="margin-top:12px"></div>
+          <div class="card mt-16" id="myPosts" aria-live="polite"></div>
         </section>
       </div>
     </div>
   </main>
   <div id="footerSlot"></div>
-
 <script src="/js/main.js"></script>
 <script>
-const username = decodeURIComponent(location.pathname.split('/')[2]);
+(async ()=>{
+    const pr = await fetch('/api/profile');
+    if (!pr.ok) { location.href = '/login'; return; }
+    const data = await pr.json();
+    if (!data.success) { document.getElementById('aboutArea').innerText = 'ไม่สามารถโหลดโปรไฟล์'; return; }
+    const { profile, followersCount, followingCount } = data;
 
-async function renderProfile() {
-    const pr = await fetch('/api/user/' + encodeURIComponent(username));
-    const resp = await pr.json();
-    if(!resp.success) return document.getElementById('aboutArea').innerHTML = '<b>ไม่พบผู้ใช้</b>';
-    const { profile, followersCount, followingCount, isFollowing, myUsername } = resp;
-
+    // Basic rendering
     document.getElementById('heroPic').src = profile.profilePic || '/img/default_profile.png';
     document.getElementById('displayName').innerText = profile.displayName || profile.username;
     document.getElementById('usernameLine').innerText = '@' + profile.username;
     document.getElementById('counts').innerHTML = `ติดตาม: ${followingCount} • ผู้ติดตาม: ${followersCount}`;
 
-    const followArea = document.getElementById('followArea');
-    followArea.innerHTML = '';
-    if (myUsername && myUsername !== profile.username) {
-      const btn = document.createElement('button');
-      btn.className = 'btn ' + (isFollowing ? 'btn-ghost' : 'btn-primary');
-      btn.innerText = isFollowing ? 'Unfollow' : 'Follow';
-      btn.onclick = async () => {
-        const url = isFollowing ? `/api/user/${encodeURIComponent(profile.username)}/unfollow` : `/api/user/${encodeURIComponent(profile.username)}/follow`;
-        const r = await fetch(url, { method: 'POST' });
-        const d = await r.json();
-        if (d && d.success) {
-          await renderProfile(); // reload
-        } else alert(d.msg || 'ไม่สำเร็จ');
-      };
-      followArea.appendChild(btn);
-    }
+    document.getElementById('btnViewPublic').onclick = function() {
+      window.location.href = '/user/' + encodeURIComponent(profile.username);
+    };
 
     // About area
-    let aboutHtml = `<h3>เกี่ยวกับ</h3>
-      <div class="small mt-8">${profile.bio ? profile.bio : '<i>ยังไม่มีข้อมูล</i>'}</div>
-      <div class="small mt-10">เข้าร่วมเมื่อ: ${new Date(profile.createdAt).toLocaleDateString()}</div>
-      <div class="small mt-8"><strong>อีเมล:</strong> ${profile.showEmail ? (profile.email || '<i>ไม่มี</i>') : '<i>ซ่อน</i>'}</div>`;
-    document.getElementById('aboutArea').innerHTML = aboutHtml;
+    const aboutArea = document.getElementById('aboutArea');
+    const aboutHtml = document.createElement('div');
+    const h3 = document.createElement('h3'); h3.textContent = 'เกี่ยวกับ';
+    const bio = document.createElement('div'); bio.className = 'small mt-16';
+    bio.innerHTML = profile.bio ? escapeHtml(profile.bio) : '<i>ยังไม่มีข้อมูล</i>';
+    const joined = document.createElement('div'); joined.className = 'small mt-16';
+    joined.textContent = 'เข้าร่วมเมื่อ: ' + new Date(profile.createdAt).toLocaleDateString();
+    const emailLine = document.createElement('div'); emailLine.className = 'small mt-16';
+    emailLine.innerHTML = '<strong>อีเมล:</strong> ' + (profile.showEmail ? (escapeHtml(profile.email || '<i>ไม่มี</i>')) : '<i>ซ่อน</i>');
+    aboutHtml.appendChild(h3);
+    aboutHtml.appendChild(bio);
+    aboutHtml.appendChild(joined);
+    aboutHtml.appendChild(emailLine);
+    aboutArea.innerHTML = '';
+    aboutArea.appendChild(aboutHtml);
 
-    // posts
-    const pr2 = await fetch('/api/user/' + encodeURIComponent(username) + '/posts');
-    if (pr2.ok) {
-      const postsData = await pr2.json();
-      const posts = postsData.posts || [];
-      let postlist = '<div class="section-title"><span>โพสต์ของสมาชิกนี้</span></div>';
-      postlist += posts.length ? posts.map(p=>`<div class="post" style="padding:10px 12px;margin-bottom:8px;"><div style="flex:1"><h4 style="margin:0"><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div></div></div>`).join('') : '<i class="small">ยังไม่มีโพสต์</i>';
-      document.getElementById('userPosts').innerHTML = postlist;
+    // Load posts (โครงสร้าง DOM แทนการใช้ innerHTML เพื่อความปลอดภัยและรองรับมือถือ)
+    async function loadPosts() {
+      const container = document.getElementById('myPosts');
+      container.innerHTML = '';
+      const header = document.createElement('div'); header.className = 'section-title'; header.innerHTML = '<span>โพสต์ของฉัน</span>';
+      container.appendChild(header);
+
+      try {
+        const pr2 = await fetch('/api/user/' + encodeURIComponent(profile.username) + '/posts');
+        if (!pr2.ok) {
+          const err = document.createElement('div'); err.className = 'small mt-8'; err.textContent = 'ไม่สามารถโหลดโพสต์ได้';
+          container.appendChild(err); return;
+        }
+        const postsData = await pr2.json();
+        const posts = postsData.posts || [];
+        if (!posts.length) {
+          const empty = document.createElement('div'); empty.className = 'small mt-8'; empty.innerHTML = '<i>ยังไม่มีโพสต์</i>';
+          container.appendChild(empty); return;
+        }
+        const list = document.createElement('div'); list.style.display = 'flex'; list.style.flexDirection = 'column'; list.style.gap = '10px';
+        for (const p of posts) {
+          const postEl = document.createElement('div');
+          postEl.className = 'post';
+          postEl.style.display = 'flex';
+          postEl.style.justifyContent = 'space-between';
+          postEl.style.alignItems = 'center';
+          postEl.style.padding = '12px';
+          postEl.style.borderRadius = '8px';
+          postEl.style.background = 'linear-gradient(180deg,#fff,#fcfdff)';
+          postEl.style.border = '1px solid rgba(15,23,42,0.03)';
+          const left = document.createElement('div'); left.style.flex = '1';
+          const title = document.createElement('h4'); title.style.margin = '0 0 6px 0';
+          const a = document.createElement('a'); a.href = '/post/' + encodeURIComponent(p.id); a.textContent = p.title || '(ไม่มีหัวข้อ)';
+          title.appendChild(a);
+          const meta = document.createElement('div'); meta.className = 'small'; meta.style.color = 'var(--muted)';
+          meta.textContent = new Date(p.createdAt).toLocaleString();
+          left.appendChild(title); left.appendChild(meta);
+
+          const actions = document.createElement('div');
+          actions.style.display = 'flex'; actions.style.gap = '8px'; actions.style.alignItems = 'center';
+          const viewBtn = document.createElement('a'); viewBtn.className = 'btn btn-ghost'; viewBtn.href = '/post/' + encodeURIComponent(p.id); viewBtn.textContent = 'อ่านต่อ';
+          actions.appendChild(viewBtn);
+          // If this is own profile (it is), allow edit/delete
+          if (profile.username) {
+            const editBtn = document.createElement('a'); editBtn.className = 'btn btn-muted'; editBtn.href = '/post/' + encodeURIComponent(p.id) + '/edit'; editBtn.textContent = 'แก้ไข';
+            actions.appendChild(editBtn);
+          }
+          postEl.appendChild(left);
+          postEl.appendChild(actions);
+          list.appendChild(postEl);
+        }
+        container.appendChild(list);
+      } catch (e) {
+        const err = document.createElement('div'); err.className = 'small mt-8'; err.textContent = 'เกิดข้อผิดพลาดขณะโหลดโพสต์';
+        container.appendChild(err);
+      }
     }
-}
 
-renderProfile();
+    await loadPosts();
+
+})();
+function escapeHtml(s) { if (!s && s !== 0) return ''; return String(s).replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
 </script>
 </body>
 </html>
