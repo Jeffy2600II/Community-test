@@ -1,5 +1,7 @@
-// server.js (full) - stores profile originals + cropped, post images per-post, sliding sessions
-// Requires: npm install express body-parser cookie-parser multer sharp jsonwebtoken uuid
+// server.js (full, updated to use jimp instead of sharp)
+// Requires: npm install express body-parser cookie-parser multer jimp jsonwebtoken uuid
+// Note: jimp is pure-JS; if you need EXIF auto-rotation for mobile images, you can install exif-parser
+//       (npm i exif-parser) — the code tries to require it optionally.
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -9,7 +11,8 @@ const fs = require('fs');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const sharp = require('sharp');
+// replaced sharp with jimp
+const Jimp = require('jimp');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,7 +36,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// multer in-memory storage so we can process images with sharp before writing
+// multer in-memory storage so we can process images with jimp before writing
 const uploadMemory = multer({ storage: multer.memoryStorage() });
 
 /* ------------------------
@@ -72,7 +75,42 @@ function getPostImagesDir(postId) {
   return dir;
 }
 
-/* Search helpers */
+/* Small FS helper */
+function ensureJsonFile(p, initial = '[]') {
+  if (!fs.existsSync(p)) fs.writeFileSync(p, initial, 'utf8');
+  return p;
+}
+
+/* ------------------------
+   Optional EXIF orientation support (try to require exif-parser)
+   - Jimp does not auto-rotate using EXIF orientation. If you want auto-rotation,
+     install exif-parser and this code will attempt to rotate appropriately.
+   ------------------------ */
+let ExifParser = null;
+try {
+  ExifParser = require('exif-parser');
+} catch (e) {
+  ExifParser = null;
+}
+async function applyExifOrientationIfNeeded(buffer, jimpImage) {
+  if (!ExifParser) return jimpImage;
+  try {
+    const parser = ExifParser.create(buffer);
+    const result = parser.parse();
+    const ori = result.tags && result.tags.Orientation;
+    // orientation values: 1 (no), 3 (180), 6 (90 CW), 8 (270)
+    if (ori === 3) jimpImage.rotate(180);
+    else if (ori === 6) jimpImage.rotate(90);
+    else if (ori === 8) jimpImage.rotate(270);
+  } catch (e) {
+    // ignore parse errors
+  }
+  return jimpImage;
+}
+
+/* ------------------------
+   Search helpers (unchanged)
+   ------------------------ */
 function findUserByUsername(usernameRaw) {
   const username = decodeURIComponent(usernameRaw);
   if (!fs.existsSync(USERS_DIR)) return null;
@@ -105,11 +143,9 @@ function findUserByEmail(email) {
   return null;
 }
 
-/* Simple JSON-file helpers */
-function ensureJsonFile(p, initial = '[]') {
-  if (!fs.existsSync(p)) fs.writeFileSync(p, initial, 'utf8');
-  return p;
-}
+/* ------------------------
+   JSON helpers (unchanged)
+   ------------------------ */
 function getFollowersForUser(userId) {
   const p = getFollowersPath(userId);
   ensureJsonFile(p);
@@ -150,7 +186,9 @@ function isFollowing(followerUserId, targetUserId) {
   return following.includes(targetUserId);
 }
 
-/* Notifications */
+/* ------------------------
+   Notifications (unchanged)
+   ------------------------ */
 function ensureUserNotificationsFile(userId) {
   const p = path.join(getUserDir(userId), 'notifications.json');
   if (!fs.existsSync(p)) fs.writeFileSync(p, '[]', 'utf8');
@@ -208,7 +246,7 @@ function markNotificationsRead(userId, ids = []) {
   return arr;
 }
 
-/* Accounts cookie helpers */
+/* Accounts cookie helpers (unchanged) */
 function readAccountsFromReq(req) {
   try {
     const s = req.cookies.accounts;
@@ -229,7 +267,7 @@ function filterValidAccounts(accounts) {
   return out;
 }
 
-/* Sliding session middleware */
+/* Sliding session middleware (unchanged except we didn't touch cookie logic) */
 app.use((req, res, next) => {
   try {
     const currentAccounts = readAccountsFromReq(req);
@@ -267,7 +305,7 @@ app.use((req, res, next) => {
 });
 
 /* ------------------------
-   Auth / HTML routes
+   Auth / HTML routes (unchanged)
    ------------------------ */
 function authMiddleware(req, res, next) {
   const token = req.cookies.token;
@@ -293,10 +331,9 @@ app.get('/post/:id/edit', authMiddleware, (req, res) => res.sendFile(path.join(_
 app.get('/post/:id', (req, res) => res.sendFile(path.join(__dirname, 'views/post.html')));
 
 /* ------------------------
-   API routes
+   API routes (unchanged for auth/accounts)
    ------------------------ */
 
-/* Register / Login / Accounts */
 app.post('/api/register', (req, res) => {
   const { username, email, password } = req.body;
   if (!username || !email || !password) return res.json({ success: false, msg: 'Missing fields' });
@@ -527,19 +564,18 @@ app.post('/api/profile/update', authMiddleware, (req, res) => {
 });
 
 /*
- Upload profile picture endpoint behavior:
+ Upload profile picture endpoint behavior (Jimp-based):
  - Accepts multipart/form-data with:
     - 'profilePic' (required) => the image to use for the cropped avatar (may already be cropped client-side)
     - optional 'original' file field => if provided, server will save this as original.jpg and also create/update avatar.jpg
     - optional form field 'replaceOriginal' = '1' => when set and original exists, overwrite original with profilePic buffer
  - If 'original' not provided:
-    - If user has no existing original, server will save the incoming profilePic as original too (so original preserved)
-    - If original exists and replaceOriginal is not set, server will keep the existing original and only replace avatar.jpg
- This approach preserves the un-cropped original whenever possible.
+    - If user has no existing original, server will save the incoming profilePic as original too
+    - If original exists and replaceOriginal is set -> overwrite original with incoming profilePic
+ - Jimp will be used to create a square avatar (center-crop) sized 400x400 (same as previous behavior).
 */
 app.post('/api/profile/upload-pic', authMiddleware, uploadMemory.fields([{ name: 'profilePic', maxCount: 1 }, { name: 'original', maxCount: 1 }]), async (req, res) => {
   const userId = req.user.id;
-  // profilePic is required (the image we will use to generate avatar.jpg)
   const profFiles = req.files || {};
   const profileFiles = profFiles.profilePic || [];
   if (profileFiles.length === 0) return res.json({ success: false, msg: 'No file uploaded' });
@@ -570,23 +606,34 @@ app.post('/api/profile/upload-pic', authMiddleware, uploadMemory.fields([{ name:
       // otherwise: keep existing original (do nothing)
     }
 
-    // Always (re)create avatar.jpg from the provided profilePic buffer (ensure square)
-    // We will fit into 400x400; if incoming isn't square, we center-crop to square first then resize.
-    const img = sharp(profilePicFile.buffer);
-    const meta = await img.metadata().catch(() => ({}));
-    // if not square, center crop to square using smallest side, then resize
-    if (meta.width && meta.height) {
-      const min = Math.min(meta.width, meta.height);
-      await img.extract({ left: Math.floor((meta.width - min) / 2), top: Math.floor((meta.height - min) / 2), width: min, height: min })
-               .resize(400, 400)
-               .toFormat('jpeg')
-               .toFile(croppedPath);
-    } else {
-      // fallback: just resize to 400x400
-      await img.resize(400, 400).toFormat('jpeg').toFile(croppedPath);
+    // Create avatar.jpg from provided profilePic buffer (ensure square, center-crop then resize)
+    // We'll create a 400x400 JPEG for avatar (to match previous behavior)
+    try {
+      const img = await Jimp.read(profilePicFile.buffer);
+      await applyExifOrientationIfNeeded(profilePicFile.buffer, img);
+
+      const w = img.bitmap.width || 0;
+      const h = img.bitmap.height || 0;
+
+      if (w > 0 && h > 0) {
+        const min = Math.min(w, h);
+        const left = Math.floor((w - min) / 2);
+        const top = Math.floor((h - min) / 2);
+        await img.clone().crop(left, top, min, min).resize(400, 400).quality(92).writeAsync(croppedPath);
+      } else {
+        await img.clone().resize(400, 400).quality(92).writeAsync(croppedPath);
+      }
+    } catch (e) {
+      // If Jimp fails to process (rare), fallback to saving raw buffer as avatar (not ideal)
+      try {
+        fs.writeFileSync(croppedPath, profilePicFile.buffer);
+      } catch (e2) {
+        console.error('failed to write avatar fallback:', e2 && e2.message);
+        return res.status(500).json({ success: false, msg: 'Save failed' });
+      }
     }
 
-    // update profile.json to reflect paths
+    // update profile.json to reflect paths (public-accessible via /data)
     const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
     profile.profilePic = `/data/users/${userId}/profile_pic/avatar.jpg`;
     profile.profilePicOriginal = `/data/users/${userId}/profile_pic/original.jpg`;
@@ -617,7 +664,7 @@ app.post('/api/profile/remove-pic', authMiddleware, (req, res) => {
   }
 });
 
-/* Follow / Unfollow */
+/* Follow / Unfollow (unchanged) */
 app.post('/api/user/:username/follow', authMiddleware, (req, res) => {
   const target = findUserByUsername(req.params.username);
   if (!target) return res.json({ success: false, msg: 'Target not found' });
@@ -641,7 +688,7 @@ app.post('/api/user/:username/unfollow', authMiddleware, (req, res) => {
   res.json({ success: true, followersCount: getFollowersForUser(target._userId).length });
 });
 
-/* Notifications */
+/* Notifications (unchanged) */
 app.get('/api/notifications', authMiddleware, (req, res) => {
   const userId = req.user.id;
   const nots = getNotificationsForUser(userId);
@@ -655,7 +702,7 @@ app.post('/api/notifications/mark-read', authMiddleware, (req, res) => {
 });
 
 /* ------------------------
-   Posts & Comments
+   Posts & Comments (image processing replaced with Jimp)
    ------------------------ */
 
 // Create post (store post in data/posts/{postId}/post.json, store post image in data/posts/{postId}/images/main.jpg)
@@ -674,9 +721,25 @@ app.post('/api/post/create', authMiddleware, uploadMemory.single('postImage'), a
     if (req.file) {
       const imgDir = getPostImagesDir(postId);
       const dest = path.join(imgDir, 'main.jpg');
-      // resize to fit inside 1200x1200 to avoid huge uploads
-      await sharp(req.file.buffer).resize({ width: 1200, height: 1200, fit: 'inside' }).toFormat('jpeg').toFile(dest);
-      imgPathPublic = `/data/posts/${postId}/images/main.jpg`;
+      try {
+        const img = await Jimp.read(req.file.buffer);
+        await applyExifOrientationIfNeeded(req.file.buffer, img);
+        // resize to fit inside 1200x1200 to avoid huge uploads
+        const MAX = 1200;
+        if (img.bitmap.width > MAX || img.bitmap.height > MAX) {
+          await img.clone().scaleToFit(MAX, MAX).quality(88).writeAsync(dest);
+        } else {
+          await img.clone().quality(88).writeAsync(dest);
+        }
+        imgPathPublic = `/data/posts/${postId}/images/main.jpg`;
+      } catch (e) {
+        console.error('post image processing failed', e && e.message);
+        // fallback: save raw buffer
+        const imgDir = getPostImagesDir(postId);
+        const dest = path.join(imgDir, 'main.jpg');
+        fs.writeFileSync(dest, req.file.buffer);
+        imgPathPublic = `/data/posts/${postId}/images/main.jpg`;
+      }
     }
 
     const post = {
@@ -738,8 +801,21 @@ app.post('/api/post/:id/edit', authMiddleware, uploadMemory.single('postImage'),
       }
       const imgDir = getPostImagesDir(postId);
       const dest = path.join(imgDir, 'main.jpg');
-      await sharp(req.file.buffer).resize({ width: 1200, height: 1200, fit: 'inside' }).toFormat('jpeg').toFile(dest);
-      post.image = `/data/posts/${postId}/images/main.jpg`;
+      try {
+        const img = await Jimp.read(req.file.buffer);
+        await applyExifOrientationIfNeeded(req.file.buffer, img);
+        const MAX = 1200;
+        if (img.bitmap.width > MAX || img.bitmap.height > MAX) {
+          await img.clone().scaleToFit(MAX, MAX).quality(88).writeAsync(dest);
+        } else {
+          await img.clone().quality(88).writeAsync(dest);
+        }
+        post.image = `/data/posts/${postId}/images/main.jpg`;
+      } catch (e) {
+        // fallback: write raw buffer
+        fs.writeFileSync(dest, req.file.buffer);
+        post.image = `/data/posts/${postId}/images/main.jpg`;
+      }
     }
 
     post.updatedAt = new Date().toISOString();
@@ -823,7 +899,7 @@ app.get('/api/user/:username/posts', (req, res) => {
   res.json({ success: true, posts });
 });
 
-/* Comments */
+/* Comments (unchanged) */
 app.post('/api/post/:id/comment', authMiddleware, (req, res) => {
   const postId = req.params.id;
   const username = req.user.username;
@@ -853,7 +929,7 @@ app.post('/api/post/:id/comment', authMiddleware, (req, res) => {
     if (post && post.username && post.username !== username) {
       const ownerObj = findUserByUsername(post.username);
       if (ownerObj) {
-        addNotificationToUser(ownerObj._userId, 'comment', `${username} แสดงความคิดเห็นในโพสต์ของคุณ`, { postId, commentId: comment.id, actorUsername: username });
+        addNotificationToUser(ownerObj._userId, 'comment', `${username} แสดงความคิดเห็นในโพสต์ของคุณ`, { postId, commentId: comment.id, actorUsername: username, actorId: req.user.id });
       }
     }
   } catch (e) { /* ignore */ }
