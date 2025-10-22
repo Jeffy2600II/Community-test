@@ -5,25 +5,74 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>โพสต์ของสมาชิก</title>
     <link rel="stylesheet" href="/css/style.css">
+    <style>
+      /* ปรับปรุงหน้าโพสต์ของสมาชิกให้มือถือ-friendly */
+      @media (max-width: 900px) {
+        .container { padding-left: 12px; padding-right: 12px; }
+        #userPosts .post { padding: 12px; border-radius: 10px; display:block; }
+        #userPosts .post .meta { margin-top:8px; color:var(--muted); }
+        #userPosts .post .post-actions { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; }
+        #userPosts .post .post-actions .btn { flex: 1 1 auto; min-width: 120px; }
+      }
+      /* Desktop minor polish */
+      #userPosts .post { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px; border-radius:10px; border:1px solid rgba(15,23,42,0.03); background:linear-gradient(180deg,#fff,#fcfdff); }
+      #userPosts .post h4 { margin:0; font-size:1rem; }
+    </style>
 </head>
 <body>
   <div id="headerSlot"></div>
   <main>
     <div class="container mt-16" style="max-width:800px;">
       <div class="section-title"><span>โพสต์ของสมาชิก</span></div>
-      <div id="userPosts"></div>
+      <div id="userPosts" aria-live="polite"></div>
     </div>
   </main>
   <div id="footerSlot"></div>
 <script src="/js/main.js"></script>
 <script>
-const username = location.pathname.split('/')[2];
+const username = decodeURIComponent(location.pathname.split('/')[2] || '');
+
 (async ()=>{
-    const pr2 = await fetch('/api/user/' + username + '/posts');
-    const { posts } = await pr2.json();
-    let postlist = '';
-    postlist += posts.length ? posts.map(p=>`<div class="post" style="padding:10px 12px;margin-bottom:8px;"><div style="flex:1"><h4 style="margin:0"><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div></div></div>`).join('') : '<i class="small">ยังไม่มีโพสต์</i>';
-    document.getElementById('userPosts').innerHTML = postlist;
+    const container = document.getElementById('userPosts');
+    container.innerHTML = '<div class="small">กำลังโหลด...</div>';
+    try {
+      const pr2 = await fetch('/api/user/' + encodeURIComponent(username) + '/posts');
+      if (!pr2.ok) {
+        container.innerHTML = '<div class="small">ไม่สามารถโหลดโพสต์ได้</div>';
+        return;
+      }
+      const { posts } = await pr2.json();
+      container.innerHTML = '';
+      if (!posts || !posts.length) {
+        container.innerHTML = '<div class="small"><i>ยังไม่มีโพสต์</i></div>';
+        return;
+      }
+      const list = document.createElement('div');
+      list.style.display = 'flex';
+      list.style.flexDirection = 'column';
+      list.style.gap = '10px';
+      for (const p of posts) {
+        const postEl = document.createElement('div');
+        postEl.className = 'post';
+        // left (title + meta)
+        const left = document.createElement('div'); left.style.flex = '1';
+        const h4 = document.createElement('h4');
+        const a = document.createElement('a'); a.href = '/post/' + encodeURIComponent(p.id); a.textContent = p.title || '(ไม่มีหัวข้อ)';
+        h4.appendChild(a);
+        const meta = document.createElement('div'); meta.className = 'meta small'; meta.textContent = new Date(p.createdAt).toLocaleString();
+        left.appendChild(h4); left.appendChild(meta);
+        // actions
+        const actions = document.createElement('div'); actions.className = 'post-actions';
+        const view = document.createElement('a'); view.className = 'btn btn-ghost'; view.href = '/post/' + encodeURIComponent(p.id); view.textContent = 'อ่านต่อ';
+        actions.appendChild(view);
+        list.appendChild(postEl);
+        postEl.appendChild(left);
+        postEl.appendChild(actions);
+      }
+      container.appendChild(list);
+    } catch (e) {
+      container.innerHTML = '<div class="small">เกิดข้อผิดพลาดขณะโหลด</div>';
+    }
 })();
 </script>
 </body>
