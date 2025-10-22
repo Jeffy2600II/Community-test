@@ -2,9 +2,9 @@
   "watch": ["server.js"], 
   "ignore": [
     "data/*",
-    "public/*",
+    "public/partial*",
     "views/*",
-    "css/*",
-    "js/*"], 
+    "public/css*",
+    "public/js*"], 
   "ext": "js,json"
 }
