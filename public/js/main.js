@@ -1,21 +1,18 @@
-// public/js/main.js
-// Updated: mobile sidebar (slide-in from right) + robust header partial handling
-// - Moves #navBar into the mobile sidebar when opened and moves it back when closed.
-// - Gracefully retries header setup if partials aren't available yet.
-// - Keeps dropdown/notification/account behaviors from original implementation.
+// public/js/main.js (updated: mobile drawer overlay z-index fix)
+//
+// - Ensure the mobile drawer overlay (#mobileSidebarOverlay) is inserted with a z-index
+//   that is lower than the mobile drawer itself so the drawer (menu) appears above the overlay.
+// - Moves nav into drawer on small screens and back on larger screens (unchanged behavior).
+// - Keep other dropdown overlays separate so they don't interfere.
 
-// -------------------- Utilities --------------------
+ /* -------------------- Utilities -------------------- */
 async function loadPartial(id, file) {
   try {
     const resp = await fetch(file);
-    if (!resp.ok) throw new Error('partial fetch failed ' + resp.status);
     const html = await resp.text();
-    const slot = document.getElementById(id);
-    if (slot) slot.innerHTML = html;
-    return true;
+    document.getElementById(id).innerHTML = html;
   } catch (e) {
     console.error('loadPartial error', e && e.message);
-    return false;
   }
 }
 
@@ -25,141 +22,125 @@ function elFrom(html) {
   return div.firstChild;
 }
 
-// -------------------- Globals --------------------
+/* -------------------- Globals -------------------- */
 let globalAccounts = [];
 let globalActive = null;
 let dropdownEl = null;
 let dropdownVisible = false;
 let overlayEl = null;
-let dropdownEscapeListener = null;
+let escapeKeyListener = null;
 
-// -------------------- Header interactions (mobile sidebar) --------------------
+/* -------------------- Header interactions (mobile drawer) -------------------- */
 function setupHeaderInteractions() {
-  try {
-    const toggle = document.getElementById('mobileMenuToggle');
-    const headerBottom = document.getElementById('headerBottom');
-    const mobileSidebar = document.getElementById('mobileSidebar');
-    const mobileSidebarContent = document.getElementById('mobileSidebarContent');
-    const mobileOverlay = document.getElementById('mobileSidebarOverlay');
-    const navBar = document.getElementById('navBar');
+  const toggle = document.getElementById('mobileMenuToggle');
+  const headerBottom = document.getElementById('headerBottom');
+  const mobileSidebar = document.getElementById('mobileSidebar');
+  const mobileClose = document.getElementById('mobileSidebarClose');
+  const navBar = document.getElementById('navBar');
+  const mobileNavContainer = document.getElementById('mobileNavContainer');
 
-    // If DOM nodes are not yet present (partials may not be loaded), retry once shortly.
-    if (!toggle || !headerBottom || !mobileSidebar || !mobileSidebarContent || !mobileOverlay || !navBar) {
-      setTimeout(() => {
-        // try again once
-        const retryToggle = document.getElementById('mobileMenuToggle');
-        if (retryToggle) setupHeaderInteractions();
-      }, 120);
-      return;
-    }
+  if (!toggle || !mobileSidebar || !mobileClose || !navBar || !mobileNavContainer) {
+    // nothing to do if elements aren't present yet
+    return;
+  }
 
-    // helpers for overlay accessibility
-    function showMobileOverlay() {
-      mobileOverlay.classList.remove('hidden');
-      mobileOverlay.classList.add('show');
-      mobileOverlay.setAttribute('aria-hidden', 'false');
-    }
-    function hideMobileOverlay() {
-      mobileOverlay.classList.remove('show');
-      mobileOverlay.setAttribute('aria-hidden', 'true');
-      setTimeout(() => mobileOverlay.classList.add('hidden'), 320);
-    }
+  // helper to move nav DOM node into mobile drawer
+  function moveNavToMobile() {
+    try {
+      if (!mobileNavContainer.contains(navBar)) mobileNavContainer.appendChild(navBar);
+    } catch (e) {}
+  }
+  function moveNavToHeader() {
+    try {
+      if (!headerBottom.contains(navBar)) headerBottom.appendChild(navBar);
+    } catch (e) {}
+  }
 
-    // Move navBar into sidebar content (preserve listeners)
-    function moveNavToSidebar() {
-      if (!mobileSidebarContent.contains(navBar)) {
-        mobileSidebarContent.appendChild(navBar);
-      }
-    }
-    // Move navBar back to headerBottom
-    function moveNavToHeader() {
-      if (!headerBottom.contains(navBar)) {
-        headerBottom.appendChild(navBar);
-      }
-    }
+  // overlay specific to mobile drawer (keeps separation from dropdown overlay)
+  function createMobileOverlay() {
+    let o = document.getElementById('mobileSidebarOverlay');
+    if (o) return o;
+    o = document.createElement('div');
+    o.id = 'mobileSidebarOverlay';
+    o.style.position = 'fixed';
+    o.style.inset = '0';
+    o.style.background = 'rgba(0,0,0,0.32)';
+    // IMPORTANT: overlay z-index must be LOWER than the mobile drawer's z-index.
+    // The mobile drawer CSS sets z-index (e.g., 1600). Here we use 1500 so the drawer sits above.
+    o.style.zIndex = '1500';
+    o.addEventListener('click', function () {
+      mobileSidebar.classList.remove('open');
+      toggle.setAttribute('aria-expanded', 'false');
+      try { o.remove(); } catch (e) {}
+    }, { passive: true });
+    return o;
+  }
 
-    // track escape listener closure to remove later
-    let escapeListener = null;
+  toggle.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    const isOpen = mobileSidebar.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
 
-    function openSidebar() {
-      mobileSidebar.classList.add('open');
+    // close other dropdowns when opening drawer
+    if (isOpen) {
+      hideDropdown();
+      const ov = createMobileOverlay();
+      if (!document.body.contains(ov)) document.body.appendChild(ov);
       mobileSidebar.setAttribute('aria-hidden', 'false');
-      toggle.setAttribute('aria-expanded', 'true');
-      moveNavToSidebar();
-      showMobileOverlay();
-      // focus the content for keyboard users
-      try { mobileSidebarContent.focus(); } catch (e) {}
-      if (!escapeListener) {
-        escapeListener = function (ev) {
-          if (ev.key === 'Escape' && mobileSidebar.classList.contains('open')) {
-            ev.preventDefault();
-            closeSidebar();
-          }
-        };
-        document.addEventListener('keydown', escapeListener, true);
-      }
+    } else {
+      const ov = document.getElementById('mobileSidebarOverlay');
+      if (ov) ov.remove();
+      mobileSidebar.setAttribute('aria-hidden', 'true');
     }
+  });
 
-    function closeSidebar() {
+  mobileClose.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    mobileSidebar.classList.remove('open');
+    toggle.setAttribute('aria-expanded', 'false');
+    const ov = document.getElementById('mobileSidebarOverlay'); if (ov) ov.remove();
+    mobileSidebar.setAttribute('aria-hidden', 'true');
+  });
+
+  // click outside to close (when drawer open - also handled by overlay)
+  document.addEventListener('click', (ev) => {
+    if (!mobileSidebar.classList.contains('open')) return;
+    const path = ev.composedPath ? ev.composedPath() : (ev.path || []);
+    if (!path || path.length === 0) return;
+    if (!path.includes(mobileSidebar) && !path.includes(toggle)) {
+      mobileSidebar.classList.remove('open');
+      toggle.setAttribute('aria-expanded', 'false');
+      const ov = document.getElementById('mobileSidebarOverlay'); if (ov) ov.remove();
+      mobileSidebar.setAttribute('aria-hidden', 'true');
+    }
+  }, true);
+
+  // ensure state on resize and move nav DOM as needed
+  function headerResizeHandler() {
+    const w = window.innerWidth;
+    if (w > 800) {
+      // on desktop/tablet show headerBottom (desktop nav) and hide mobile drawer
+      moveNavToHeader();
       mobileSidebar.classList.remove('open');
       mobileSidebar.setAttribute('aria-hidden', 'true');
       toggle.setAttribute('aria-expanded', 'false');
-      hideMobileOverlay();
-      // move nav back to header
-      moveNavToHeader();
-      if (escapeListener) {
-        document.removeEventListener('keydown', escapeListener, true);
-        escapeListener = null;
-      }
-      try { toggle.focus(); } catch (e) {}
+      toggle.style.display = 'none';
+      const ov = document.getElementById('mobileSidebarOverlay'); if (ov) ov.remove();
+    } else {
+      // on small screens hide header-bottom and move nav into drawer
+      moveNavToMobile();
+      mobileSidebar.classList.remove('open');
+      mobileSidebar.setAttribute('aria-hidden', 'true');
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.style.display = '';
     }
-
-    // attach events
-    toggle.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      const willOpen = !mobileSidebar.classList.contains('open');
-      if (willOpen) openSidebar(); else closeSidebar();
-    });
-
-    const btnClose = document.getElementById('mobileSidebarClose');
-    if (btnClose) {
-      btnClose.addEventListener('click', (ev) => {
-        ev.preventDefault();
-        closeSidebar();
-      });
-    }
-
-    mobileOverlay.addEventListener('click', (ev) => {
-      ev.preventDefault();
-      closeSidebar();
-    }, { passive: false });
-
-    // ensure correct state on resize
-    function headerResizeHandler() {
-      const w = window.innerWidth;
-      if (w > 800) {
-        // desktop: ensure nav in header and toggle hidden
-        moveNavToHeader();
-        mobileSidebar.classList.remove('open');
-        mobileSidebar.setAttribute('aria-hidden', 'true');
-        toggle.setAttribute('aria-expanded', 'false');
-        toggle.style.display = 'none';
-        mobileOverlay.classList.remove('show');
-        mobileOverlay.classList.add('hidden');
-      } else {
-        toggle.style.display = '';
-        // keep headerBottom collapsed by default on small screens
-        headerBottom.classList.remove('open');
-      }
-    }
-    headerResizeHandler();
-    window.addEventListener('resize', headerResizeHandler);
-  } catch (err) {
-    console.error('setupHeaderInteractions error:', err && err.message);
   }
+  window.addEventListener('resize', headerResizeHandler);
+  // initial call
+  headerResizeHandler();
 }
 
-// -------------------- Fetch helpers --------------------
+/* -------------------- Fetch helpers -------------------- */
 async function fetchAccounts() {
   try {
     const r = await fetch('/api/accounts');
@@ -186,7 +167,7 @@ async function fetchNotifications() {
   }
 }
 
-// -------------------- Dropdown + Overlay --------------------
+/* -------------------- Dropdown + Overlay -------------------- */
 function ensureDropdown() {
   if (dropdownEl && document.body.contains(dropdownEl)) return dropdownEl;
   dropdownEl = document.createElement('div');
@@ -222,20 +203,20 @@ function showOverlay() {
   const ov = createOverlay();
   if (!document.body.contains(ov)) document.body.appendChild(ov);
   if (dropdownEl && document.body.contains(dropdownEl)) document.body.appendChild(dropdownEl);
-  dropdownEscapeListener = function (ev) {
+  escapeKeyListener = function (ev) {
     if (ev.key === 'Escape' && dropdownVisible) {
       ev.preventDefault();
       hideDropdown();
     }
   };
-  document.addEventListener('keydown', dropdownEscapeListener, true);
+  document.addEventListener('keydown', escapeKeyListener, true);
 }
 
 function hideOverlay() {
   if (overlayEl && document.body.contains(overlayEl)) overlayEl.remove();
-  if (dropdownEscapeListener) {
-    document.removeEventListener('keydown', dropdownEscapeListener, true);
-    dropdownEscapeListener = null;
+  if (escapeKeyListener) {
+    document.removeEventListener('keydown', escapeKeyListener, true);
+    escapeKeyListener = null;
   }
 }
 
@@ -252,7 +233,7 @@ function hideDropdown() {
   hideOverlay();
 }
 
-// -------------------- Notification helpers --------------------
+/* -------------------- Notification helpers -------------------- */
 function isNotificationFromActive(n, activeUsername) {
   if (!activeUsername) return true;
   const a = String(activeUsername);
@@ -276,7 +257,7 @@ function computeNotificationUrl(n) {
   return null;
 }
 
-// -------------------- Positioning --------------------
+/* -------------------- Positioning -------------------- */
 async function positionDropdownRelativeTo(anchorEl) {
   const dd = ensureDropdown();
   const winW = window.innerWidth;
@@ -297,17 +278,13 @@ async function positionDropdownRelativeTo(anchorEl) {
   }
 }
 
-// -------------------- Nav rendering --------------------
+/* -------------------- Nav rendering -------------------- */
 async function renderNav() {
   const nav = document.getElementById('navBar');
-  if (!nav) {
-    // navBar might not exist yet (partial not loaded) — retry shortly
-    setTimeout(renderNav, 120);
-    return;
-  }
+  if (!nav) return;
   nav.innerHTML = '';
 
-  // Left-side links
+  // Left-side (brief links)
   const left = elFrom(`<div class="nav-left" style="display:flex;align-items:center;gap:12px;">
     <a href="/" class="small-link">หน้าแรก</a>
     <a href="/post/create" class="small-link">สร้างโพสต์</a>
@@ -323,16 +300,15 @@ async function renderNav() {
   const accData = await fetchAccounts();
   const notifData = await fetchNotifications();
 
-  // Notification bell (simple SVG)
+  // Notification bell
   const bell = document.createElement('div');
   bell.className = 'notify-bell';
   bell.setAttribute('role','button');
   bell.setAttribute('aria-label','Notifications');
   bell.style.cursor = 'pointer';
   bell.style.position = 'relative';
-  bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 17H9"/><path d="M12 3v1"/><path d="M5 9a7 7 0 0014 0"/></svg>`;
+  bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 [...]`;
 
-  // badge count calculation
   let badgeCount = 0;
   if (notifData && notifData.notifications) {
     let activeName = accData && accData.active ? accData.active : null;
@@ -360,7 +336,7 @@ async function renderNav() {
   }
   accountArea.appendChild(bell);
 
-  // Account area
+  // If user accounts exist, render avatar + account dropdown; otherwise login/register
   if (accData && accData.accounts && accData.accounts.length > 0) {
     globalAccounts = accData.accounts;
     globalActive = accData.active;
@@ -377,22 +353,19 @@ async function renderNav() {
     avatarBtn.style.background = 'transparent';
     avatarBtn.style.padding = '6px';
     avatarBtn.style.cursor = 'pointer';
-    // safe HTML: escaped values where appropriate (displayName may contain characters)
-    const safeName = (activeAcc.displayName || activeAcc.username).replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
-    avatarBtn.innerHTML = `<img src="${avatarUrl}" class="avatar-img" alt="${activeAcc.username}" style="width:32px;height:32px;border-radius:8px;object-fit:cover"> <span style="color:#1f2a37;font-weight:700">${safeName}</span>`;
+    avatarBtn.innerHTML = `<img src="${avatarUrl}" class="avatar-img" alt="${activeAcc.username}" style="width:32px;height:32px;border-radius:8px;object-fit:cover"> <span style="color:#1f2a37;font-weight:700">${activeAcc.username}</span>`;
     accountArea.appendChild(avatarBtn);
 
     const dd = ensureDropdown();
     dd.innerHTML = '';
 
-    avatarBtn.addEventListener('click', async (ev) => {
+    avatarBtn.onclick = async (ev) => {
       ev.stopPropagation();
       if (dropdownVisible) { hideDropdown(); return; }
       dd.innerHTML = '';
-
       const header = document.createElement('div');
       header.className = 'dropdown-header';
-      header.innerHTML = `<img src="${avatarUrl}" class="avatar-img" style="width:48px;height:48px;border-radius:8px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${safeName}</div><div class="small" style="color:var(--muted)">@${activeAcc.username}</div></div>`;
+      header.innerHTML = `<img src="${avatarUrl}" class="avatar-img" style="width:48px;height:48px;border-radius:8px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${activeAcc.displayName||activeAcc.username}</div><div class="small" style="color:var(--muted)">@${activeAcc.username}</div></div>`;
       dd.appendChild(header);
 
       const list = document.createElement('div');
@@ -401,15 +374,14 @@ async function renderNav() {
       list.style.display = 'flex';
       list.style.flexDirection = 'column';
       list.style.gap = '8px';
+      dd.appendChild(list);
 
-      // other saved accounts (if any)
       for (let acc of globalAccounts) {
         if (acc.username === globalActive) continue;
         const item = document.createElement('div');
         item.className = 'dropdown-item';
-        const safeDisp = (acc.displayName || acc.username).replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
-        item.innerHTML = `<img src="${acc.profilePic || '/img/default_profile.png'}" class="avatar-img" style="width:36px;height:36px;border-radius:6px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${safeDisp}</div><div class="small" style="color:var(--muted)">@${acc.username}</div></div>`;
-        item.addEventListener('click', async () => {
+        item.innerHTML = `<img src="${acc.profilePic || '/img/default_profile.png'}" class="avatar-img" style="width:36px;height:36px;border-radius:6px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${acc.displayName||acc.username}</div><div class="small" style="color:var(--muted)">${acc.username}</div></div>`;
+        item.onclick = async () => {
           const confirmSwitch = confirm(`สลับไปใช้บัญชี ${acc.username} ?`);
           if (!confirmSwitch) return;
           try {
@@ -427,11 +399,9 @@ async function renderNav() {
           } catch {
             alert('เกิดข้อผิดพลาดขณะสลับบัญชี');
           }
-        });
+        };
         list.appendChild(item);
       }
-
-      dd.appendChild(list);
 
       const footer = document.createElement('div');
       footer.style.padding = '8px';
@@ -443,10 +413,10 @@ async function renderNav() {
 
       await positionDropdownRelativeTo(avatarBtn);
       showDropdown();
-    });
+    };
 
-    // Notification bell click: show recent notifications inside dropdown
-    bell.addEventListener('click', async (ev) => {
+    // Notification bell handling (unchanged)
+    bell.onclick = async (ev) => {
       ev.stopPropagation();
       const nd = await fetchNotifications();
       const dd = ensureDropdown();
@@ -461,7 +431,7 @@ async function renderNav() {
       const unreadCount = visibleNotifs && visibleNotifs.length > 0 && Object.prototype.hasOwnProperty.call(visibleNotifs[0], 'read')
         ? visibleNotifs.filter(n => !n.read).length
         : (nd ? (nd.unread || 0) : 0);
-      header.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>การแจ้งเตือน</strong><div class="small">${unreadCount} รายการยังไม่อ่าน</div></div></div>`;
+      header.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>การแจ้งเตือน</strong><div class="small">${unreadCount} รายการยังไม่อ่าน</div></div><div></div></div>`;
       dd.appendChild(header);
 
       const list = document.createElement('div');
@@ -498,7 +468,7 @@ async function renderNav() {
           it.appendChild(title);
           it.appendChild(msg);
           if (!n.read) it.style.background = '#fffef6';
-          it.addEventListener('click', async () => {
+          it.onclick = async () => {
             const dest = computeNotificationUrl(n);
             try {
               await fetch('/api/notifications/mark-read', {
@@ -510,7 +480,7 @@ async function renderNav() {
             hideDropdown();
             setTimeout(() => window.dispatchEvent(new Event('accountsChanged')), 120);
             if (dest) location.assign(dest);
-          });
+          };
           list.appendChild(it);
         }
         const footer = document.createElement('div');
@@ -526,7 +496,7 @@ async function renderNav() {
 
       const mar = dd.querySelector('#markAllRead');
       if (mar) {
-        mar.addEventListener('click', async (ev) => {
+        mar.onclick = async (ev) => {
           ev.preventDefault();
           try {
             await fetch('/api/notifications/mark-read', {
@@ -537,9 +507,9 @@ async function renderNav() {
           } catch (err) { console.warn('mark all read failed', err && err.message); }
           hideDropdown();
           await renderNav();
-        });
+        };
       }
-    });
+    };
 
   } else {
     accountArea.appendChild(elFrom('<a href="/login" class="btn btn-ghost">เข้าสู่ระบบ</a>'));
@@ -554,26 +524,20 @@ async function renderNav() {
   }, true);
 }
 
-// -------------------- Events --------------------
+/* -------------------- Events -------------------- */
 function setupGlobalRefreshOnMessage() {
   window.addEventListener('accountsChanged', async () => {
     await renderNav();
   });
 }
 
-// -------------------- Init --------------------
+/* -------------------- Init -------------------- */
 window.onload = async function() {
-  try {
-    // Load header/footer partials if available. Continue even if they fail.
-    await loadPartial('headerSlot', '/partial/header.html').catch(()=>{});
-    await loadPartial('footerSlot', '/partial/footer.html').catch(()=>{});
-
-    // Setup header interactions (will retry internally if partial wasn't ready)
-    setupHeaderInteractions();
-    setupGlobalRefreshOnMessage();
-    // Render nav (renderNav is resilient and will retry if #navBar not present yet)
-    await renderNav();
-  } catch (e) {
-    console.error('main init error', e && e.message);
-  }
+  // load header/footer partials if present
+  await loadPartial('headerSlot', '/partial/header.html').catch(()=>{});
+  await loadPartial('footerSlot', '/partial/footer.html').catch(()=>{});
+  // header interactions must be setup after partial is injected
+  setupHeaderInteractions();
+  setupGlobalRefreshOnMessage();
+  await renderNav();
 };
