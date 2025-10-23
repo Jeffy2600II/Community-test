@@ -22,7 +22,20 @@ const username = location.pathname.split('/')[2];
     const pr2 = await fetch('/api/user/' + username + '/posts');
     const { posts } = await pr2.json();
     let postlist = '';
-    postlist += posts.length ? posts.map(p=>`<div class="post" style="padding:10px 12px;margin-bottom:8px;"><div style="flex:1"><h4 style="margin:0"><a href="/post/${p.id}">${p.title}</a></h4><div class="small">${new Date(p.createdAt).toLocaleString()}</div></div></div>`).join('') : '<i class="small">ยังไม่มีโพสต์</i>';
+    // Show excerpt from content instead of title
+    if (!posts || posts.length === 0) {
+      postlist = '<i class="small">ยังไม่มีโพสต์</i>';
+    } else {
+      for (const p of posts) {
+        const excerpt = (p.content || '').slice(0,220) + ((p.content||'').length > 220 ? '...' : '');
+        postlist += `<div class="post" style="padding:10px 12px;margin-bottom:8px;">
+          <div style="flex:1">
+            <h4 style="margin:0"><a href="/post/${p.id}">${excerpt}</a></h4>
+            <div class="small">${new Date(p.createdAt).toLocaleString()}</div>
+          </div>
+        </div>`;
+      }
+    }
     document.getElementById('userPosts').innerHTML = postlist;
 })();
 </script>
