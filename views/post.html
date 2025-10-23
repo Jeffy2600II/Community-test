@@ -36,9 +36,11 @@ async function loadPost() {
     if (!data.success) return document.getElementById('postBox').innerText = 'ไม่พบโพสต์';
     const { post, comments, owner, myUsername: apiUsername } = data;
     myUsername = apiUsername;
+    // Title removed: show the full content as the main body.
     let html = `<header class="row" style="justify-content:space-between;align-items:flex-start;">
       <div>
-        <h2 style="margin:0 0 6px 0">${post.title}</h2>
+        <!-- Show a short lead extracted from content as a visual heading (first line) -->
+        <div style="font-size:1.25rem;font-weight:700;margin-bottom:6px;">${(post.content || '').split('\\n')[0].slice(0,200)}</div>
         <div class="small">โดย <a href="/user/${post.username}">${post.username}</a> • ${new Date(post.createdAt).toLocaleString()}</div>
       </div>
       <div class="row">
