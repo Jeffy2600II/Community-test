@@ -1,11 +1,11 @@
-// public/js/main.js (updated: header mobile toggle + original nav logic + right-side mobile off-canvas sidebar)
-// - เพิ่มการจัดการ mobile menu toggle (id: mobileMenuToggle) เพื่อเปิด/ปิด headerBottom บนเดสก์ท็อป/แท็บเล็ต
-// - บนมือถือ (<=800px) ปุ่มจะเปิด sidebar ทางขวา (#mobileSidebar) พร้อม overlay (#mobileSidebarOverlay)
-// - เมื่อเปิด mobile sidebar จะปิด dropdowns อื่น ๆ เพื่อหลีกเลี่ยงการทับกัน
-// - renderNav ยังคงสร้าง nav หลัก แต่จะสำเนา/ปรับรูปแบบสั้น ๆ ไปยัง #mobileSidebarNav เพื่อแสดงใน sidebar
-// - ฟังก์ชัน dropdown/overlay เดิมถูกเก็บไว้และทำงานร่วมกันได้
+// public/js/main.js (updated: header mobile toggle -> mobile sidebar + overlay)
+//
+// - mobileMenuToggle now opens a right-side sidebar overlay on small screens.
+// - The navBar element is moved into the sidebar when opened and moved back when closed.
+// - Overlay click, Escape key, and close button close the sidebar.
+// - Desktop behavior unchanged: navBar remains in headerBottom.
 
-/* -------------------- Utilities -------------------- */
+ /* -------------------- Utilities -------------------- */
 async function loadPartial(id, file) {
   try {
     const resp = await fetch(file);
@@ -30,150 +30,123 @@ let dropdownVisible = false;
 let overlayEl = null;
 let escapeKeyListener = null;
 
-/* -------------------- Header interactions (mobile + sidebar) -------------------- */
+/* -------------------- Header interactions (mobile) -------------------- */
 function setupHeaderInteractions() {
   const toggle = document.getElementById('mobileMenuToggle');
   const headerBottom = document.getElementById('headerBottom');
-  const mobileSidebarClose = document.getElementById('mobileSidebarClose');
+  const mobileSidebar = document.getElementById('mobileSidebar');
+  const mobileSidebarContent = document.getElementById('mobileSidebarContent');
   const mobileOverlay = document.getElementById('mobileSidebarOverlay');
-  const sidebar = document.getElementById('mobileSidebar');
-  if (!toggle) return;
+  const navBar = document.getElementById('navBar');
 
-  // On small screens headerBottom is hidden by default (CSS). Toggle acts depending on width:
-  // - >800px: toggle headerBottom
-  // - <=800px: open/close right-side mobile sidebar
+  if (!toggle || !mobileSidebar || !mobileOverlay || !navBar) return;
+
+  // helper to show overlay
+  function showMobileOverlay() {
+    mobileOverlay.classList.remove('hidden');
+    mobileOverlay.classList.add('show');
+    mobileOverlay.setAttribute('aria-hidden', 'false');
+  }
+  function hideMobileOverlay() {
+    mobileOverlay.classList.remove('show');
+    mobileOverlay.setAttribute('aria-hidden', 'true');
+    // keep hidden class for accessibility after small delay (to let transition finish)
+    setTimeout(() => mobileOverlay.classList.add('hidden'), 350);
+  }
+
+  // Move navBar into sidebar (preserve element and event listeners)
+  function moveNavToSidebar() {
+    if (!mobileSidebarContent.contains(navBar)) {
+      mobileSidebarContent.appendChild(navBar);
+    }
+  }
+  // Move navBar back to headerBottom
+  function moveNavToHeader() {
+    if (!headerBottom.contains(navBar)) {
+      headerBottom.appendChild(navBar);
+    }
+  }
+
+  // open/close handlers
+  function openSidebar() {
+    mobileSidebar.classList.add('open');
+    mobileSidebar.setAttribute('aria-hidden', 'false');
+    toggle.setAttribute('aria-expanded', 'true');
+    moveNavToSidebar();
+    showMobileOverlay();
+    // focus for keyboard users
+    const content = mobileSidebarContent;
+    if (content) content.focus();
+    // Escape key closes it
+    if (!escapeKeyListener) {
+      escapeKeyListener = function (ev) {
+        if (ev.key === 'Escape' && mobileSidebar.classList.contains('open')) {
+          ev.preventDefault();
+          closeSidebar();
+        }
+      };
+      document.addEventListener('keydown', escapeKeyListener, true);
+    }
+  }
+  function closeSidebar() {
+    mobileSidebar.classList.remove('open');
+    mobileSidebar.setAttribute('aria-hidden', 'true');
+    toggle.setAttribute('aria-expanded', 'false');
+    hideMobileOverlay();
+    // move nav back to header
+    moveNavToHeader();
+    // remove escape handler
+    if (escapeKeyListener) {
+      document.removeEventListener('keydown', escapeKeyListener, true);
+      escapeKeyListener = null;
+    }
+    // restore focus to toggle for accessibility
+    try { toggle.focus(); } catch (e) {}
+  }
+
+  // toggle button behavior
   toggle.addEventListener('click', (ev) => {
     ev.stopPropagation();
-    const w = window.innerWidth;
-    if (w > 800) {
-      if (!headerBottom) return;
-      const isOpen = headerBottom.classList.toggle('open');
-      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-      if (isOpen) {
-        hideDropdown();
-      }
-    } else {
-      // mobile behavior: right-side sidebar
-      if (!sidebar) return;
-      const isOpen = sidebar.classList.toggle('open');
-      sidebar.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
-      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-      if (isOpen) {
-        // show overlay and prevent body scroll
-        if (mobileOverlay) {
-          mobileOverlay.classList.remove('hidden');
-          mobileOverlay.classList.add('show');
-          mobileOverlay.setAttribute('aria-hidden', 'false');
-        }
-        document.body.style.overflow = 'hidden';
-        hideDropdown();
-        escapeKeyListener = function (ev) {
-          if (ev.key === 'Escape') { ev.preventDefault(); closeMobileSidebar(); }
-        };
-        document.addEventListener('keydown', escapeKeyListener, true);
-      } else {
-        if (mobileOverlay) {
-          mobileOverlay.classList.add('hidden');
-          mobileOverlay.classList.remove('show');
-          mobileOverlay.setAttribute('aria-hidden', 'true');
-        }
-        document.body.style.overflow = '';
-        if (escapeKeyListener) {
-          document.removeEventListener('keydown', escapeKeyListener, true);
-          escapeKeyListener = null;
-        }
-      }
-    }
+    const isOpen = mobileSidebar.classList.toggle('open');
+    if (isOpen) openSidebar(); else closeSidebar();
   });
 
-  // close sidebar via close button
-  if (mobileSidebarClose) {
-    mobileSidebarClose.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      closeMobileSidebar();
-      if (toggle) toggle.setAttribute('aria-expanded', 'false');
+  // close button inside sidebar
+  const btnClose = document.getElementById('mobileSidebarClose');
+  if (btnClose) {
+    btnClose.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      closeSidebar();
     });
   }
 
   // overlay click closes sidebar
-  if (mobileOverlay) {
-    mobileOverlay.addEventListener('click', (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      closeMobileSidebar();
-      if (toggle) toggle.setAttribute('aria-expanded', 'false');
-    }, { passive: false });
-  }
+  mobileOverlay.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    closeSidebar();
+  }, { passive: false });
 
-  // close headerBottom / sidebar when clicking outside
-  document.addEventListener('click', (ev) => {
-    if (headerBottom && headerBottom.classList.contains('open') && window.innerWidth > 800) {
-      const path = ev.composedPath ? ev.composedPath() : (ev.path || []);
-      if (!path || path.length === 0) return;
-      if (!path.includes(headerBottom) && !path.includes(toggle)) {
-        headerBottom.classList.remove('open');
-        toggle.setAttribute('aria-expanded', 'false');
-      }
-    }
-    // if sidebar open and click outside -> close (overlay handles most cases)
-    const sb = document.getElementById('mobileSidebar');
-    if (sb && sb.classList.contains('open') && window.innerWidth <= 800) {
-      const path = ev.composedPath ? ev.composedPath() : (ev.path || []);
-      if (!path || path.length === 0) return;
-      if (!path.includes(sb) && !path.includes(toggle) && !path.includes(document.getElementById('mobileSidebarOverlay'))) {
-        closeMobileSidebar();
-        if (toggle) toggle.setAttribute('aria-expanded', 'false');
-      }
-    }
-  }, true);
-
-  // ensure headerBottom state on resize
+  // ensure sidebar closed on resize to wider screens and nav restored
   function headerResizeHandler() {
     const w = window.innerWidth;
     if (w > 800) {
-      // on desktop/tablet show headerBottom
-      if (headerBottom) {
-        headerBottom.classList.add('open');
-      }
-      if (toggle) {
-        toggle.setAttribute('aria-expanded', 'true');
-        toggle.style.display = 'none';
-      }
-      // ensure sidebar closed
-      closeMobileSidebar();
+      // on desktop/tablet ensure nav is in headerBottom and toggle hidden
+      moveNavToHeader();
+      mobileSidebar.classList.remove('open');
+      mobileSidebar.setAttribute('aria-hidden', 'true');
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.style.display = 'none';
+      mobileOverlay.classList.remove('show');
+      mobileOverlay.classList.add('hidden');
     } else {
-      // on small screens hide headerBottom by default, show toggle
-      if (headerBottom) headerBottom.classList.remove('open');
-      if (toggle) {
-        toggle.setAttribute('aria-expanded', 'false');
-        toggle.style.display = '';
-      }
-      // ensure sidebar closed initially
-      closeMobileSidebar();
+      // show toggle on small screens
+      toggle.style.display = '';
+      // keep headerBottom collapsed by default (we rely on sidebar for menu)
+      headerBottom.classList.remove('open');
     }
   }
   window.addEventListener('resize', headerResizeHandler);
-  // initial call
   headerResizeHandler();
-}
-
-/* -------------------- Mobile sidebar helpers -------------------- */
-function closeMobileSidebar() {
-  const sb = document.getElementById('mobileSidebar');
-  const ov = document.getElementById('mobileSidebarOverlay');
-  const toggle = document.getElementById('mobileMenuToggle');
-  if (!sb || !ov) return;
-  sb.classList.remove('open');
-  sb.setAttribute('aria-hidden', 'true');
-  ov.classList.add('hidden');
-  ov.classList.remove('show');
-  ov.setAttribute('aria-hidden', 'true');
-  document.body.style.overflow = '';
-  if (escapeKeyListener) {
-    document.removeEventListener('keydown', escapeKeyListener, true);
-    escapeKeyListener = null;
-  }
-  if (toggle) toggle.setAttribute('aria-expanded', 'false');
 }
 
 /* -------------------- Fetch helpers -------------------- */
@@ -343,8 +316,7 @@ async function renderNav() {
   bell.setAttribute('aria-label','Notifications');
   bell.style.cursor = 'pointer';
   bell.style.position = 'relative';
-  bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path></svg>`;
-
+  bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 [...]
   let badgeCount = 0;
   if (notifData && notifData.notifications) {
     let activeName = accData && accData.active ? accData.active : null;
@@ -401,7 +373,7 @@ async function renderNav() {
       dd.innerHTML = '';
       const header = document.createElement('div');
       header.className = 'dropdown-header';
-      header.innerHTML = `<img src="${avatarUrl}" class="avatar-img" style="width:48px;height:48px;border-radius:8px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${activeAcc.displayName || activeAcc.username}</div><div class="small" style="color:var(--muted)">${activeAcc.username}</div></div>`;
+      header.innerHTML = `<img src="${avatarUrl}" class="avatar-img" style="width:48px;height:48px;border-radius:8px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${activeAcc.disp[...]
       dd.appendChild(header);
 
       const list = document.createElement('div');
@@ -416,7 +388,7 @@ async function renderNav() {
         if (acc.username === globalActive) continue;
         const item = document.createElement('div');
         item.className = 'dropdown-item';
-        item.innerHTML = `<img src="${acc.profilePic || '/img/default_profile.png'}" class="avatar-img" style="width:36px;height:36px;border-radius:6px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${acc.displayName || acc.username}</div><div class="small" style="color:var(--muted)">${acc.username}</div></div>`;
+        item.innerHTML = `<img src="${acc.profilePic || '/img/default_profile.png'}" class="avatar-img" style="width:36px;height:36px;border-radius:6px;object-fit:cover"><div style="flex:1"><div style[...]
         item.onclick = async () => {
           const confirmSwitch = confirm(`สลับไปใช้บัญชี ${acc.username} ?`);
           if (!confirmSwitch) return;
@@ -467,7 +439,7 @@ async function renderNav() {
       const unreadCount = visibleNotifs && visibleNotifs.length > 0 && Object.prototype.hasOwnProperty.call(visibleNotifs[0], 'read')
         ? visibleNotifs.filter(n => !n.read).length
         : (nd ? (nd.unread || 0) : 0);
-      header.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>การแจ้งเตือน</strong><div class="small">${unreadCount} รายการยังไม่อ่าน</div></div></div>`;
+      header.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>การแจ้งเตือน</strong><div class="small">${unreadCount} รา[...]
       dd.appendChild(header);
 
       const list = document.createElement('div');
@@ -558,38 +530,6 @@ async function renderNav() {
   document.addEventListener('click', function () {
     if (dropdownVisible) hideDropdown();
   }, true);
-
-  // mirror nav into mobile sidebar for small screens (vertical layout)
-  try {
-    const mobileNav = document.getElementById('mobileSidebarNav');
-    if (mobileNav) {
-      mobileNav.innerHTML = '';
-      // clone only the left links and accountArea, sanitized for vertical layout
-      const leftClone = left.cloneNode(true);
-      leftClone.style.display = 'flex';
-      leftClone.style.flexDirection = 'column';
-      leftClone.querySelectorAll('a').forEach(a => { a.style.display = 'block'; a.style.padding = '10px 12px'; a.style.borderRadius = '10px'; });
-
-      const acctClone = accountArea.cloneNode(true);
-      // tidy cloned account area: remove event handlers (they won't be cloned), make items block-level
-      acctClone.querySelectorAll('button, a, .avatar-img').forEach(el => {
-        el.removeAttribute('onclick');
-        el.style.display = 'block';
-        if (el.tagName === 'IMG') el.style.width = '48px';
-      });
-
-      mobileNav.appendChild(leftClone);
-      mobileNav.appendChild(acctClone);
-
-      // add quick links for accounts & notifications as shortcuts
-      const extras = document.createElement('div');
-      extras.style.paddingTop = '8px';
-      extras.innerHTML = `<a href="/accounts" class="small-link" style="display:block;padding:10px 12px;border-radius:10px;">จัดการบัญชี</a><a href="/notifications" class="small-link" style="display:block;padding:10px 12px;border-radius:10px;margin-top:6px;">การแจ้งเตือน</a>`;
-      mobileNav.appendChild(extras);
-    }
-  } catch (e) {
-    console.warn('mirror to mobileSidebarNav failed', e && e.message);
-  }
 }
 
 /* -------------------- Events -------------------- */
@@ -608,8 +548,4 @@ window.onload = async function() {
   setupHeaderInteractions();
   setupGlobalRefreshOnMessage();
   await renderNav();
-
-  // attach close handler to mobile sidebar close control (in case renderNav ran earlier)
-  const mobileSidebarClose = document.getElementById('mobileSidebarClose');
-  if (mobileSidebarClose) mobileSidebarClose.addEventListener('click', () => { closeMobileSidebar(); });
 };
