@@ -13,10 +13,9 @@
       <div class="card">
         <div class="section-title"><span>สร้างโพสต์ใหม่</span></div>
         <form id="postForm" enctype="multipart/form-data">
-            <label class="small">หัวข้อ</label>
-            <input type="text" name="title" placeholder="หัวข้อ" required>
+            <!-- หัวข้อถูกเอาออก: ใช้ textarea เพียงช่องเดียวสำหรับเนื้อหา -->
             <label class="small">เนื้อหา</label>
-            <textarea name="content" placeholder="เนื้อหา" required></textarea>
+            <textarea name="content" placeholder="เขียนสิ่งที่คุณต้องการแบ่งปันที่นี่..." required></textarea>
             <div class="input-file mt-16">
               <label class="btn btn-ghost">
                 แนบรูป (ถ้ามี) <input type="file" name="postImage">
@@ -36,6 +35,7 @@
 document.getElementById('postForm').onsubmit = async e => {
     e.preventDefault();
     const fd = new FormData(e.target);
+    // backend now accepts posts without title; content is required
     const res = await fetch('/api/post/create', {
         method: 'POST',
         body: fd
