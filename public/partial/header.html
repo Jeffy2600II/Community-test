@@ -1,6 +1,6 @@
 <header class="site-header" role="banner">
   <div class="container header-inner">
-    <!-- Top row: logo + mobile toggles -->
+    <!-- Top row: logo + mobile toggle -->
     <div class="header-top" role="presentation">
       <a class="logo" href="/" aria-label="COMMUNITY home">
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden="true" class="logo-mark" focusable="false">
@@ -13,25 +13,16 @@
         </div>
       </a>
 
-      <div style="display:flex;align-items:center;gap:8px;">
-        <!-- Sidebar toggle (mobile) - new: opens off-canvas sidebar on small screens -->
-        <button id="mobileSidebarToggle" class="btn btn-icon" aria-expanded="false" aria-controls="mobileSidebar" aria-label="Toggle sidebar" title="เมนู">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1f2a37" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M3 12h18M3 6h18M3 18h18"></path>
-          </svg>
-        </button>
-
-        <!-- Mobile menu toggle: toggles header-bottom (search/actions) as before -->
-        <button id="mobileMenuToggle" class="btn btn-icon" aria-expanded="false" aria-controls="headerBottom" aria-label="Toggle menu" title="ค้นหา/การตั้งค่า">
-          <!-- hamburger icon (slightly different intent) -->
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1f2a37" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M4 7h16M4 12h16M4 17h16"></path>
-          </svg>
-        </button>
-      </div>
+      <!-- Mobile menu toggle: appears on small screens and toggles mobile sidebar -->
+      <button id="mobileMenuToggle" class="btn btn-icon" aria-expanded="false" aria-controls="mobileSidebar" aria-label="Toggle menu">
+        <!-- simple hamburger icon -->
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1f2a37" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 7h16M4 12h16M4 17h16"></path>
+        </svg>
+      </button>
     </div>
 
-    <!-- Bottom row: search + dynamic nav/actions (this will be toggled on mobile) -->
+    <!-- Bottom row: search + dynamic nav/actions (desktop / tablet) -->
     <div id="headerBottom" class="header-bottom" role="navigation" aria-label="Site actions">
       <div class="header-search" role="search" aria-label="Site search">
         <form onsubmit="event.preventDefault(); const q=this.query.value.trim(); if(q) location.href='/search?q='+encodeURIComponent(q);">
@@ -44,15 +35,20 @@
       <div id="navBar" class="header-actions" aria-hidden="false"></div>
     </div>
   </div>
-</header>
 
-<!-- Mobile off-canvas sidebar container (new) -->
-<aside id="mobileSidebar" class="mobile-sidebar" aria-hidden="true" role="dialog" aria-label="Mobile menu">
-  <div class="mobile-sidebar-inner" tabindex="-1" role="document">
-    <!-- navBar will be moved here in JS on mobile; fallback content -->
-    <nav class="sidebar-fallback" aria-hidden="true">
-      <a href="/" class="small-link">หน้าแรก</a>
-      <a href="/post/create" class="small-link">สร้างโพสต์</a>
-    </nav>
+  <!-- Mobile sidebar (slides in from right) -->
+  <div id="mobileSidebar" class="mobile-sidebar" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="mobile-sidebar-panel" role="document">
+      <div class="mobile-sidebar-header row" style="justify-content:space-between;align-items:center;">
+        <div style="font-weight:700;">เมนู</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button id="mobileSidebarClose" class="btn btn-ghost" aria-label="ปิดเมนู">ปิด</button>
+        </div>
+      </div>
+      <div id="mobileSidebarContent" class="mobile-sidebar-content" tabindex="0"></div>
+    </div>
   </div>
-</aside>
+
+  <!-- overlay that appears beneath the sidebar (covers page) -->
+  <div id="mobileSidebarOverlay" class="mobile-sidebar-overlay hidden" aria-hidden="true"></div>
+</header>
