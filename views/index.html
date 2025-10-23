@@ -6,8 +6,8 @@
   <title>Community Home</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
-    /* Simple safe visual styles for feed content */
-    .post { position: relative; padding: 12px; border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; }
+    /* Feed & content visuals */
+    .post { position: relative; padding: 12px; border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); }
     .post-header { display:flex; align-items:center; gap:12px; width:100%; }
     .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit: cover; }
     .post-header-meta { display:flex; flex-direction:column; gap:2px; min-width:0; }
@@ -15,19 +15,30 @@
     .post-time { color:var(--muted); font-size:0.88rem; }
 
     .post-body { margin-top:10px; line-height:1.55; }
-    .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
+    .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; cursor: pointer; }
     .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; }
 
     /* Kebab and popup (left side) */
     .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; }
-    .post-popup { position:absolute; left:8px; top:46px; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); min-width:160px; z-index:2200; overflow:hidden; }
+    .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
+    .post-popup { position:absolute; left:8px; top:44px; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); min-width:160px; z-index:2200; overflow:hidden; }
     .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
     .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
 
-    /* ensure actions area hidden in-feed (we use popup instead) */
+    /* Hide inline actions in feed (we use popup) */
     .post-actions { display:none; }
 
-    /* small responsive tweak */
+    /* Excerpt clamp for long posts (if you want CSS clamp instead of JS truncation) */
+    .post-excerpt a.post-link {
+      color: inherit;
+      text-decoration: none;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      -webkit-line-clamp: 5;
+    }
+
     @media (max-width:560px) {
       .post-username a { max-width:140px; }
     }
@@ -49,9 +60,12 @@
 
   <div id="footerSlot"></div>
 
+  <!-- main.js ต้องถูกโหลดเพื่อเติม partial header/footer และจัดการ header interactions -->
+  <script src="/js/main.js"></script>
+
   <script>
   (function () {
-    // Small helper to escape HTML then replace newlines with <br>
+    // Escape HTML and preserve line breaks as <br>
     function escapeAndFormat(text) {
       if (text === null || text === undefined) return '';
       const s = String(text)
@@ -60,22 +74,20 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-      // preserve line breaks
       return s.replace(/\r\n|\r|\n/g, '<br>');
     }
 
-    // Truncate to approx N characters (preserve words)
+    // Truncate to approx N chars without cutting words awkwardly
     function truncateText(str, max) {
       if (!str) return '';
       if (str.length <= max) return str;
-      // try not to cut mid-word
       const sub = str.slice(0, max);
       const lastSpace = sub.lastIndexOf(' ');
       if (lastSpace > Math.floor(max * 0.6)) return sub.slice(0, lastSpace) + '...';
       return sub + '...';
     }
 
-    // Load current logged-in username (if any) to know owner actions
+    // Load logged-in username (if any)
     async function loadMyUsername() {
       try {
         const pr = await fetch('/api/profile');
@@ -95,11 +107,9 @@
     }
 
     function attachGlobalPopupHandlers() {
-      // close on outside click
       document.addEventListener('click', function (ev) {
         if (!ev.target.closest('.post-popup') && !ev.target.closest('.post-kebab')) closePopup();
       }, true);
-      // close on Escape
       document.addEventListener('keydown', function (ev) {
         if (ev.key === 'Escape') closePopup();
       });
@@ -129,7 +139,6 @@
       }
 
       for (const post of posts) {
-        // Build DOM nodes so textContent/innerHTML handled safely
         const art = document.createElement('article');
         art.className = 'post';
         art.dataset.postId = post.id;
@@ -159,7 +168,6 @@
         const img = document.createElement('img');
         img.className = 'avatar-img';
         img.alt = post.username || '';
-        // unique id to update later
         img.id = 'avatar-' + (post.username || 'u') + '-' + (post.id || 'x');
         img.src = '/img/default_profile.png';
         avatarLink.appendChild(img);
@@ -187,16 +195,13 @@
         const body = document.createElement('div');
         body.className = 'post-body';
 
-        // content: show full-ish content (truncated by JS), formatted newlines
+        // content
         const fullContent = post.content || '';
-        const truncated = truncateText(fullContent, 1000); // show up to ~1000 chars in feed, then ...
+        const truncated = truncateText(fullContent, 1000);
         const formatted = escapeAndFormat(truncated);
         const contentDiv = document.createElement('div');
         contentDiv.className = 'post-content';
-        // use innerHTML because we replaced newlines with <br> safely
         contentDiv.innerHTML = formatted;
-        // make content clickable to go to post page
-        contentDiv.style.cursor = 'pointer';
         contentDiv.addEventListener('click', function () {
           window.location.href = '/post/' + encodeURIComponent(post.id);
         });
@@ -212,30 +217,27 @@
           body.appendChild(im);
         }
 
-        // hidden actions placeholder (we moved actions to popup)
+        // hidden actions placeholder
         const actions = document.createElement('div');
         actions.className = 'post-actions';
         body.appendChild(actions);
 
         art.appendChild(body);
-
         feedEl.appendChild(art);
       }
 
-      // after DOM created, load avatars async and wire kebab popup behavior
+      // after DOM created, load avatars and wire kebab
       loadAvatarsAndWireKebab(myUsername);
     }
 
     async function loadAvatarsAndWireKebab(myUsername) {
-      // update avatars
       const avatarImgs = Array.from(document.querySelectorAll('img[id^="avatar-"]'));
       const seen = new Set();
       for (const img of avatarImgs) {
         const parts = img.id.split('-');
-        // id format avatar-<username>-<postid>
         if (parts.length < 3) continue;
         const username = parts.slice(1, parts.length - 1).join('-');
-        if (seen.has(username)) continue; // avoid duplicate fetches per username
+        if (seen.has(username)) continue;
         seen.add(username);
         (async () => {
           try {
@@ -243,7 +245,6 @@
             if (!up.ok) return;
             const ud = await up.json();
             if (ud && ud.success && ud.profile && ud.profile.profilePic) {
-              // set for all imgs that match username
               document.querySelectorAll('img[id^="avatar-' + username + '"]').forEach(i => {
                 i.src = ud.profile.profilePic;
               });
@@ -252,7 +253,7 @@
         })();
       }
 
-      // kebab behavior using event delegation
+      // kebab behavior (delegated)
       const feed = document.getElementById('feed');
       feed.addEventListener('click', function (ev) {
         const kebab = ev.target.closest('.post-kebab');
@@ -265,15 +266,12 @@
         const postId = postEl.dataset.postId;
         const owner = postEl.dataset.postOwner;
 
-        // toggle: if already open for same post, close
         if (openPopup && openPopup.dataset.postId === postId) {
           closePopup();
           return;
         }
-        // close existing popup
         closePopup();
 
-        // build popup
         const popup = document.createElement('div');
         popup.className = 'post-popup';
         popup.dataset.postId = postId;
@@ -294,7 +292,6 @@
             if (!confirm('ลบโพสต์นี้?')) return;
             try {
               await fetch('/api/post/' + encodeURIComponent(postId), { method: 'DELETE' });
-              // remove element
               const el = document.querySelector('.post[data-post-id="' + postId + '"]');
               if (el) el.remove();
             } catch (err) {
@@ -326,7 +323,6 @@
       }, true);
     }
 
-    // init
     attachGlobalPopupHandlers();
     document.addEventListener('DOMContentLoaded', renderFeed);
   })();
