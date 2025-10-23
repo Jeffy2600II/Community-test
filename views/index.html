@@ -5,6 +5,22 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Community Home</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* ให้ excerpt ในฟีดตัดเป็นจุดเมื่อยาวเกิน (ปรับจำนวนบรรทัดได้ที่ --clamp-lines) */
+    .post-excerpt a.post-link {
+      color: inherit;
+      text-decoration: none;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      /* จำนวนบรรทัดที่ต้องการแสดงก่อนตัด (เปลี่ยนค่าได้) */
+      -webkit-line-clamp: 5;
+    }
+    .post-excerpt a.post-link:hover { text-decoration: underline; }
+    /* ให้ whole post-body area have readable line height */
+    .post .post-body { line-height: 1.55; }
+  </style>
 </head>
 <body>
   <div id="headerSlot"></div>
@@ -35,10 +51,10 @@
     const posts = (data && data.posts) || [];
     let feedHtml = '';
     for (let post of posts) {
-      // New structure: no title field in UI
-      // Show avatar + username + time inline, then excerpt (first 220 chars) from content
-      const excerpt = (post.content || '').slice(0, 220) + ((post.content || '').length > 220 ? '...' : '');
-      feedHtml += `<article class="post" aria-labelledby="title-${post.id}">
+      // แสดง header (avatar + username + time) แบบเดียวกับ feed
+      // แสดง excerpt จาก content โดยตัดด้วย CSS (line-clamp)
+      const excerpt = (post.content || '').slice(0, 200) + ((post.content || '').length > 200 ? '...' : '');
+      feedHtml += `<article class="post" aria-labelledby="post-${post.id}">
         <div class="post-header" role="group" aria-label="ผู้โพสต์">
           <a class="post-avatar" href="/user/${post.username}" aria-hidden="false">
             <img src="/img/default_profile.png" class="avatar-img" alt="${post.username}" id="avatar-${post.username}-${post.id}">
@@ -50,11 +66,10 @@
         </div>
 
         <div class="post-body">
-          <!-- Title removed: show excerpt as the leading content line -->
-          <div class="post-excerpt"><a href="/post/${post.id}">${excerpt}</a></div>
+          <!-- แสดงเนื้อหาในฟีดทันที (ตัดด้วย CSS) -->
+          <div class="post-excerpt"><a class="post-link" href="/post/${post.id}">${excerpt}</a></div>
           ${post.image ? `<img src="${post.image}" class="post-img" alt="post image" loading="lazy">` : ''}
           <div class="post-actions">
-            <a class="btn btn-ghost" href="/post/${post.id}">อ่านต่อ</a>
             ${myUsername === post.username ? `<a class="btn btn-muted" href="/post/${post.id}/edit">แก้ไข</a> <button class="btn btn-ghost" onclick="deletePost('${post.id}')">ลบ</button>` : ''}
           </div>
         </div>
