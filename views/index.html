@@ -18,10 +18,11 @@
     .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; cursor: pointer; }
     .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; }
 
-    /* Kebab and popup (left side) */
-    .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; }
+    /* Kebab placed on the right side of the header */
+    .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
     .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
-    .post-popup { position:absolute; left:8px; top:44px; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); min-width:160px; z-index:2200; overflow:hidden; }
+    /* popup should align to the right of the post when kebab is on the right */
+    .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); min-width:160px; z-index:2200; overflow:hidden; }
     .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
     .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
 
@@ -148,17 +149,6 @@
         const header = document.createElement('div');
         header.className = 'post-header';
 
-        // kebab button (left)
-        const kebab = document.createElement('button');
-        kebab.className = 'post-kebab';
-        kebab.type = 'button';
-        kebab.setAttribute('aria-haspopup','true');
-        kebab.setAttribute('aria-expanded','false');
-        kebab.title = 'ตัวเลือกโพสต์';
-        kebab.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`;
-        header.appendChild(kebab);
-
         // avatar
         const avatarLink = document.createElement('a');
         avatarLink.className = 'post-avatar';
@@ -188,6 +178,17 @@
         meta.appendChild(nameDiv);
         meta.appendChild(timeDiv);
         header.appendChild(meta);
+
+        // kebab button (right)
+        const kebab = document.createElement('button');
+        kebab.className = 'post-kebab';
+        kebab.type = 'button';
+        kebab.setAttribute('aria-haspopup','true');
+        kebab.setAttribute('aria-expanded','false');
+        kebab.title = 'ตัวเลือกโพสต์';
+        kebab.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`;
+        header.appendChild(kebab);
 
         art.appendChild(header);
 
