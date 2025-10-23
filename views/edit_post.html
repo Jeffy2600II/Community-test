@@ -13,8 +13,7 @@
       <div class="card">
         <div class="section-title"><span>แก้ไขโพสต์</span></div>
         <form id="editPostForm" enctype="multipart/form-data">
-            <label class="small">หัวข้อ</label>
-            <input type="text" name="title" placeholder="หัวข้อ">
+            <!-- เอาช่องหัวข้อออก: ใช้ textarea เดียวสำหรับเนื้อหา -->
             <label class="small">เนื้อหา</label>
             <textarea name="content" placeholder="เนื้อหา"></textarea>
             <div class="input-file mt-16">
@@ -38,8 +37,8 @@ const postId = location.pathname.split('/').slice(-2)[0];
     const res = await fetch('/api/post/' + postId);
     const data = await res.json();
     if (data.success) {
-        document.querySelector('input[name=title]').value = data.post.title;
-        document.querySelector('textarea[name=content]').value = data.post.content;
+        // ไม่ใช้ title อีกต่อไป — ใส่แค่ content ลงใน textarea
+        document.querySelector('textarea[name=content]').value = data.post.content || '';
     }
 })();
 document.getElementById('editPostForm').onsubmit = async e => {
