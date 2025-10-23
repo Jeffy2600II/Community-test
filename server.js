@@ -710,8 +710,9 @@ app.post('/api/post/create', authMiddleware, uploadMemory.single('postImage'), a
   try {
     const userId = req.user.id;
     const username = req.user.username;
+    // Title is optional now; we require content only
     const { title, content } = req.body;
-    if (!title || !content) return res.json({ success: false, msg: 'Missing fields' });
+    if (!content) return res.json({ success: false, msg: 'Missing content' });
 
     const postId = uuidv4();
     const postDir = getPostDir(postId);
@@ -745,7 +746,8 @@ app.post('/api/post/create', authMiddleware, uploadMemory.single('postImage'), a
     const post = {
       id: postId,
       username,
-      title,
+      // store title if provided, otherwise keep empty string for compatibility
+      title: title || '',
       content,
       image: imgPathPublic,
       createdAt: new Date().toISOString(),
@@ -765,7 +767,9 @@ app.post('/api/post/create', authMiddleware, uploadMemory.single('postImage'), a
     try {
       const followers = getFollowersForUser(userId) || [];
       for (let fid of followers) {
-        addNotificationToUser(fid, 'new_post', `${username} โพสต์ใหม่: "${title}"`, { postId, actorId: userId, actorUsername: username });
+        // Use title if present, otherwise use excerpt of content for notification message
+        const snippet = (post.title && post.title.trim().length > 0) ? post.title : (post.content || '').slice(0, 60);
+        addNotificationToUser(fid, 'new_post', `${username} โพสต์ใหม่: "${snippet}"`, { postId, actorId: userId, actorUsername: username });
       }
     } catch (e) { console.error('notify followers error', e && e.message) }
 
@@ -788,8 +792,12 @@ app.post('/api/post/:id/edit', authMiddleware, uploadMemory.single('postImage'),
     if (post.username !== username) return res.json({ success: false, msg: 'Not owner' });
 
     const { title, content } = req.body;
-    if (title) post.title = title;
-    if (content) post.content = content;
+    // Content optional update, but we don't allow emptying content to nothing
+    if (typeof content !== 'undefined' && content !== null) {
+      post.content = content;
+    }
+    // If client provides title (legacy), allow updating it; otherwise keep existing
+    if (typeof title !== 'undefined') post.title = title || '';
 
     if (req.file) {
       // remove old image file if exists
@@ -929,7 +937,7 @@ app.post('/api/post/:id/comment', authMiddleware, (req, res) => {
     if (post && post.username && post.username !== username) {
       const ownerObj = findUserByUsername(post.username);
       if (ownerObj) {
-        addNotificationToUser(ownerObj._userId, 'comment', `${username} แสดงความคิดเห็นในโพสต์ของคุณ`, { postId, commentId: comment.id, actorUsername: username, actorId: req.user.id });
+        addNotificationToUser(ownerObj._userId, 'comment', `${username} แสดงความคิดเห็นในโพสต์ของคุณ`, { postId, commentId: comment.id, actorUsername: username });
       }
     }
   } catch (e) { /* ignore */ }
