@@ -35,15 +35,23 @@
     const posts = (data && data.posts) || [];
     let feedHtml = '';
     for (let post of posts) {
+      // New structure:
+      // 1) post-header: avatar + username + time (horizontal)
+      // 2) title
+      // 3) excerpt/content
       feedHtml += `<article class="post" aria-labelledby="title-${post.id}">
-        <div class="post-left">
-          <a href="/user/${post.username}">
+        <div class="post-header" role="group" aria-label="ผู้โพสต์">
+          <a class="post-avatar" href="/user/${post.username}" aria-hidden="false">
             <img src="/img/default_profile.png" class="avatar-img" alt="${post.username}" id="avatar-${post.username}">
           </a>
+          <div class="post-header-meta">
+            <div class="post-username"><a href="/user/${post.username}">${post.username}</a></div>
+            <div class="post-time small">${new Date(post.createdAt).toLocaleString()}</div>
+          </div>
         </div>
+
         <div class="post-body">
           <h3 id="title-${post.id}" class="post-title"><a href="/post/${post.id}">${post.title}</a></h3>
-          <div class="post-meta">โดย <a href="/user/${post.username}">${post.username}</a> • ${new Date(post.createdAt).toLocaleString()}</div>
           <div class="post-excerpt">${(post.content||'').slice(0, 220)}${(post.content||'').length>220?'...':''}</div>
           ${post.image ? `<img src="${post.image}" class="post-img" alt="post image" loading="lazy">` : ''}
           <div class="post-actions">
