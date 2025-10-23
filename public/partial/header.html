@@ -13,8 +13,8 @@
         </div>
       </a>
 
-      <!-- Mobile menu toggle: appears on small screens and toggles header-bottom / mobile sidebar -->
-      <button id="mobileMenuToggle" class="btn btn-icon" aria-expanded="false" aria-controls="headerBottom mobileSidebar" aria-label="Toggle menu">
+      <!-- Mobile menu toggle: appears on small screens and toggles mobile sidebar -->
+      <button id="mobileMenuToggle" class="btn btn-icon" aria-expanded="false" aria-controls="mobileSidebar" aria-label="Toggle menu">
         <!-- simple hamburger icon -->
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1f2a37" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M4 7h16M4 12h16M4 17h16"></path>
@@ -22,7 +22,7 @@
       </button>
     </div>
 
-    <!-- Bottom row: search + dynamic nav/actions (this will be toggled on mobile) -->
+    <!-- Bottom row: search + dynamic nav/actions (desktop / tablet) -->
     <div id="headerBottom" class="header-bottom" role="navigation" aria-label="Site actions">
       <div class="header-search" role="search" aria-label="Site search">
         <form onsubmit="event.preventDefault(); const q=this.query.value.trim(); if(q) location.href='/search?q='+encodeURIComponent(q);">
@@ -36,25 +36,19 @@
     </div>
   </div>
 
-  <!-- Mobile off-canvas sidebar (slides in from the right on small screens) -->
-  <div id="mobileSidebar" class="mobile-sidebar" aria-hidden="true" role="dialog" aria-label="Mobile menu">
-    <div class="mobile-sidebar-inner">
-      <div class="mobile-sidebar-header">
-        <a class="logo" href="/" aria-label="COMMUNITY home">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
-            <rect width="24" height="24" rx="6" fill="#2f80ed"></rect>
-            <path d="M7 13h10M7 9h10" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path>
-          </svg>
-          <div style="margin-left:8px;font-weight:700;">COMMUNITY</div>
-        </a>
-        <button id="mobileSidebarClose" class="btn btn-ghost" aria-label="ปิดเมนู">ปิด</button>
+  <!-- Mobile sidebar (slides in from right) -->
+  <div id="mobileSidebar" class="mobile-sidebar" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="mobile-sidebar-panel" role="document">
+      <div class="mobile-sidebar-header row" style="justify-content:space-between;align-items:center;">
+        <div style="font-weight:700;">เมนู</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button id="mobileSidebarClose" class="btn btn-ghost" aria-label="ปิดเมนู">ปิด</button>
+        </div>
       </div>
-      <div id="mobileSidebarNav" class="mobile-sidebar-nav" tabindex="0" aria-live="polite">
-        <!-- populated by JS with nav content (vertical layout on mobile) -->
-      </div>
+      <div id="mobileSidebarContent" class="mobile-sidebar-content" tabindex="0"></div>
     </div>
   </div>
 
-  <!-- overlay inserted/managed by JS when sidebar opens (keeps DOM-friendly fallback) -->
+  <!-- overlay that appears beneath the sidebar (covers page) -->
   <div id="mobileSidebarOverlay" class="mobile-sidebar-overlay hidden" aria-hidden="true"></div>
 </header>
