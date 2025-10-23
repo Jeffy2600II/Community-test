@@ -1,37 +1,34 @@
 /* public/css/style.css
-   Refined: Minimal, modern, professional UI system.
-   - Cleaned up spacing scale, refined color palette for neutrality + accessible accents.
-   - Stronger typographic scale, improved card/header/buttons for platform-grade polish.
-   - All original class names preserved; rules are adjusted to be additive and compatible.
+   Focused patch: improvements to mobile sidebar + overlay stacking/visibility/scroll-lock.
+   Other sections kept (full file previously), but here we include the whole stylesheet with
+   targeted adjustments in the mobile-sidebar and overlay rules so the mobile sidebar behaves
+   consistently and the overlay covers the viewport and sits under the sidebar.
 */
 
+/* ---------- (top part is identical to the existing design system) ---------- */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
 
 :root{
-  /* Palette */
   --bg: #f7f8fb;
   --surface: #ffffff;
   --muted: #93a0b2;
-  --text: #111827; /* dark neutral for high contrast */
-  --accent: #2563eb; /* professional blue */
+  --text: #111827;
+  --accent: #2563eb;
   --accent-2: #06b6d4;
   --danger: #ef4444;
   --glass: rgba(16,24,40,0.04);
 
-  /* Typography & scale */
   --font-sans: 'Inter', 'Noto Sans Thai', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
   --base-size: 15px;
   --leading: 1.6;
   --readable-line: 1.6rem;
 
-  /* Radii & shadows */
   --radius-sm: 8px;
   --radius: 12px;
   --radius-lg: 16px;
   --shadow-1: 0 6px 24px rgba(16,24,40,0.06);
   --shadow-2: 0 14px 40px rgba(16,24,40,0.08);
 
-  /* Spacing */
   --space-xxs: 4px;
   --space-xs: 8px;
   --space-sm: 12px;
@@ -45,12 +42,10 @@
   --touch-target: 44px;
 }
 
-/* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   :root { --transition: 0ms; }
 }
 
-/* Reset & base */
 * { box-sizing: border-box; }
 html,body { height: 100%; }
 body {
@@ -67,7 +62,6 @@ body {
   background-attachment: fixed;
 }
 
-/* Container */
 .container {
   width: 100%;
   max-width: var(--max-width);
@@ -75,7 +69,6 @@ body {
   padding: 0 var(--space-md);
 }
 
-/* Main / Cards */
 main {
   max-width: var(--max-width-narrow);
   margin: calc(var(--space-lg) + 8px) auto;
@@ -97,15 +90,12 @@ main {
   border-color: rgba(37,99,235,0.06);
 }
 
-/* Headings and utility typographic tweaks */
 h1,h2,h3,h4,h5 { margin: 0 0 8px 0; font-weight: 700; color: var(--text); }
 .small { font-size: 0.88rem; color: var(--muted); }
 
-/* Link styles */
 a { color: var(--accent); text-decoration: none; }
 a:hover, a:focus { text-decoration: underline; }
 
-/* Clean, modern header */
 .site-header {
   background: rgba(255,255,255,0.9);
   border-bottom: 1px solid rgba(15,23,42,0.04);
@@ -116,7 +106,6 @@ a:hover, a:focus { text-decoration: underline; }
   box-shadow: 0 1px 0 rgba(16,24,40,0.02);
 }
 
-/* header inner layout */
 .site-header .container {
   display: flex;
   align-items: center;
@@ -126,7 +115,6 @@ a:hover, a:focus { text-decoration: underline; }
   padding-right: var(--space-md);
 }
 
-/* header wrapper (stacking on mobile) */
 .header-inner {
   max-width: var(--max-width);
   margin: 0 auto;
@@ -134,7 +122,6 @@ a:hover, a:focus { text-decoration: underline; }
   width: 100%;
 }
 
-/* header-top: logo + toggle */
 .header-top {
   display: flex;
   align-items: center;
@@ -145,7 +132,6 @@ a:hover, a:focus { text-decoration: underline; }
   padding-bottom: 6px;
 }
 
-/* Logo styling - simplified */
 .logo {
   display:flex;
   align-items:center;
@@ -164,7 +150,6 @@ a:hover, a:focus { text-decoration: underline; }
   color: var(--muted);
 }
 
-/* mobile toggle */
 #mobileMenuToggle {
   display: none;
   background: transparent;
@@ -176,7 +161,6 @@ a:hover, a:focus { text-decoration: underline; }
 }
 #mobileMenuToggle:focus { outline: 3px solid rgba(37,99,235,0.12); outline-offset: 3px; }
 
-/* stacked header-bottom (search + nav) */
 .header-bottom {
   display: flex;
   align-items: center;
@@ -190,11 +174,9 @@ a:hover, a:focus { text-decoration: underline; }
   max-height: 999px;
 }
 
-/* collapsed/open states (mobile behavior preserved) */
 .header-bottom.collapsed { max-height: 0; opacity: 0; pointer-events: none; transform: translateY(-6px); }
 .header-bottom.open { max-height: 999px; opacity: 1; pointer-events: auto; transform: translateY(0); }
 
-/* Primary nav */
 .header-left {
   display:flex;
   align-items:center;
@@ -217,7 +199,6 @@ a:hover, a:focus { text-decoration: underline; }
   }
 }
 
-/* Search refined */
 .header-search {
   display:flex;
   align-items:center;
@@ -247,14 +228,12 @@ a:hover, a:focus { text-decoration: underline; }
   color: var(--text);
 }
 
-/* Right account area */
 .header-actions {
   display:flex;
   align-items:center;
   gap: var(--space-sm);
 }
 
-/* Avatar button */
 .avatar-btn {
   display:flex;
   align-items:center;
@@ -278,7 +257,6 @@ a:hover, a:focus { text-decoration: underline; }
   border: 1px solid rgba(15,23,42,0.06);
 }
 
-/* Buttons (modern & consistent) */
 .btn {
   display:inline-flex;
   align-items:center;
@@ -315,13 +293,11 @@ a:hover, a:focus { text-decoration: underline; }
   padding: 8px 12px;
 }
 
-/* subtle secondary */
 .btn-muted {
   background: #f4f6fb;
   color: var(--text);
 }
 
-/* Badge */
 .badge {
   padding: 5px 10px;
   font-size: 12px;
@@ -331,7 +307,6 @@ a:hover, a:focus { text-decoration: underline; }
   font-weight: 700;
 }
 
-/* Feed & posts */
 .feed {
   display:flex;
   flex-direction:column;
@@ -365,7 +340,6 @@ a:hover, a:focus { text-decoration: underline; }
   box-shadow: 0 8px 30px rgba(16,24,40,0.04);
 }
 
-/* Post actions */
 .post-actions {
   margin-top: 12px;
   display:flex;
@@ -373,7 +347,6 @@ a:hover, a:focus { text-decoration: underline; }
   align-items:center;
 }
 
-/* Comments */
 .comment {
   background: #fbfdff;
   border: 1px solid rgba(15,23,42,0.03);
@@ -383,7 +356,6 @@ a:hover, a:focus { text-decoration: underline; }
 }
 .comment .meta { font-size: 0.9rem; color: var(--muted); margin-bottom: 6px; }
 
-/* Forms & inputs */
 input, textarea, select, button {
   font-family: inherit;
 }
@@ -404,11 +376,9 @@ input:focus, textarea:focus {
 }
 textarea { min-height: 140px; resize: vertical; }
 
-/* File input */
 .input-file { display:inline-flex; gap:8px; align-items:center; }
 .input-file input[type="file"] { display:none; }
 
-/* Profile hero refinements */
 .profile-hero {
   background: linear-gradient(180deg,#fff,#fbfdff);
   padding: var(--space-md);
@@ -429,7 +399,6 @@ textarea { min-height: 140px; resize: vertical; }
   box-shadow: var(--shadow-2);
 }
 
-/* Grid helpers */
 .grid-2 {
   display:grid;
   grid-template-columns: 320px 1fr;
@@ -439,7 +408,6 @@ textarea { min-height: 140px; resize: vertical; }
   .grid-2 { grid-template-columns: 1fr; }
 }
 
-/* Dropdowns */
 .dropdown-panel {
   min-width: 320px;
   max-width: 420px;
@@ -457,7 +425,6 @@ textarea { min-height: 140px; resize: vertical; }
   gap:12px;
 }
 
-/* Notification badge */
 .notify-bell { position: relative; width:42px; height:42px; display:flex; align-items:center; justify-content:center; border-radius:10px; }
 .notify-badge {
   position:absolute;
@@ -471,7 +438,6 @@ textarea { min-height: 140px; resize: vertical; }
   font-weight:700;
 }
 
-/* Footer modernized */
 .site-footer {
   margin-top: var(--space-xl);
   background: transparent;
@@ -491,20 +457,27 @@ textarea { min-height: 140px; resize: vertical; }
 .footer-links { display:flex; gap: var(--space-md); }
 .footer-links a { color: var(--muted); text-decoration:none; font-weight:600; }
 
-/* Accessibility helpers */
 .sr-only { position: absolute !important; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; }
 
-/* Misc */
 img { max-width: 100%; height: auto; display: block; }
 
-/* Utility */
 .hidden { display:none !important; }
 .center { display:flex; align-items:center; justify-content:center; }
 .row { display:flex; gap:12px; align-items:center; }
 .col { display:flex; flex-direction:column; gap:8px; }
 
-/* Small screen adjustments (mobile-first) */
+.section-title { margin: var(--space-md) 0; display:flex; align-items:center; gap:12px; }
+.section-title span {
+  background: linear-gradient(90deg, rgba(37,99,235,0.10), rgba(6,182,212,0.06));
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight:700;
+  color: var(--accent);
+}
+
+/* ---------- Mobile-first: improved mobile sidebar + overlay rules ---------- */
 @media (max-width: 800px) {
+
   :root {
     --space-sm: 10px;
     --space-md: 14px;
@@ -517,7 +490,7 @@ img { max-width: 100%; height: auto; display: block; }
   .logo .brand { font-size: 1rem; }
   .logo .tagline { display:none; }
 
-  /* header-bottom becomes overlay panel */
+  /* header-bottom overlay (collapsed by default) */
   .header-bottom {
     position: fixed;
     top: 74px;
@@ -537,7 +510,7 @@ img { max-width: 100%; height: auto; display: block; }
     transition:
       transform 0.36s cubic-bezier(0.4, 0, 0.2, 1),
       opacity 0.28s ease;
-    z-index: 1000;
+    z-index: 1010;
   }
   .header-bottom.open {
     transform: translateY(0);
@@ -559,7 +532,12 @@ img { max-width: 100%; height: auto; display: block; }
   .site-footer .footer-inner { flex-direction: column; text-align: center; gap: var(--space-sm); }
   .footer-links { flex-direction: column; gap: 8px; }
 
-  /* Mobile sidebar tweaks */
+  /* ---------- Mobile sidebar & overlay (IMPROVED) ---------- */
+
+  /* Sidebar container (fixed to right, but kept out of tab order until opened)
+     - pointer-events toggled by .open
+     - transform moves it off-canvas initially; translateX(110%) avoids 1px gap issues
+     - higher z-index than overlay so it appears above the dim */
   .mobile-sidebar {
     position: fixed;
     top: 0;
@@ -567,46 +545,67 @@ img { max-width: 100%; height: auto; display: block; }
     height: 100vh;
     width: min(92vw, 420px);
     max-width: 92vw;
-    transform: translateX(100%);
+    transform: translateX(110%);
     transition: transform 320ms cubic-bezier(.2,.9,.2,1);
-    z-index: 1400;
+    z-index: 1405; /* above overlay */
     display: flex;
     align-items: stretch;
     justify-content: flex-end;
-    pointer-events: none;
+    pointer-events: none; /* disabled when closed */
+    will-change: transform;
   }
   .mobile-sidebar.open {
     transform: translateX(0);
     pointer-events: auto;
   }
+
+  /* Panel that slides in */
   .mobile-sidebar-panel {
     width: 100%;
     height: 100%;
     background: var(--surface);
-    box-shadow: -18px 0 40px rgba(16,24,40,0.12);
+    box-shadow: -22px 0 48px rgba(16,24,40,0.14);
     padding: 18px;
     overflow: auto;
     display: flex;
     flex-direction: column;
     gap: 12px;
     border-radius: 6px 0 0 6px;
+    outline: none;
   }
+
+  /* Overlay sits behind the sidebar but above the page content.
+     Use visibility + opacity to avoid pointer-events flicker; .show toggles both */
   .mobile-sidebar-overlay {
     position: fixed;
     inset: 0;
-    z-index: 1390;
+    z-index: 1400; /* under the sidebar */
     background: rgba(0,0,0,0.45);
     opacity: 0;
-    transition: opacity 220ms ease;
+    visibility: hidden;
+    transition: opacity 220ms ease, visibility 220ms ease;
     pointer-events: none;
   }
   .mobile-sidebar-overlay.show {
     opacity: 1;
+    visibility: visible;
     pointer-events: auto;
   }
+
+  /* When sidebar open, make sure header-bottom and other header overlays stay behind */
+  .mobile-sidebar.open ~ .site-footer,
+  .mobile-sidebar.open ~ main {
+    /* optional visual dimming (keep subtle or remove) */
+    filter: none;
+  }
+
+  /* small refinements for mobile controls inside panel */
+  .mobile-sidebar-panel .row { gap: 8px; }
+  .mobile-sidebar-panel button { min-width: 0; }
+
 }
 
-/* Medium screens */
+/* ---------- medium & desktop breakpoints ---------- */
 @media (min-width: 801px) and (max-width: 1100px) {
   .header-search { min-width: 220px; width: 30%; }
   .header-inner { padding: 0 var(--space-md); }
@@ -614,20 +613,7 @@ img { max-width: 100%; height: auto; display: block; }
   #mobileMenuToggle { display: none; }
 }
 
-/* Desktop */
 @media (min-width: 1101px) {
   .header-bottom { max-height: none; opacity: 1; pointer-events: auto; transform: none; }
   #mobileMenuToggle { display: none; }
 }
-
-/* tiny polish */
-.section-title { margin: var(--space-md) 0; display:flex; align-items:center; gap:12px; }
-.section-title span {
-  background: linear-gradient(90deg, rgba(37,99,235,0.10), rgba(6,182,212,0.06));
-  padding: 8px 14px;
-  border-radius: 999px;
-  font-weight:700;
-  color: var(--accent);
-}
-
-/* End of file */
