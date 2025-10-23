@@ -1,15 +1,14 @@
+/* public/css/style.css
+   Compatibility-first revision:
+   - keep all original classnames/IDs used by HTML/JS
+   - add off-canvas sidebar support for .profile-hero on small screens
+   - retain improved visual tokens (minimal/premium) while restoring layout behavior
+*/
+
+/* ---------- Font import (kept) ---------- */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
 
-/* ========================================================================
-   Updated design system (responsive & touch-friendly)
-   - Baseline taken from the provided authoritative stylesheet.
-   - Extended to support stacked header (header-top / header-bottom),
-     a mobile menu toggle, and behavior for header-bottom.open.
-   - All existing class names kept; new rules are additive and scoped so
-     existing pages continue to work while enabling the new header layout.
-   - Accessibility: ARIA-friendly, keyboard focus, reduced-motion support.
-   ======================================================================== */
-
+/* ---------- Design tokens (compatible) ---------- */
 :root{
   --bg: #f6f7fb;
   --surface: #ffffff;
@@ -24,8 +23,8 @@
   --radius: 10px;
   --radius-lg: 14px;
 
-  --shadow-1: 0 6px 20px rgba(29, 41, 56, 0.06);
-  --shadow-2: 0 14px 40px rgba(29, 41, 56, 0.08);
+  --shadow-1: 0 6px 20px rgba(29,41,56,0.06);
+  --shadow-2: 0 14px 40px rgba(29,41,56,0.08);
 
   --space-xxs: 4px;
   --space-xs: 8px;
@@ -41,12 +40,12 @@
   --touch-target: 44px;
 }
 
-/* Accessibility: respect user's reduced motion preference */
+/* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   :root { --transition: 0ms; }
 }
 
-/* Global reset & base */
+/* Base reset */
 * { box-sizing: border-box; }
 html,body { height: 100%; }
 body {
@@ -59,8 +58,6 @@ body {
   line-height: 1.45;
   font-size: 15px;
   -webkit-text-size-adjust: 100%;
-  -webkit-font-feature-settings: "ss01" on;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Layout containers */
@@ -94,13 +91,7 @@ main {
   box-shadow: 0 10px 30px rgba(29,41,56,0.06);
 }
 
-/* ==========================================================================
-   HEADER (STACKED on mobile)
-   - New structure uses header-inner (wrap), header-top (logo + toggle),
-     header-bottom (search + nav/actions). This is additive so older
-     selectors still function.
-   ========================================================================== */
-
+/* HEADER (stacked / responsive) */
 .site-header {
   background: white;
   border-bottom: 1px solid rgba(15,23,42,0.04);
@@ -110,10 +101,7 @@ main {
   box-shadow: 0 1px 0 rgba(16,24,40,0.02);
 }
 
-/* container / header-inner
-   - Keep the original .site-header .container rules for compatibility,
-     but prefer using .header-inner in markup to enable stacked layout.
-*/
+/* container / header-inner */
 .site-header .container {
   display: flex;
   align-items: center;
@@ -123,7 +111,7 @@ main {
   padding-right: var(--space-md);
 }
 
-/* New: header-inner is a thin wrapper to allow stacking behavior */
+/* header-inner wrapper (compatible) */
 .header-inner {
   max-width: var(--max-width);
   margin: 0 auto;
@@ -171,9 +159,7 @@ main {
   border-radius: 8px;
 }
 
-/* header-bottom: search + nav + account actions
-   - collapsible on mobile (use .open to show)
-*/
+/* header-bottom: search + nav + account actions */
 .header-bottom {
   display: flex;
   align-items: center;
@@ -184,7 +170,7 @@ main {
   transition: max-height 220ms ease, opacity 180ms ease, transform 180ms ease;
   overflow: hidden;
   width: 100%;
-  max-height: 999px; /* default for wide screens (overridden on mobile) */
+  max-height: 999px;
 }
 
 /* When header-bottom is collapsed on mobile we'll set max-height:0; when open add class .open */
@@ -404,7 +390,7 @@ textarea { min-height: 120px; resize: vertical; }
 }
 .input-file input[type="file"] { display:none; }
 
-/* Profile hero */
+/* Profile hero (used as sidebar) */
 .profile-hero {
   background: linear-gradient(180deg,#fff,#fbfdff);
   padding: var(--space-md);
@@ -431,13 +417,79 @@ textarea { min-height: 120px; resize: vertical; }
   grid-template-columns: 320px 1fr;
   gap: var(--space-md);
 }
+/* Desktop -> tablet -> mobile transitions */
 @media (max-width: 1100px) {
-  .grid-2 { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
 }
+/* Default mobile behaviour previously stacked; we now support both stacked and off-canvas.
+   By default (no sidebar-open) we will stack; when body.sidebar-open we show off-canvas sidebar. */
 @media (max-width: 950px) {
   .header-search { display:none; }
   .avatar-img { width:36px;height:36px; }
   .logo .brand { font-size: 0.95rem; }
+
+  /* stacked default */
+  .grid-2 { grid-template-columns: 1fr; }
+
+  /* Off-canvas sidebar styling for pages that should show a sidebar (e.g., .profile-hero)
+     The JS will add body.sidebar-open to open it and attach overlay */
+  .profile-hero {
+    position: static;
+    transition: transform 0.32s cubic-bezier(.2,.9,.2,1), box-shadow 180ms;
+  }
+  /* overlay for sidebar (invisible unless body.sidebar-open) */
+  .sidebar-overlay {
+    display: none;
+  }
+}
+
+/* Sidebar off-canvas rules (activated when JS toggles body.sidebar-open) */
+@media (max-width: 950px) {
+  body.sidebar-open .profile-hero {
+    position: fixed;
+    left: 0;
+    top: 72px;
+    width: min(320px, 86vw);
+    height: calc(100vh - 72px);
+    z-index: 1500;
+    transform: translateX(0);
+    box-shadow: 0 20px 60px rgba(16,24,40,0.18);
+    border-radius: 0 12px 12px 0;
+    overflow:auto;
+    background: linear-gradient(180deg,#fff,#fbfdff);
+  }
+  /* shift main content when sidebar open to avoid overlap */
+  body.sidebar-open .grid-2 > .profile-main,
+  body.sidebar-open .grid-2 > main,
+  body.sidebar-open main .container {
+    margin-left: min(320px, 86vw);
+    transition: margin-left 0.32s cubic-bezier(.2,.9,.2,1);
+  }
+  /* show overlay */
+  body.sidebar-open .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 72px 0 0 0;
+    z-index: 1400;
+    background: rgba(0,0,0,0.32);
+    backdrop-filter: blur(2px);
+  }
+  /* insert a close button inside sidebar when open */
+  .profile-hero .sidebar-close {
+    display: flex;
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    background: transparent;
+    border: none;
+    width: 40px;
+    height: 40px;
+    align-items:center;
+    justify-content:center;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .profile-hero .sidebar-close svg { stroke: var(--muted); }
 }
 
 /* Dropdown panel (account / notifications) */
@@ -579,186 +631,10 @@ a { color: var(--accent); text-decoration: none; }
   .card { padding: 12px; }
 }
 
-/* Small improvements for medium screens */
-@media (min-width: 561px) and (max-width: 950px) {
-  .header-search { display:none; }
-  .grid-2 { grid-template-columns: 1fr; }
-  .avatar-circle { width: 110px; height: 110px; }
-}
-
 /* Provide a subtle focus outline for keyboard users (only show when focusing via keyboard) */
 :root:focus-within .btn:focus { outline-offset: 3px; }
 
 /* Ensure images don't overflow */
 img { max-width: 100%; height: auto; display: block; }
 
-/* ========================================================================
-   Mobile-First Media Query
-   - Emphasize stacked header behavior: on small screens header-bottom
-     collapses beneath the logo; toggle shows/hides it. This prevents
-     crowding in the header row and moves controls (search, actions) below.
-   ======================================================================== */
-
-/* Mobile Devices (Portrait and Landscape) */
-@media (max-width: 800px) {
-
-  :root {
-    /* adjust spacing for mobile */
-    --space-sm: 10px;
-    --space-md: 14px;
-    --space-lg: 20px;
-  }
-
-  /* Use header-inner to stack header-top + header-bottom */
-  .header-inner { display:flex; flex-direction:column; gap:8px; align-items:stretch; padding: 8px var(--space-sm); }
-  .header-top { height: 56px; }
-
-  /* smaller brand */
-  .logo .brand { font-size: 1rem; }
-  .logo .tagline { display:none; }
-
- /* header-bottom collapsed by default */
-.header-bottom {
-  position: fixed;
-  top: 80px; /* เว้นจากด้านบน */
-  left: 0;
-  width: 100%;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-
-  /* เว้นระยะด้านในเพื่อไม่ให้ปุ่มติดขอบ */
-  padding: 0.75rem 1rem;
-
-  display: flex;
-  align-items: center;
-  justify-content: space-between; /* กระจายปุ่มซ้าย-ขวาให้อยู่ในจอ */
-  
-  transform: translateY(-100%);
-  opacity: 0;
-  pointer-events: none;
-
-  transition: 
-    transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.3s ease;
-  z-index: 1000;
-}
-
-/* เมื่อเปิด */
-.header-bottom.open {
-  transform: translateY(0);
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* สไตล์ปุ่ม (ถ้าอยากให้ดูสวยขึ้นด้วย) */
-.header-bottom button {
-  padding: 0.5rem 1rem;
-  border-radius: 12px;
-  border: none;
-  background: #007bff;
-  color: #fff;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.header-bottom button:hover {
-  background: #0056b3;
-}
-
-  /* show mobile toggle button */
-  #mobileMenuToggle { display: inline-flex; }
-
-  /* header-search becomes full width when visible */
-  .header-search { width: 100%; min-width: auto; order: 1; }
-
-  /* nav/actions stacked below search */
-  #navBar { order: 2; display:flex; width:100%; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
-
-  /* Make posts stack vertically */
-  .card, .post { padding: var(--space-md); margin-bottom: var(--space-md); flex-direction: column; gap: var(--space-md); }
-  .post .post-left { width: 100%; display:flex; align-items:center; gap:12px; }
-  .post .post-body { order: 2; }
-  .post .post-excerpt { display:none; }
-  .post .post-img { max-width: 100%; height: auto; margin-top: var(--space-sm); }
-
-  /* Footer stack */
-  .site-footer .footer-inner { flex-direction: column; text-align: center; gap: var(--space-sm); }
-  .footer-links { flex-direction: column; gap: 8px; }
-
-  /* ---------------------------
-     Mobile sidebar styles
-     --------------------------- */
-  .mobile-sidebar {
-    position: fixed;
-    top: 0;
-    right: 0;
-    height: 100vh;
-    width: min(92vw, 420px);
-    max-width: 92vw;
-    transform: translateX(100%);
-    transition: transform 320ms cubic-bezier(.2,.9,.2,1);
-    z-index: 1400;
-    display: flex;
-    align-items: stretch;
-    justify-content: flex-end;
-    pointer-events: none;
-  }
-  .mobile-sidebar.open {
-    transform: translateX(0);
-    pointer-events: auto;
-  }
-  .mobile-sidebar-panel {
-    width: 100%;
-    height: 100%;
-    background: var(--surface);
-    box-shadow: -18px 0 40px rgba(16,24,40,0.12);
-    padding: 18px;
-    overflow: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    border-radius: 6px 0 0 6px;
-  }
-  .mobile-sidebar-header { padding-bottom: 6px; border-bottom: 1px solid rgba(15,23,42,0.04); }
-  .mobile-sidebar-content { padding-top: 8px; display: flex; flex-direction: column; gap: 8px; }
-
-  /* overlay behind sidebar */
-  .mobile-sidebar-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 1390;
-    background: rgba(0,0,0,0.45);
-    opacity: 0;
-    transition: opacity 220ms ease;
-    pointer-events: none;
-  }
-  .mobile-sidebar-overlay.show {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  /* ensure headerBottom is not interactable when sidebar open (visual only) */
-  .mobile-sidebar.open ~ .site-footer,
-  .mobile-sidebar.open ~ main {
-    filter: none;
-  }
-}
-
-/* Medium Screens and Tablets */
-@media (min-width: 801px) and (max-width: 1100px) {
-  .header-search { min-width: 200px; width: 30%; }
-  .header-inner { padding: 0 var(--space-md); }
-  .header-bottom { max-height: none; opacity: 1; pointer-events: auto; transform: none; }
-  #mobileMenuToggle { display: none; }
-}
-
-/* Desktop: header bottom always visible, toggle hidden */
-@media (min-width: 1101px) {
-  .header-bottom { max-height: none; opacity: 1; pointer-events: auto; transform: none; }
-  #mobileMenuToggle { display: none; }
-}
-
-/* End of stylesheet */
+/* END */
