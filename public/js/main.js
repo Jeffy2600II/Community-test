@@ -1,11 +1,8 @@
-// public/js/main.js (updated: header mobile toggle + original nav logic + right-side mobile off-canvas sidebar)
-// - เพิ่มการจัดการ mobile menu toggle (id: mobileMenuToggle) เพื่อเปิด/ปิด headerBottom บนเดสก์ท็อป/แท็บเล็ต
-// - บนมือถือ (<=800px) ปุ่มจะเปิด sidebar ทางขวา (#mobileSidebar) พร้อม overlay (#mobileSidebarOverlay)
-// - เมื่อเปิด mobile sidebar จะปิด dropdowns อื่น ๆ เพื่อหลีกเลี่ยงการทับกัน
-// - renderNav ยังคงสร้าง nav หลัก แต่จะสำเนา/ปรับรูปแบบสั้น ๆ ไปยัง #mobileSidebarNav เพื่อแสดงใน sidebar
-// - ฟังก์ชัน dropdown/overlay เดิมถูกเก็บไว้และทำงานร่วมกันได้
+// public/js/main.js (updated: header/mobile toggle, separate dropdown overlay, dropdown z-index fixes)
+// See conversation: ensure dropdown appears above mobile sidebar and overlay, overlay touch closes dropdown immediately,
+// and opening dropdown does NOT auto-close mobile sidebar.
 
-/* -------------------- Utilities -------------------- */
+ /* -------------------- Utilities -------------------- */
 async function loadPartial(id, file) {
   try {
     const resp = await fetch(file);
@@ -27,8 +24,9 @@ let globalAccounts = [];
 let globalActive = null;
 let dropdownEl = null;
 let dropdownVisible = false;
-let overlayEl = null;
-let escapeKeyListener = null;
+let dropdownOverlayEl = null;
+let dropdownEscapeListener = null;
+let dropdownTouchCloseHandler = null;
 
 /* -------------------- Header interactions (mobile + sidebar) -------------------- */
 function setupHeaderInteractions() {
@@ -39,9 +37,7 @@ function setupHeaderInteractions() {
   const sidebar = document.getElementById('mobileSidebar');
   if (!toggle) return;
 
-  // On small screens headerBottom is hidden by default (CSS). Toggle acts depending on width:
-  // - >800px: toggle headerBottom
-  // - <=800px: open/close right-side mobile sidebar
+  // On small screens: toggle opens right-side sidebar.
   toggle.addEventListener('click', (ev) => {
     ev.stopPropagation();
     const w = window.innerWidth;
@@ -49,28 +45,22 @@ function setupHeaderInteractions() {
       if (!headerBottom) return;
       const isOpen = headerBottom.classList.toggle('open');
       toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-      if (isOpen) {
-        hideDropdown();
-      }
+      // keep existing dropdown state unchanged
     } else {
-      // mobile behavior: right-side sidebar
       if (!sidebar) return;
       const isOpen = sidebar.classList.toggle('open');
       sidebar.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
       toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+
       if (isOpen) {
-        // show overlay and prevent body scroll
+        // show sidebar overlay (separate from dropdown overlay)
         if (mobileOverlay) {
           mobileOverlay.classList.remove('hidden');
           mobileOverlay.classList.add('show');
           mobileOverlay.setAttribute('aria-hidden', 'false');
         }
         document.body.style.overflow = 'hidden';
-        hideDropdown();
-        escapeKeyListener = function (ev) {
-          if (ev.key === 'Escape') { ev.preventDefault(); closeMobileSidebar(); }
-        };
-        document.addEventListener('keydown', escapeKeyListener, true);
+        // note: do NOT hide dropdown when opening sidebar (per request)
       } else {
         if (mobileOverlay) {
           mobileOverlay.classList.add('hidden');
@@ -78,10 +68,6 @@ function setupHeaderInteractions() {
           mobileOverlay.setAttribute('aria-hidden', 'true');
         }
         document.body.style.overflow = '';
-        if (escapeKeyListener) {
-          document.removeEventListener('keydown', escapeKeyListener, true);
-          escapeKeyListener = null;
-        }
       }
     }
   });
@@ -98,6 +84,13 @@ function setupHeaderInteractions() {
   // overlay click closes sidebar
   if (mobileOverlay) {
     mobileOverlay.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      closeMobileSidebar();
+      if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    }, { passive: false });
+    // also touchstart for immediate response
+    mobileOverlay.addEventListener('touchstart', (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
       closeMobileSidebar();
@@ -127,33 +120,26 @@ function setupHeaderInteractions() {
     }
   }, true);
 
-  // ensure headerBottom state on resize
+  // ensure headerBottom / toggle / sidebar state on resize
   function headerResizeHandler() {
     const w = window.innerWidth;
     if (w > 800) {
-      // on desktop/tablet show headerBottom
-      if (headerBottom) {
-        headerBottom.classList.add('open');
-      }
+      if (headerBottom) headerBottom.classList.add('open');
       if (toggle) {
         toggle.setAttribute('aria-expanded', 'true');
         toggle.style.display = 'none';
       }
-      // ensure sidebar closed
       closeMobileSidebar();
     } else {
-      // on small screens hide headerBottom by default, show toggle
       if (headerBottom) headerBottom.classList.remove('open');
       if (toggle) {
         toggle.setAttribute('aria-expanded', 'false');
         toggle.style.display = '';
       }
-      // ensure sidebar closed initially
       closeMobileSidebar();
     }
   }
   window.addEventListener('resize', headerResizeHandler);
-  // initial call
   headerResizeHandler();
 }
 
@@ -169,10 +155,6 @@ function closeMobileSidebar() {
   ov.classList.remove('show');
   ov.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
-  if (escapeKeyListener) {
-    document.removeEventListener('keydown', escapeKeyListener, true);
-    escapeKeyListener = null;
-  }
   if (toggle) toggle.setAttribute('aria-expanded', 'false');
 }
 
@@ -203,7 +185,7 @@ async function fetchNotifications() {
   }
 }
 
-/* -------------------- Dropdown + Overlay -------------------- */
+/* -------------------- Dropdown (separate overlay) -------------------- */
 function ensureDropdown() {
   if (dropdownEl && document.body.contains(dropdownEl)) return dropdownEl;
   dropdownEl = document.createElement('div');
@@ -211,54 +193,84 @@ function ensureDropdown() {
   dropdownEl.className = 'dropdown-panel';
   dropdownEl.style.display = 'none';
   dropdownEl.style.position = 'absolute';
-  dropdownEl.style.zIndex = '1400';
-  dropdownEl.style.boxShadow = '0 8px 24px rgba(15,23,42,0.08)';
+  // ensure dropdown is top-most relative to mobile sidebar
+  dropdownEl.style.zIndex = '3000';
+  dropdownEl.style.boxShadow = '0 8px 40px rgba(15,23,42,0.18)';
   dropdownEl.style.background = '#fff';
   dropdownEl.style.borderRadius = '10px';
   dropdownEl.style.overflow = 'hidden';
+  dropdownEl.style.pointerEvents = 'auto';
   document.body.appendChild(dropdownEl);
   return dropdownEl;
 }
 
-function createOverlay() {
-  if (overlayEl && document.body.contains(overlayEl)) return overlayEl;
-  overlayEl = document.createElement('div');
-  overlayEl.id = 'dropdownOverlay';
-  overlayEl.style.position = 'fixed';
-  overlayEl.style.inset = '0';
-  overlayEl.style.background = 'transparent';
-  overlayEl.style.zIndex = '1300';
-  overlayEl.style.pointerEvents = 'auto';
-  overlayEl.addEventListener('click', function (ev) {
-    ev.preventDefault(); ev.stopPropagation(); hideDropdown();
-  }, { passive: false });
-  return overlayEl;
+function createDropdownOverlay() {
+  if (dropdownOverlayEl && document.body.contains(dropdownOverlayEl)) return dropdownOverlayEl;
+  dropdownOverlayEl = document.createElement('div');
+  dropdownOverlayEl.id = 'dropdownOverlay';
+  // Slightly transparent / capture touches; visually subtle because dropdown itself is the visible element.
+  dropdownOverlayEl.style.position = 'fixed';
+  dropdownOverlayEl.style.inset = '0';
+  dropdownOverlayEl.style.background = 'transparent';
+  dropdownOverlayEl.style.zIndex = '2950'; // below dropdownEl (3000) but above sidebar (2000)
+  dropdownOverlayEl.style.pointerEvents = 'auto';
+
+  // Click closes dropdown immediately; do not affect mobile sidebar
+  const closeNow = function (ev) {
+    try {
+      if (ev && ev.preventDefault) ev.preventDefault();
+      if (ev && ev.stopPropagation) ev.stopPropagation();
+    } catch (e) {}
+    hideDropdown();
+  };
+
+  dropdownOverlayEl.addEventListener('click', closeNow, { passive: false });
+  // immediate response on touchstart for mobile (close on touch)
+  dropdownTouchCloseHandler = function (ev) {
+    try {
+      if (ev && ev.preventDefault) ev.preventDefault();
+      if (ev && ev.stopPropagation) ev.stopPropagation();
+    } catch (e) {}
+    hideDropdown();
+  };
+  dropdownOverlayEl.addEventListener('touchstart', dropdownTouchCloseHandler, { passive: false });
+
+  return dropdownOverlayEl;
 }
 
-function showOverlay() {
-  const ov = createOverlay();
+function showDropdownOverlay() {
+  const ov = createDropdownOverlay();
   if (!document.body.contains(ov)) document.body.appendChild(ov);
   if (dropdownEl && document.body.contains(dropdownEl)) document.body.appendChild(dropdownEl);
-  escapeKeyListener = function (ev) {
+  // set escape key listener for dropdown only
+  dropdownEscapeListener = function (ev) {
     if (ev.key === 'Escape' && dropdownVisible) {
       ev.preventDefault();
       hideDropdown();
     }
   };
-  document.addEventListener('keydown', escapeKeyListener, true);
+  document.addEventListener('keydown', dropdownEscapeListener, true);
 }
 
-function hideOverlay() {
-  if (overlayEl && document.body.contains(overlayEl)) overlayEl.remove();
-  if (escapeKeyListener) {
-    document.removeEventListener('keydown', escapeKeyListener, true);
-    escapeKeyListener = null;
+function hideDropdownOverlay() {
+  if (dropdownOverlayEl && document.body.contains(dropdownOverlayEl)) {
+    // remove listeners added
+    try {
+      dropdownOverlayEl.removeEventListener('touchstart', dropdownTouchCloseHandler);
+      dropdownOverlayEl.removeEventListener('click', hideDropdown);
+    } catch (e) {}
+    dropdownOverlayEl.remove();
+  }
+  if (dropdownEscapeListener) {
+    document.removeEventListener('keydown', dropdownEscapeListener, true);
+    dropdownEscapeListener = null;
   }
 }
 
+/* show/hide dropdown */
 function showDropdown() {
   ensureDropdown();
-  showOverlay();
+  showDropdownOverlay();
   dropdownEl.style.display = 'block';
   dropdownVisible = true;
 }
@@ -266,7 +278,7 @@ function hideDropdown() {
   if (!dropdownEl) return;
   dropdownEl.style.display = 'none';
   dropdownVisible = false;
-  hideOverlay();
+  hideDropdownOverlay();
 }
 
 /* -------------------- Notification helpers -------------------- */
@@ -297,12 +309,25 @@ function computeNotificationUrl(n) {
 async function positionDropdownRelativeTo(anchorEl) {
   const dd = ensureDropdown();
   const winW = window.innerWidth;
-  if (winW <= 720) {
-    dd.style.width = '100%';
-    dd.style.left = '0px';
-    dd.style.right = '';
-    const top = (document.querySelector('.site-header')?.getBoundingClientRect().bottom || 68) + window.scrollY;
-    dd.style.top = (top + 8) + 'px';
+  // if mobile sidebar is open and viewport narrow, position dropdown to overlay on top of sidebar
+  const mobileSidebar = document.getElementById('mobileSidebar');
+  const sidebarOpen = mobileSidebar && mobileSidebar.classList.contains('open');
+
+  if (winW <= 800) {
+    // place dropdown under header (default top) and align its right edge near viewport right so it overlays the sidebar
+    const top = (document.querySelector('.site-header')?.getBoundingClientRect().bottom || 68) + window.scrollY + 8;
+    dd.style.top = top + 'px';
+    // if sidebar open, align dropdown's right to 12px so it appears over sidebar
+    if (sidebarOpen) {
+      dd.style.right = '12px';
+      dd.style.left = 'auto';
+      dd.style.width = Math.min(360, winW - 24) + 'px';
+    } else {
+      // no sidebar: full-width-friendly layout but keep some margin
+      dd.style.left = '12px';
+      dd.style.right = '12px';
+      dd.style.width = 'auto';
+    }
   } else {
     const rect = anchorEl.getBoundingClientRect();
     const ddWidth = Math.min(420, Math.max(320, rect.width * 2));
@@ -397,6 +422,7 @@ async function renderNav() {
 
     avatarBtn.onclick = async (ev) => {
       ev.stopPropagation();
+      // Toggle dropdown open/close
       if (dropdownVisible) { hideDropdown(); return; }
       dd.innerHTML = '';
       const header = document.createElement('div');
@@ -451,7 +477,7 @@ async function renderNav() {
       showDropdown();
     };
 
-    // Notification bell handling
+    // Notification bell handling (similar to previous, opens dropdown contents)
     bell.onclick = async (ev) => {
       ev.stopPropagation();
       const nd = await fetchNotifications();
@@ -554,24 +580,17 @@ async function renderNav() {
 
   nav.appendChild(accountArea);
 
-  // click outside to close dropdown
-  document.addEventListener('click', function () {
-    if (dropdownVisible) hideDropdown();
-  }, true);
-
   // mirror nav into mobile sidebar for small screens (vertical layout)
   try {
     const mobileNav = document.getElementById('mobileSidebarNav');
     if (mobileNav) {
       mobileNav.innerHTML = '';
-      // clone only the left links and accountArea, sanitized for vertical layout
       const leftClone = left.cloneNode(true);
       leftClone.style.display = 'flex';
       leftClone.style.flexDirection = 'column';
       leftClone.querySelectorAll('a').forEach(a => { a.style.display = 'block'; a.style.padding = '10px 12px'; a.style.borderRadius = '10px'; });
 
       const acctClone = accountArea.cloneNode(true);
-      // tidy cloned account area: remove event handlers (they won't be cloned), make items block-level
       acctClone.querySelectorAll('button, a, .avatar-img').forEach(el => {
         el.removeAttribute('onclick');
         el.style.display = 'block';
@@ -581,7 +600,6 @@ async function renderNav() {
       mobileNav.appendChild(leftClone);
       mobileNav.appendChild(acctClone);
 
-      // add quick links for accounts & notifications as shortcuts
       const extras = document.createElement('div');
       extras.style.paddingTop = '8px';
       extras.innerHTML = `<a href="/accounts" class="small-link" style="display:block;padding:10px 12px;border-radius:10px;">จัดการบัญชี</a><a href="/notifications" class="small-link" style="display:block;padding:10px 12px;border-radius:10px;margin-top:6px;">การแจ้งเตือน</a>`;
@@ -590,6 +608,11 @@ async function renderNav() {
   } catch (e) {
     console.warn('mirror to mobileSidebarNav failed', e && e.message);
   }
+
+  // click outside to close dropdown
+  document.addEventListener('click', function () {
+    if (dropdownVisible) hideDropdown();
+  }, true);
 }
 
 /* -------------------- Events -------------------- */
