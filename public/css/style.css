@@ -1,34 +1,31 @@
-/* public/css/style.css
-   Revised: Minimal, modern, professional visual refresh
-   - Preserves HTML structure, class names and layout rules (no layout structure changes).
-   - Kept all selectors in place so JavaScript and server-side templates continue to work.
-   - Visual changes only: refined palette, spacing, typographic scale, shadows, borders,
-     reduced decorative noise, clearer focus states, improved button styles.
-   - Mobile sidebar layout (position, size, transform) is NOT changed — only its visual
-     overlay and panel styling updated (transparency, blur, color, shadow).
-*/
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
 
-/* ------------------------------------------------------------------
-   Design tokens (colors, radii, spacing, motion)
-   - Adjusted colors to a calmer neutral + refined accent.
--------------------------------------------------------------------*/
+/* ========================================================================
+   Updated design system (responsive & touch-friendly)
+   - Baseline taken from the provided authoritative stylesheet.
+   - Extended to support stacked header (header-top / header-bottom),
+     a mobile menu toggle, and behavior for header-bottom.open.
+   - All existing class names kept; new rules are additive and scoped so
+     existing pages continue to work while enabling the new header layout.
+   - Accessibility: ARIA-friendly, keyboard focus, reduced-motion support.
+   ======================================================================== */
+
 :root{
-  --bg: #f7f8fb;
+  --bg: #f6f7fb;
   --surface: #ffffff;
-  --muted: #9aa4b2;
-  --muted-2: #b8c1cc;
-  --text: #0f1720;
-  --accent: #2563eb;      /* slightly deeper, professional blue */
-  --accent-2: #10b981;    /* teal accent for subtle highlights */
-  --danger: #e23b3b;
-  --glass: rgba(15,23,42,0.04);
+  --muted: #97a0b3;
+  --text: #1f2a37;
+  --accent: #2f80ed;
+  --accent-2: #17c2a1;
+  --danger: #e16060;
+  --glass: rgba(16,24,40,0.04);
 
   --radius-sm: 6px;
   --radius: 10px;
   --radius-lg: 14px;
 
-  --shadow-1: 0 6px 18px rgba(12,18,28,0.06);
-  --shadow-2: 0 14px 40px rgba(12,18,28,0.08);
+  --shadow-1: 0 6px 20px rgba(29, 41, 56, 0.06);
+  --shadow-2: 0 14px 40px rgba(29, 41, 56, 0.08);
 
   --space-xxs: 4px;
   --space-xs: 8px;
@@ -42,32 +39,31 @@
   --transition: 180ms cubic-bezier(.2,.9,.2,1);
   --readable-line: 1.5rem;
   --touch-target: 44px;
-
-  --glass-surface: rgba(255,255,255,0.72);
-  --overlay-dark: rgba(6,10,18,0.48);
 }
 
-/* Respect reduced motion */
+/* Accessibility: respect user's reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   :root { --transition: 0ms; }
 }
 
-/* Base reset & typography */
+/* Global reset & base */
 * { box-sizing: border-box; }
 html,body { height: 100%; }
 body {
   margin: 0;
   font-family: 'Inter', 'Noto Sans Thai', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  background: linear-gradient(180deg, var(--bg), #f3f5f9 160px);
+  background: linear-gradient(180deg, var(--bg), #f4f6fa 120px);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.45;
   font-size: 15px;
   -webkit-text-size-adjust: 100%;
+  -webkit-font-feature-settings: "ss01" on;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Container */
+/* Layout containers */
 .container {
   width: 100%;
   max-width: var(--max-width);
@@ -75,41 +71,49 @@ body {
   padding: 0 var(--space-md);
 }
 
-/* Main page area */
+/* Page content */
 main {
   max-width: var(--max-width-narrow);
   margin: calc(var(--space-lg) + 8px) auto;
+  background: transparent;
   padding: 0;
   min-height: 60vh;
 }
 
-/* Card - refined: lighter shadow, subtle border, more breathing room */
+/* Cards */
 .card {
   background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow-1);
   padding: calc(var(--space-md) - 2px);
   margin-bottom: var(--space-lg);
-  border: 1px solid rgba(12,18,28,0.06);
+  border: 1px solid rgba(15,23,42,0.03);
   transition: box-shadow var(--transition), transform var(--transition);
 }
 .card:focus-within {
-  box-shadow: 0 14px 40px rgba(12,18,28,0.06);
+  box-shadow: 0 10px 30px rgba(29,41,56,0.06);
 }
 
-/* =========================
-   Header (kept structure)
-   ========================= */
+/* ==========================================================================
+   HEADER (STACKED on mobile)
+   - New structure uses header-inner (wrap), header-top (logo + toggle),
+     header-bottom (search + nav/actions). This is additive so older
+     selectors still function.
+   ========================================================================== */
+
 .site-header {
-  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.94));
-  border-bottom: 1px solid rgba(12,18,28,0.04);
+  background: white;
+  border-bottom: 1px solid rgba(15,23,42,0.04);
   position: sticky;
   top: 0;
   z-index: 1200;
-  backdrop-filter: saturate(1.04) blur(6px);
+  box-shadow: 0 1px 0 rgba(16,24,40,0.02);
 }
 
-/* header container (unchanged layout rules, subtle spacing tweak) */
+/* container / header-inner
+   - Keep the original .site-header .container rules for compatibility,
+     but prefer using .header-inner in markup to enable stacked layout.
+*/
 .site-header .container {
   display: flex;
   align-items: center;
@@ -119,7 +123,7 @@ main {
   padding-right: var(--space-md);
 }
 
-/* wrapper for stacked header */
+/* New: header-inner is a thin wrapper to allow stacking behavior */
 .header-inner {
   max-width: var(--max-width);
   margin: 0 auto;
@@ -127,7 +131,7 @@ main {
   width: 100%;
 }
 
-/* header-top: logo + toggle */
+/* header-top: logo + mobile toggle */
 .header-top {
   display: flex;
   align-items: center;
@@ -138,7 +142,7 @@ main {
   padding-bottom: 6px;
 }
 
-/* Logo styling: cleaner, tighter kerning */
+/* Logo */
 .logo {
   display:flex;
   align-items:center;
@@ -148,7 +152,7 @@ main {
 }
 .logo .brand {
   font-weight: 700;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.6px;
   font-size: 1.05rem;
   color: var(--text);
 }
@@ -157,19 +161,19 @@ main {
   color: var(--muted);
 }
 
-/* mobile toggle (no layout change) */
+/* mobile toggle button (hamburger), hidden on wide screens */
 #mobileMenuToggle {
   display: none;
   background: transparent;
   border: none;
   cursor: pointer;
   padding: 8px;
-  border-radius: 10px;
-  transition: background var(--transition), transform var(--transition);
+  border-radius: 8px;
 }
-#mobileMenuToggle:focus { outline: 3px solid rgba(37,99,235,0.12); outline-offset: 2px; }
 
-/* header-bottom: search + nav + actions (collapsible behavior preserved) */
+/* header-bottom: search + nav + account actions
+   - collapsible on mobile (use .open to show)
+*/
 .header-bottom {
   display: flex;
   align-items: center;
@@ -180,12 +184,14 @@ main {
   transition: max-height 220ms ease, opacity 180ms ease, transform 180ms ease;
   overflow: hidden;
   width: 100%;
-  max-height: 999px;
+  max-height: 999px; /* default for wide screens (overridden on mobile) */
 }
+
+/* When header-bottom is collapsed on mobile we'll set max-height:0; when open add class .open */
 .header-bottom.collapsed { max-height: 0; opacity: 0; pointer-events: none; transform: translateY(-6px); }
 .header-bottom.open { max-height: 999px; opacity: 1; pointer-events: auto; transform: translateY(0); }
 
-/* header-left nav links (minimal) */
+/* Primary nav (left) - legacy class kept */
 .header-left {
   display:flex;
   align-items:center;
@@ -203,12 +209,12 @@ main {
 @media (hover: hover) {
   .header-left nav a:hover {
     color: var(--text);
-    background: rgba(37,99,235,0.04);
+    background: var(--glass);
     transform: translateY(-1px);
   }
 }
 
-/* Search: refined, flatter look */
+/* Search */
 .header-search {
   display:flex;
   align-items:center;
@@ -222,11 +228,11 @@ main {
   display:flex;
   align-items:center;
   gap:8px;
-  background: linear-gradient(180deg,#ffffff,#fcfdff);
-  padding:8px;
+  background: linear-gradient(180deg,#fff,#fbfdff);
+  padding:6px;
   border-radius: 12px;
-  border: 1px solid rgba(12,18,28,0.04);
-  box-shadow: 0 6px 18px rgba(12,18,28,0.02);
+  border: 1px solid rgba(15,23,42,0.04);
+  box-shadow: 0 6px 18px rgba(46,60,80,0.02);
 }
 .header-search input[type="search"]{
   border: none;
@@ -235,17 +241,16 @@ main {
   padding: 8px;
   background: transparent;
   width: 100%;
-  color: var(--text);
 }
 
-/* Right actions */
+/* Right account area */
 .header-actions {
   display:flex;
   align-items:center;
   gap: var(--space-sm);
 }
 
-/* Avatar button refined */
+/* Avatar button */
 .avatar-btn {
   display:flex;
   align-items:center;
@@ -255,21 +260,21 @@ main {
   cursor: pointer;
   color: var(--text);
   padding: 8px;
-  border-radius: 10px;
-  transition: background var(--transition), transform var(--transition);
+  border-radius: 8px;
+  transition: background var(--transition);
 }
 @media (hover: hover) {
-  .avatar-btn:hover { background: rgba(12,18,28,0.03); transform: translateY(-2px); }
+  .avatar-btn:hover { background: var(--glass); }
 }
 .avatar-img {
   width:40px;
   height:40px;
   border-radius: 10px;
   object-fit: cover;
-  border: 1px solid rgba(12,18,28,0.06);
+  border: 1px solid rgba(15,23,42,0.06);
 }
 
-/* Buttons: modern, touch-friendly */
+/* Buttons (refined & touch-friendly) */
 .btn {
   display:inline-flex;
   align-items:center;
@@ -281,43 +286,44 @@ main {
   border: none;
   cursor: pointer;
   font-weight: 700;
-  transition: transform var(--transition), box-shadow var(--transition), background var(--transition), opacity var(--transition);
+  transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
   font-size: 0.95rem;
   line-height: 1;
+  -webkit-tap-highlight-color: rgba(0,0,0,0);
 }
 .btn:active { transform: translateY(1px); }
-.btn:focus { outline: 3px solid rgba(37,99,235,0.12); outline-offset: 2px; }
+.btn:focus { outline: 3px solid rgba(47,128,237,0.12); outline-offset: 2px; }
 
 .btn-primary {
-  background: linear-gradient(180deg,var(--accent), #174fc0);
+  background: linear-gradient(180deg,var(--accent), #1f66d6);
   color: white;
-  box-shadow: 0 8px 24px rgba(37,99,235,0.10);
+  box-shadow: 0 8px 20px rgba(47,128,237,0.12);
 }
 @media (hover: hover) {
-  .btn-primary:hover { transform: translateY(-2px); opacity: 0.98; }
+  .btn-primary:hover { transform: translateY(-2px); }
 }
 
 .btn-ghost {
   background: transparent;
-  border: 1px solid rgba(12,18,28,0.06);
+  border: 1px solid rgba(15,23,42,0.06);
   color: var(--text);
 }
 .btn-muted {
-  background: #f5f7fb;
+  background: #f4f6fb;
   color: var(--text);
 }
 
-/* Utility badge */
+/* Utility badges */
 .badge {
   padding: 4px 8px;
   font-size: 12px;
   border-radius: 999px;
-  background: rgba(37,99,235,0.08);
+  background: #eef6ff;
   color: var(--accent);
   font-weight: 700;
 }
 
-/* Feed & posts: subtle elevation and spacing */
+/* Feed & posts */
 .feed {
   display:flex;
   flex-direction:column;
@@ -328,10 +334,10 @@ main {
   gap: var(--space-md);
   align-items:flex-start;
   padding: calc(var(--space-md) - 2px);
-  background: linear-gradient(180deg,#fff,#fbfdff);
+  background: linear-gradient(180deg,#fff,#fcfdff);
   border-radius: var(--radius);
-  box-shadow: 0 6px 20px rgba(12,18,28,0.03);
-  border: 1px solid rgba(12,18,28,0.04);
+  box-shadow: var(--shadow-1);
+  border: 1px solid rgba(15,23,42,0.03);
 }
 .post .post-left {
   width: 64px;
@@ -342,13 +348,13 @@ main {
 }
 .post .post-title { font-size: 1.05rem; margin:0; color: var(--text); font-weight:700; }
 .post .post-meta { color: var(--muted); font-size: 0.9rem; margin-top:6px; display:flex; gap:8px; align-items:center; }
-.post .post-excerpt { margin-top: 12px; color: #34404a; }
+.post .post-excerpt { margin-top: 12px; color: #38414b; }
 .post .post-img {
   max-width: 280px;
   border-radius: 10px;
   object-fit: cover;
   margin-top: 12px;
-  box-shadow: 0 8px 30px rgba(12,18,28,0.04);
+  box-shadow: 0 8px 30px rgba(16,24,40,0.04);
 }
 
 /* Post actions */
@@ -362,21 +368,21 @@ main {
 /* Comments */
 .comment {
   background: #fbfdff;
-  border: 1px solid rgba(12,18,28,0.04);
+  border: 1px solid rgba(15,23,42,0.03);
   padding: 10px;
   border-radius: 8px;
   margin-bottom: 10px;
 }
 .comment .meta { font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
 
-/* Forms & inputs */
+/* Forms & inputs (clear visual focus & spacing) */
 input, textarea, select, button {
   font-family: inherit;
 }
 input[type="text"], input[type="email"], input[type="password"], textarea {
   width: 100%;
   border-radius: 10px;
-  border: 1px solid rgba(12,18,28,0.06);
+  border: 1px solid rgba(15,23,42,0.06);
   padding: 12px 14px;
   background: #fff;
   transition: box-shadow var(--transition), border-color var(--transition);
@@ -385,12 +391,12 @@ input[type="text"], input[type="email"], input[type="password"], textarea {
 }
 input:focus, textarea:focus {
   outline: none;
-  border-color: rgba(37,99,235,0.6);
-  box-shadow: 0 12px 36px rgba(37,99,235,0.06);
+  border-color: rgba(47,128,237,0.6);
+  box-shadow: 0 8px 30px rgba(47,128,237,0.06);
 }
 textarea { min-height: 120px; resize: vertical; }
 
-/* File input */
+/* File input custom */
 .input-file {
   display:inline-flex;
   gap:8px;
@@ -408,7 +414,7 @@ textarea { min-height: 120px; resize: vertical; }
   gap: var(--space-sm);
   align-items:center;
   text-align:center;
-  border: 1px solid rgba(12,18,28,0.04);
+  border: 1px solid rgba(15,23,42,0.03);
 }
 .profile-hero .avatar {
   width: 140px;
@@ -419,7 +425,7 @@ textarea { min-height: 120px; resize: vertical; }
   box-shadow: var(--shadow-2);
 }
 
-/* Responsive helpers */
+/* Responsive layout helpers */
 .grid-2 {
   display:grid;
   grid-template-columns: 320px 1fr;
@@ -434,19 +440,19 @@ textarea { min-height: 120px; resize: vertical; }
   .logo .brand { font-size: 0.95rem; }
 }
 
-/* Dropdown panel (refined card visual) */
+/* Dropdown panel (account / notifications) */
 .dropdown-panel {
   min-width: 320px;
   max-width: 420px;
   border-radius: 12px;
   overflow: hidden;
-  background: linear-gradient(180deg, #ffffff, #fbfdff);
-  border: 1px solid rgba(12,18,28,0.06);
-  box-shadow: 0 18px 48px rgba(12,18,28,0.12);
+  background: var(--surface);
+  border: 1px solid rgba(15,23,42,0.06);
+  box-shadow: 0 20px 60px rgba(16,24,40,0.12);
 }
 .dropdown-header {
   padding: 12px;
-  border-bottom: 1px solid rgba(12,18,28,0.04);
+  border-bottom: 1px solid rgba(15,23,42,0.04);
   display:flex;
   align-items:center;
   gap:12px;
@@ -460,7 +466,7 @@ textarea { min-height: 120px; resize: vertical; }
   cursor: pointer;
 }
 @media (hover: hover) {
-  .dropdown-item:hover { background: rgba(12,18,28,0.02); }
+  .dropdown-item:hover { background: #fbfdff; }
 }
 
 /* Notification badge */
@@ -504,7 +510,7 @@ textarea { min-height: 120px; resize: vertical; }
 .small { font-size: 0.85rem; color: var(--muted); }
 .section-title { margin: var(--space-md) 0; display:flex; align-items:center; gap:12px; }
 .section-title span {
-  background: linear-gradient(90deg, rgba(37,99,235,0.10), rgba(16,185,129,0.06));
+  background: linear-gradient(90deg, rgba(47,128,237,0.12), rgba(23,194,161,0.08));
   padding: 8px 14px;
   border-radius: 999px;
   font-weight:700;
@@ -514,13 +520,13 @@ textarea { min-height: 120px; resize: vertical; }
 /* accessibility helpers */
 .sr-only { position: absolute !important; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; }
 
-/* anchors */
+/* Misc polish */
 a { color: var(--accent); text-decoration: none; }
 @media (hover: hover) {
   a:hover { text-decoration: underline; }
 }
 
-/* Avatar circle */
+/* Avatar / profile UI */
 .avatar-circle {
   width: 120px;
   height: 120px;
@@ -529,14 +535,14 @@ a { color: var(--accent); text-decoration: none; }
   display: inline-block;
   background: linear-gradient(180deg,#fff,#f5f7fb);
   border: 3px solid #fff;
-  box-shadow: 0 6px 18px rgba(12,18,28,0.06);
+  box-shadow: 0 6px 18px rgba(16,24,40,0.06);
 }
 .avatar-circle img { width:100%; height:100%; object-fit: cover; display:block; }
 
-/* Modal helpers */
+/* Modal helpers (used by JS UI) */
 .modal-fullscreen-bg {
   position: fixed; z-index: 9999; left: 0; top: 0; width: 100vw; height: 100vh;
-  background: rgba(6,10,18,0.56); display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.56); display: flex; align-items: center; justify-content: center;
   padding: 20px;
 }
 .modal-fullscreen-content {
@@ -549,16 +555,16 @@ a { color: var(--accent); text-decoration: none; }
   box-shadow: var(--shadow-2);
 }
 
-/* Inline error message */
+/* Inline small message (errors only) */
 #inlineMsg { display:none; margin-top:8px; color:var(--danger); font-size:0.95rem; }
 
-/* Utilities */
+/* Utility classes */
 .hidden { display:none !important; }
 .center { display:flex; align-items:center; justify-content:center; }
 .row { display:flex; gap:12px; align-items:center; }
 .col { display:flex; flex-direction:column; gap:8px; }
 
-/* Very small screens adjustments */
+/* Layout adjustments for very small screens */
 @media (max-width: 560px) {
   :root {
     --space-md: 12px;
@@ -573,109 +579,119 @@ a { color: var(--accent); text-decoration: none; }
   .card { padding: 12px; }
 }
 
-/* Medium screens slight tweaks */
+/* Small improvements for medium screens */
 @media (min-width: 561px) and (max-width: 950px) {
   .header-search { display:none; }
   .grid-2 { grid-template-columns: 1fr; }
   .avatar-circle { width: 110px; height: 110px; }
 }
 
-/* subtle keyboard-only focus outlines */
+/* Provide a subtle focus outline for keyboard users (only show when focusing via keyboard) */
 :root:focus-within .btn:focus { outline-offset: 3px; }
 
 /* Ensure images don't overflow */
 img { max-width: 100%; height: auto; display: block; }
 
-/* ============================
-   Mobile-first adjustments
-   (STACKED header behavior preserved)
-   ============================ */
+/* ========================================================================
+   Mobile-First Media Query
+   - Emphasize stacked header behavior: on small screens header-bottom
+     collapses beneath the logo; toggle shows/hides it. This prevents
+     crowding in the header row and moves controls (search, actions) below.
+   ======================================================================== */
+
+/* Mobile Devices (Portrait and Landscape) */
 @media (max-width: 800px) {
 
   :root {
+    /* adjust spacing for mobile */
     --space-sm: 10px;
     --space-md: 14px;
     --space-lg: 20px;
   }
 
+  /* Use header-inner to stack header-top + header-bottom */
   .header-inner { display:flex; flex-direction:column; gap:8px; align-items:stretch; padding: 8px var(--space-sm); }
   .header-top { height: 56px; }
+
+  /* smaller brand */
   .logo .brand { font-size: 1rem; }
   .logo .tagline { display:none; }
 
-  /* header-bottom visual: keep position/transform/width unchanged (behavior kept),
-     but enhance overlay styling for clarity (glass + softer shadow). */
-  .header-bottom {
-    position: fixed;
-    top: 80px; /* เว้นจากด้านบน (unchanged) */
-    left: 0;
-    width: 100%;
-    background: linear-gradient(180deg, rgba(255,255,255,0.86), rgba(255,255,255,0.82));
-    backdrop-filter: blur(8px) saturate(1.05);
-    box-shadow: 0 10px 30px rgba(6,10,18,0.12);
-    border-bottom: 1px solid rgba(6,10,18,0.05);
+ /* header-bottom collapsed by default */
+.header-bottom {
+  position: fixed;
+  top: 80px; /* เว้นจากด้านบน */
+  left: 0;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 
-    /* padding retained to preserve spacing */
-    padding: 0.75rem 1rem;
+  /* เว้นระยะด้านในเพื่อไม่ให้ปุ่มติดขอบ */
+  padding: 0.75rem 1rem;
 
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* กระจายปุ่มซ้าย-ขวาให้อยู่ในจอ */
+  
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
 
-    transform: translateY(-100%);
-    opacity: 0;
-    pointer-events: none;
+  transition: 
+    transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.3s ease;
+  z-index: 1000;
+}
 
-    transition:
-      transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-      opacity 0.3s ease;
-    z-index: 1000;
-  }
+/* เมื่อเปิด */
+.header-bottom.open {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
 
-  /* open state (unchanged layout) */
-  .header-bottom.open {
-    transform: translateY(0);
-    opacity: 1;
-    pointer-events: auto;
-  }
+/* สไตล์ปุ่ม (ถ้าอยากให้ดูสวยขึ้นด้วย) */
+.header-bottom button {
+  padding: 0.5rem 1rem;
+  border-radius: 12px;
+  border: none;
+  background: #007bff;
+  color: #fff;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
 
-  /* button visuals inside header-bottom */
-  .header-bottom button {
-    padding: 0.5rem 0.9rem;
-    border-radius: 12px;
-    border: none;
-    background: linear-gradient(180deg,var(--accent), #0f4fc2);
-    color: #fff;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.18s ease, transform var(--transition);
-  }
-  .header-bottom button:hover { transform: translateY(-1px); }
+.header-bottom button:hover {
+  background: #0056b3;
+}
 
-  /* show mobile toggle (unchanged layout) */
+  /* show mobile toggle button */
   #mobileMenuToggle { display: inline-flex; }
 
+  /* header-search becomes full width when visible */
   .header-search { width: 100%; min-width: auto; order: 1; }
 
   /* nav/actions stacked below search */
   #navBar { order: 2; display:flex; width:100%; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
 
-  /* Stack posts/cards visually (kept layout behavior) */
+  /* Make posts stack vertically */
   .card, .post { padding: var(--space-md); margin-bottom: var(--space-md); flex-direction: column; gap: var(--space-md); }
   .post .post-left { width: 100%; display:flex; align-items:center; gap:12px; }
   .post .post-body { order: 2; }
   .post .post-excerpt { display:none; }
   .post .post-img { max-width: 100%; height: auto; margin-top: var(--space-sm); }
 
-  /* Footer */
+  /* Footer stack */
   .site-footer .footer-inner { flex-direction: column; text-align: center; gap: var(--space-sm); }
   .footer-links { flex-direction: column; gap: 8px; }
 
   /* ---------------------------
-     Mobile sidebar (layout preserved)
+     Mobile sidebar styles
      --------------------------- */
   .mobile-sidebar {
-    /* layout / position / width / transform preserved to avoid layout changes */
     position: fixed;
     top: 0;
     right: 0;
@@ -694,34 +710,30 @@ img { max-width: 100%; height: auto; display: block; }
     transform: translateX(0);
     pointer-events: auto;
   }
-
-  /* mobile-sidebar-panel: visual refresh only (no layout reorder) */
   .mobile-sidebar-panel {
     width: 100%;
     height: 100%;
-    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,251,255,0.96));
-    box-shadow: -20px 0 48px rgba(6,10,18,0.16);
-    padding: 20px;
+    background: var(--surface);
+    box-shadow: -18px 0 40px rgba(16,24,40,0.12);
+    padding: 18px;
     overflow: auto;
     display: flex;
     flex-direction: column;
     gap: 12px;
     border-radius: 6px 0 0 6px;
-    border-left: 1px solid rgba(12,18,28,0.04);
   }
-  .mobile-sidebar-header { padding-bottom: 6px; border-bottom: 1px solid rgba(12,18,28,0.04); }
+  .mobile-sidebar-header { padding-bottom: 6px; border-bottom: 1px solid rgba(15,23,42,0.04); }
   .mobile-sidebar-content { padding-top: 8px; display: flex; flex-direction: column; gap: 8px; }
 
-  /* overlay behind sidebar (visual only) */
+  /* overlay behind sidebar */
   .mobile-sidebar-overlay {
     position: fixed;
     inset: 0;
     z-index: 1390;
-    background: linear-gradient(180deg, rgba(6,10,18,0.36), rgba(6,10,18,0.48));
+    background: rgba(0,0,0,0.45);
     opacity: 0;
     transition: opacity 220ms ease;
     pointer-events: none;
-    backdrop-filter: blur(2px);
   }
   .mobile-sidebar-overlay.show {
     opacity: 1;
@@ -735,7 +747,7 @@ img { max-width: 100%; height: auto; display: block; }
   }
 }
 
-/* Medium screens/tablets */
+/* Medium Screens and Tablets */
 @media (min-width: 801px) and (max-width: 1100px) {
   .header-search { min-width: 200px; width: 30%; }
   .header-inner { padding: 0 var(--space-md); }
@@ -743,7 +755,7 @@ img { max-width: 100%; height: auto; display: block; }
   #mobileMenuToggle { display: none; }
 }
 
-/* Desktop: header bottom visible, toggle hidden */
+/* Desktop: header bottom always visible, toggle hidden */
 @media (min-width: 1101px) {
   .header-bottom { max-height: none; opacity: 1; pointer-events: auto; transform: none; }
   #mobileMenuToggle { display: none; }
