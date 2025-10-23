@@ -1,69 +1,81 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
-
 /* ========================================================================
-   Updated design system (responsive & touch-friendly)
-   - Baseline taken from the provided authoritative stylesheet.
-   - Extended to support stacked header (header-top / header-bottom),
-     a mobile menu toggle, and behavior for header-bottom.open.
-   - All existing class names kept; new rules are additive and scoped so
-     existing pages continue to work while enabling the new header layout.
-   - Accessibility: ARIA-friendly, keyboard focus, reduced-motion support.
+   COMMUNITY - modern / minimal refinement
+   - Purpose: evolve the existing design toward a cleaner, more "platform"
+     feel while preserving all selectors, class names and behaviors used
+     throughout the app. Changes are additive and intended to improve
+     visual hierarchy, spacing, and accessibility without removing any
+     existing CSS contract.
+   - Strategy:
+     * preserve all original class names and responsive breakpoints
+     * simplify shadows, reduce visual noise, increase whitespace
+     * stronger typographic scale, clearer focus states, subtle motion
+     * maintain header stacking + mobile toggle behavior as before
    ======================================================================== */
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
+
 :root{
-  --bg: #f6f7fb;
+  /* core palette (tuned for neutral, modern platform look) */
+  --bg: #f5f7fb;
   --surface: #ffffff;
-  --muted: #97a0b3;
-  --text: #1f2a37;
-  --accent: #2f80ed;
-  --accent-2: #17c2a1;
-  --danger: #e16060;
-  --glass: rgba(16,24,40,0.04);
+  --muted: #90a0b3;
+  --text: #0f1720;
+  --accent: #2563eb;     /* calmer blue */
+  --accent-2: #10b981;
+  --danger: #e05050;
+  --glass: rgba(16,24,40,0.03);
 
+  /* radii */
   --radius-sm: 6px;
-  --radius: 10px;
-  --radius-lg: 14px;
+  --radius: 12px;
+  --radius-lg: 16px;
 
-  --shadow-1: 0 6px 20px rgba(29, 41, 56, 0.06);
-  --shadow-2: 0 14px 40px rgba(29, 41, 56, 0.08);
+  /* shadows (more subtle & consistent) */
+  --shadow-1: 0 6px 18px rgba(15,23,42,0.06);
+  --shadow-2: 0 12px 36px rgba(15,23,42,0.08);
 
+  /* spacing scale */
   --space-xxs: 4px;
   --space-xs: 8px;
   --space-sm: 12px;
-  --space-md: 16px;
-  --space-lg: 24px;
-  --space-xl: 36px;
+  --space-md: 18px;
+  --space-lg: 28px;
+  --space-xl: 40px;
 
+  /* layout */
   --max-width: 1100px;
   --max-width-narrow: 920px;
   --transition: 180ms cubic-bezier(.2,.9,.2,1);
-  --readable-line: 1.5rem;
+  --readable-line: 1.6rem;
   --touch-target: 44px;
 }
 
-/* Accessibility: respect user's reduced motion preference */
+/* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   :root { --transition: 0ms; }
 }
 
-/* Global reset & base */
+/* ------------------------------------------------------------------------
+   Base reset and typography
+   - keep original stack but refine sizes and weights for a modern look
+   ------------------------------------------------------------------------ */
 * { box-sizing: border-box; }
 html,body { height: 100%; }
 body {
   margin: 0;
   font-family: 'Inter', 'Noto Sans Thai', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  background: linear-gradient(180deg, var(--bg), #f4f6fa 120px);
+  background: linear-gradient(180deg, var(--bg), #f3f6fa 140px);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  line-height: 1.45;
+  line-height: 1.5;
   font-size: 15px;
   -webkit-text-size-adjust: 100%;
+  letter-spacing: 0.01em;
   -webkit-font-feature-settings: "ss01" on;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Layout containers */
+/* container */
 .container {
   width: 100%;
   max-width: var(--max-width);
@@ -71,38 +83,55 @@ body {
   padding: 0 var(--space-md);
 }
 
-/* Page content */
+/* main content */
 main {
   max-width: var(--max-width-narrow);
   margin: calc(var(--space-lg) + 8px) auto;
-  background: transparent;
   padding: 0;
   min-height: 60vh;
 }
 
-/* Cards */
+/* subtle system link style */
+a { color: var(--accent); text-decoration: none; }
+@media (hover: hover) {
+  a:hover { text-decoration: underline; }
+}
+
+/* utility small text */
+.small { font-size: 0.86rem; color: var(--muted); }
+
+/* consistent spacing helpers */
+.row { display:flex; gap:12px; align-items:center; }
+.col { display:flex; flex-direction:column; gap:8px; }
+
+/* sr-only for accessibility */
+.sr-only { position:absolute !important; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; }
+
+/* images */
+img { max-width:100%; height:auto; display:block; }
+
+/* ------------------------------------------------------------------------
+   Cards (cleaner, slightly larger radius, reduced border noise)
+   ------------------------------------------------------------------------ */
 .card {
   background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow-1);
   padding: calc(var(--space-md) - 2px);
   margin-bottom: var(--space-lg);
-  border: 1px solid rgba(15,23,42,0.03);
-  transition: box-shadow var(--transition), transform var(--transition);
+  border: 1px solid rgba(15,23,42,0.04);
+  transition: box-shadow var(--transition), transform var(--transition), border-color var(--transition);
 }
 .card:focus-within {
-  box-shadow: 0 10px 30px rgba(29,41,56,0.06);
+  box-shadow: 0 14px 36px rgba(15,23,42,0.06);
+  border-color: rgba(37,99,235,0.08);
 }
 
-/* ==========================================================================
-   HEADER (STACKED on mobile)
-   - New structure uses header-inner (wrap), header-top (logo + toggle),
-     header-bottom (search + nav/actions). This is additive so older
-     selectors still function.
-   ========================================================================== */
-
+/* ------------------------------------------------------------------------
+   Header (stacked / responsive) - keep structure but refine details
+   ------------------------------------------------------------------------ */
 .site-header {
-  background: white;
+  background: var(--surface);
   border-bottom: 1px solid rgba(15,23,42,0.04);
   position: sticky;
   top: 0;
@@ -110,20 +139,17 @@ main {
   box-shadow: 0 1px 0 rgba(16,24,40,0.02);
 }
 
-/* container / header-inner
-   - Keep the original .site-header .container rules for compatibility,
-     but prefer using .header-inner in markup to enable stacked layout.
-*/
+/* container inside header */
 .site-header .container {
-  display: flex;
-  align-items: center;
+  display:flex;
+  align-items:center;
   gap: var(--space-md);
   height: 68px;
   padding-left: var(--space-md);
   padding-right: var(--space-md);
 }
 
-/* New: header-inner is a thin wrapper to allow stacking behavior */
+/* header-inner wrapper (stacking for mobile) */
 .header-inner {
   max-width: var(--max-width);
   margin: 0 auto;
@@ -131,28 +157,28 @@ main {
   width: 100%;
 }
 
-/* header-top: logo + mobile toggle */
+/* header-top: logo + toggle */
 .header-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
   gap: var(--space-md);
   height: 68px;
   padding-top: 6px;
   padding-bottom: 6px;
 }
 
-/* Logo */
+/* logo */
 .logo {
   display:flex;
   align-items:center;
   gap: 12px;
-  text-decoration: none;
+  text-decoration:none;
   color: var(--text);
 }
 .logo .brand {
   font-weight: 700;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.4px;
   font-size: 1.05rem;
   color: var(--text);
 }
@@ -161,7 +187,7 @@ main {
   color: var(--muted);
 }
 
-/* mobile toggle button (hamburger), hidden on wide screens */
+/* mobile toggle */
 #mobileMenuToggle {
   display: none;
   background: transparent;
@@ -169,29 +195,36 @@ main {
   cursor: pointer;
   padding: 8px;
   border-radius: 8px;
+  transition: background var(--transition), transform var(--transition);
 }
+#mobileMenuToggle:active { transform: translateY(1px); }
+@media (hover: hover) {
+  #mobileMenuToggle:hover { background: var(--glass); }
 
-/* header-bottom: search + nav + account actions
-   - collapsible on mobile (use .open to show)
-*/
+/* keep a11y focus ring */
+}
+#mobileMenuToggle:focus { outline: 3px solid rgba(37,99,235,0.12); outline-offset: 3px; }
+
+/* header-bottom (search + nav) */
 .header-bottom {
-  display: flex;
-  align-items: center;
+  display:flex;
+  align-items:center;
   gap: var(--space-md);
-  justify-content: space-between;
+  justify-content:space-between;
   padding-top: 8px;
   padding-bottom: 8px;
   transition: max-height 220ms ease, opacity 180ms ease, transform 180ms ease;
   overflow: hidden;
   width: 100%;
-  max-height: 999px; /* default for wide screens (overridden on mobile) */
+  max-height: 999px;
+  background: transparent;
 }
 
-/* When header-bottom is collapsed on mobile we'll set max-height:0; when open add class .open */
+/* collapsed / open states preserved */
 .header-bottom.collapsed { max-height: 0; opacity: 0; pointer-events: none; transform: translateY(-6px); }
 .header-bottom.open { max-height: 999px; opacity: 1; pointer-events: auto; transform: translateY(0); }
 
-/* Primary nav (left) - legacy class kept */
+/* header-left nav links */
 .header-left {
   display:flex;
   align-items:center;
@@ -205,16 +238,17 @@ main {
   border-radius: 8px;
   font-weight: 600;
   transition: color var(--transition), background var(--transition), transform var(--transition);
+  font-size: 0.95rem;
 }
 @media (hover: hover) {
   .header-left nav a:hover {
     color: var(--text);
-    background: var(--glass);
+    background: rgba(47,128,237,0.04);
     transform: translateY(-1px);
   }
 }
 
-/* Search */
+/* search refinement: simpler, taller input */
 .header-search {
   display:flex;
   align-items:center;
@@ -224,33 +258,34 @@ main {
   width: 40%;
 }
 .header-search form {
-  width: 100%;
+  width:100%;
   display:flex;
   align-items:center;
-  gap:8px;
+  gap:10px;
   background: linear-gradient(180deg,#fff,#fbfdff);
-  padding:6px;
+  padding:8px;
   border-radius: 12px;
   border: 1px solid rgba(15,23,42,0.04);
-  box-shadow: 0 6px 18px rgba(46,60,80,0.02);
+  box-shadow: 0 6px 18px rgba(16,24,40,0.03);
 }
 .header-search input[type="search"]{
   border: none;
   outline: none;
-  font-size: 0.95rem;
-  padding: 8px;
+  font-size: 0.96rem;
+  padding: 10px;
   background: transparent;
   width: 100%;
+  color: var(--text);
 }
 
-/* Right account area */
+/* header-actions (right area) */
 .header-actions {
   display:flex;
   align-items:center;
   gap: var(--space-sm);
 }
 
-/* Avatar button */
+/* avatar button */
 .avatar-btn {
   display:flex;
   align-items:center;
@@ -264,7 +299,7 @@ main {
   transition: background var(--transition);
 }
 @media (hover: hover) {
-  .avatar-btn:hover { background: var(--glass); }
+  .avatar-btn:hover { background: rgba(16,24,40,0.03); }
 }
 .avatar-img {
   width:40px;
@@ -274,7 +309,9 @@ main {
   border: 1px solid rgba(15,23,42,0.06);
 }
 
-/* Buttons (refined & touch-friendly) */
+/* ------------------------------------------------------------------------
+   Buttons: more minimal, consistent sizing, stronger typography
+   ------------------------------------------------------------------------ */
 .btn {
   display:inline-flex;
   align-items:center;
@@ -286,21 +323,22 @@ main {
   border: none;
   cursor: pointer;
   font-weight: 700;
-  transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
+  transition: transform var(--transition), box-shadow var(--transition), background var(--transition), opacity var(--transition);
   font-size: 0.95rem;
   line-height: 1;
   -webkit-tap-highlight-color: rgba(0,0,0,0);
+  background: transparent;
 }
 .btn:active { transform: translateY(1px); }
-.btn:focus { outline: 3px solid rgba(47,128,237,0.12); outline-offset: 2px; }
+.btn:focus { outline: 3px solid rgba(37,99,235,0.12); outline-offset: 2px; }
 
 .btn-primary {
   background: linear-gradient(180deg,var(--accent), #1f66d6);
   color: white;
-  box-shadow: 0 8px 20px rgba(47,128,237,0.12);
+  box-shadow: 0 8px 22px rgba(37,99,235,0.10);
 }
 @media (hover: hover) {
-  .btn-primary:hover { transform: translateY(-2px); }
+  .btn-primary:hover { transform: translateY(-2px); opacity: 0.98; }
 }
 
 .btn-ghost {
@@ -309,21 +347,23 @@ main {
   color: var(--text);
 }
 .btn-muted {
-  background: #f4f6fb;
+  background: #f6f8fc;
   color: var(--text);
 }
 
-/* Utility badges */
+/* smaller badge / utility */
 .badge {
   padding: 4px 8px;
   font-size: 12px;
   border-radius: 999px;
-  background: #eef6ff;
+  background: rgba(37,99,235,0.08);
   color: var(--accent);
   font-weight: 700;
 }
 
-/* Feed & posts */
+/* ------------------------------------------------------------------------
+   Feed / posts - clearer hierarchy, read-friendly widths
+   ------------------------------------------------------------------------ */
 .feed {
   display:flex;
   flex-direction:column;
@@ -346,18 +386,18 @@ main {
 .post .post-body {
   flex: 1;
 }
-.post .post-title { font-size: 1.05rem; margin:0; color: var(--text); font-weight:700; }
+.post .post-title { font-size: 1.06rem; margin:0; color: var(--text); font-weight:800; }
 .post .post-meta { color: var(--muted); font-size: 0.9rem; margin-top:6px; display:flex; gap:8px; align-items:center; }
-.post .post-excerpt { margin-top: 12px; color: #38414b; }
+.post .post-excerpt { margin-top: 12px; color: #39424b; font-size: 0.98rem; line-height:1.5; }
 .post .post-img {
   max-width: 280px;
   border-radius: 10px;
   object-fit: cover;
   margin-top: 12px;
-  box-shadow: 0 8px 30px rgba(16,24,40,0.04);
+  box-shadow: 0 10px 30px rgba(16,24,40,0.04);
 }
 
-/* Post actions */
+/* post actions */
 .post-actions {
   margin-top: 12px;
   display:flex;
@@ -365,7 +405,7 @@ main {
   align-items:center;
 }
 
-/* Comments */
+/* comment card */
 .comment {
   background: #fbfdff;
   border: 1px solid rgba(15,23,42,0.03);
@@ -375,10 +415,8 @@ main {
 }
 .comment .meta { font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
 
-/* Forms & inputs (clear visual focus & spacing) */
-input, textarea, select, button {
-  font-family: inherit;
-}
+/* forms & inputs */
+input, textarea, select, button { font-family: inherit; }
 input[type="text"], input[type="email"], input[type="password"], textarea {
   width: 100%;
   border-radius: 10px;
@@ -386,25 +424,21 @@ input[type="text"], input[type="email"], input[type="password"], textarea {
   padding: 12px 14px;
   background: #fff;
   transition: box-shadow var(--transition), border-color var(--transition);
-  font-size: 0.96rem;
-  line-height: 1.3;
+  font-size: 0.98rem;
+  line-height: 1.4;
 }
 input:focus, textarea:focus {
   outline: none;
-  border-color: rgba(47,128,237,0.6);
-  box-shadow: 0 8px 30px rgba(47,128,237,0.06);
+  border-color: rgba(37,99,235,0.6);
+  box-shadow: 0 10px 30px rgba(37,99,235,0.06);
 }
 textarea { min-height: 120px; resize: vertical; }
 
-/* File input custom */
-.input-file {
-  display:inline-flex;
-  gap:8px;
-  align-items:center;
-}
+/* file input */
+.input-file { display:inline-flex; gap:8px; align-items:center; }
 .input-file input[type="file"] { display:none; }
 
-/* Profile hero */
+/* profile hero */
 .profile-hero {
   background: linear-gradient(180deg,#fff,#fbfdff);
   padding: var(--space-md);
@@ -425,22 +459,20 @@ textarea { min-height: 120px; resize: vertical; }
   box-shadow: var(--shadow-2);
 }
 
-/* Responsive layout helpers */
-.grid-2 {
-  display:grid;
-  grid-template-columns: 320px 1fr;
-  gap: var(--space-md);
+/* avatar circle */
+.avatar-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 9999px;
+  overflow: hidden;
+  display: inline-block;
+  background: linear-gradient(180deg,#fff,#f5f7fb);
+  border: 3px solid #fff;
+  box-shadow: 0 6px 18px rgba(16,24,40,0.06);
 }
-@media (max-width: 1100px) {
-  .grid-2 { grid-template-columns: 1fr; }
-}
-@media (max-width: 950px) {
-  .header-search { display:none; }
-  .avatar-img { width:36px;height:36px; }
-  .logo .brand { font-size: 0.95rem; }
-}
+.avatar-circle img { width:100%; height:100%; object-fit: cover; display:block; }
 
-/* Dropdown panel (account / notifications) */
+/* dropdowns */
 .dropdown-panel {
   min-width: 320px;
   max-width: 420px;
@@ -469,7 +501,7 @@ textarea { min-height: 120px; resize: vertical; }
   .dropdown-item:hover { background: #fbfdff; }
 }
 
-/* Notification badge */
+/* notify bell and badge */
 .notify-bell { position: relative; width:42px; height:42px; display:flex; align-items:center; justify-content:center; border-radius:10px; }
 .notify-badge {
   position:absolute;
@@ -483,7 +515,7 @@ textarea { min-height: 120px; resize: vertical; }
   font-weight:700;
 }
 
-/* Footer */
+/* footer */
 .site-footer {
   margin-top: var(--space-xl);
   background: transparent;
@@ -506,40 +538,152 @@ textarea { min-height: 120px; resize: vertical; }
   .footer-links a:hover { color: var(--text); }
 }
 
-/* Small & muted */
-.small { font-size: 0.85rem; color: var(--muted); }
+/* subtle section title */
 .section-title { margin: var(--space-md) 0; display:flex; align-items:center; gap:12px; }
 .section-title span {
-  background: linear-gradient(90deg, rgba(47,128,237,0.12), rgba(23,194,161,0.08));
+  background: linear-gradient(90deg, rgba(37,99,235,0.10), rgba(16,185,129,0.06));
   padding: 8px 14px;
   border-radius: 999px;
   font-weight:700;
   color: var(--accent);
 }
 
-/* accessibility helpers */
-.sr-only { position: absolute !important; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; }
+/* inline messages (errors) */
+#inlineMsg { display:none; margin-top:8px; color:var(--danger); font-size:0.95rem; }
 
-/* Misc polish */
-a { color: var(--accent); text-decoration: none; }
-@media (hover: hover) {
-  a:hover { text-decoration: underline; }
+/* misc utilities */
+.hidden { display:none !important; }
+.center { display:flex; align-items:center; justify-content:center; }
+
+/* responsive tweaks */
+.grid-2 {
+  display:grid;
+  grid-template-columns: 320px 1fr;
+  gap: var(--space-md);
+}
+@media (max-width: 1100px) { .grid-2 { grid-template-columns: 1fr; } }
+@media (max-width: 950px) {
+  .header-search { display:none; }
+  .avatar-img { width:36px;height:36px; }
+  .logo .brand { font-size: 0.95rem; }
 }
 
-/* Avatar / profile UI */
-.avatar-circle {
-  width: 120px;
-  height: 120px;
-  border-radius: 9999px;
-  overflow: hidden;
-  display: inline-block;
-  background: linear-gradient(180deg,#fff,#f5f7fb);
-  border: 3px solid #fff;
-  box-shadow: 0 6px 18px rgba(16,24,40,0.06);
+/* small screens layout adjustments */
+@media (max-width: 560px) {
+  :root {
+    --space-md: 12px;
+    --space-lg: 18px;
+    --touch-target: 48px;
+  }
+  body { font-size: 15px; }
+  .site-header .container { height: 60px; padding-left: 12px; padding-right: 12px; }
+  .btn { padding: 12px 14px; font-size: 0.95rem; border-radius: 12px; }
+  .avatar-circle { width: 96px; height: 96px; }
+  .profile-hero .avatar { width: 120px; height: 120px; }
+  .card { padding: 12px; }
 }
-.avatar-circle img { width:100%; height:100%; object-fit: cover; display:block; }
 
-/* Modal helpers (used by JS UI) */
+/* medium screens */
+@media (min-width: 561px) and (max-width: 950px) {
+  .header-search { display:none; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .avatar-circle { width: 110px; height: 110px; }
+}
+
+/* keyboard-only outline improvement */
+:root:focus-within .btn:focus { outline-offset: 3px; }
+
+/* ========================================================================
+   Mobile first stacking behavior for header-bottom (preserve original)
+   ======================================================================== */
+@media (max-width: 800px) {
+
+  :root {
+    --space-sm: 10px;
+    --space-md: 14px;
+    --space-lg: 20px;
+  }
+
+  .header-inner { display:flex; flex-direction:column; gap:8px; align-items:stretch; padding: 8px var(--space-sm); }
+  .header-top { height: 56px; }
+
+  .logo .brand { font-size: 1rem; }
+  .logo .tagline { display:none; }
+
+  /* header-bottom becomes a layer that slides down */
+  .header-bottom {
+    position: fixed;
+    top: 80px;
+    left: 0;
+    width: 100%;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.10);
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      transform 0.36s cubic-bezier(0.22,0.9,0.2,1),
+      opacity 0.28s ease;
+    z-index: 1000;
+  }
+
+  .header-bottom.open {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .header-bottom button {
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.18s ease;
+  }
+  .header-bottom button:hover { background: #1f5fd6; }
+
+  #mobileMenuToggle { display: inline-flex; }
+
+  .header-search { width: 100%; min-width: auto; order: 1; }
+
+  #navBar { order: 2; display:flex; width:100%; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+
+  .card, .post { padding: var(--space-md); margin-bottom: var(--space-md); flex-direction: column; gap: var(--space-md); }
+  .post .post-left { width: 100%; display:flex; align-items:center; gap:12px; }
+  .post .post-body { order: 2; }
+  .post .post-excerpt { display:none; }
+  .post .post-img { max-width: 100%; height: auto; margin-top: var(--space-sm); }
+
+  .site-footer .footer-inner { flex-direction: column; text-align: center; gap: var(--space-sm); }
+  .footer-links { flex-direction: column; gap: 8px; }
+}
+
+/* Medium screens / tablet */
+@media (min-width: 801px) and (max-width: 1100px) {
+  .header-search { min-width: 200px; width: 30%; }
+  .header-inner { padding: 0 var(--space-md); }
+  .header-bottom { max-height: none; opacity: 1; pointer-events: auto; transform: none; background: transparent; box-shadow: none; border-bottom: 1px solid rgba(15,23,42,0.03); }
+  #mobileMenuToggle { display: none; }
+}
+
+/* Desktop: header-bottom visible permanently */
+@media (min-width: 1101px) {
+  .header-bottom { max-height: none; opacity: 1; pointer-events: auto; transform: none; }
+  #mobileMenuToggle { display: none; }
+}
+
+/* ------------------------------------------------------------------------
+   Dropdown / overlay helpers (consistent z-index, pointer control)
+   ------------------------------------------------------------------------ */
 .modal-fullscreen-bg {
   position: fixed; z-index: 9999; left: 0; top: 0; width: 100vw; height: 100vh;
   background: rgba(0,0,0,0.56); display: flex; align-items: center; justify-content: center;
@@ -555,210 +699,27 @@ a { color: var(--accent); text-decoration: none; }
   box-shadow: var(--shadow-2);
 }
 
-/* Inline small message (errors only) */
-#inlineMsg { display:none; margin-top:8px; color:var(--danger); font-size:0.95rem; }
+/* tiny polish for inputs/buttons inside dropdowns and lists */
+.dropdown-panel .btn { padding: 8px 12px; font-size: 0.92rem; }
 
-/* Utility classes */
-.hidden { display:none !important; }
+/* kebab / notification controls (keeps original layout) */
+.notif-card { display:flex; flex-direction:column; gap:8px; }
+.notif-controls { display:flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.notif-list { max-height: 420px; overflow: auto; display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
+.notif-item { position: relative; padding: 12px; border-radius: 10px; background: #fff; border: 1px solid rgba(15,23,42,0.04); display:flex; flex-direction:column; gap:8px; cursor: pointer; }
+.notif-item.unread { background: #fffdf6; }
+
+/* kebab of notification */
+.notif-kebab { position: absolute; right: 10px; top: 10px; width: 36px; height: 36px; display:flex; align-items:center; justify-content:center; border-radius: 8px; background: transparent; border: none; cursor: pointer; }
+.notif-kebab:focus { outline: 2px solid rgba(37,99,235,0.12); }
+
+/* small dropdown for kebab */
+.notif-dropdown { position: absolute; right: 10px; top: 44px; background: var(--surface); border: 1px solid rgba(15,23,42,0.06); border-radius: 10px; box-shadow: 0 10px 30px rgba(16,24,40,0.08); min-width: 160px; z-index: 2000; overflow: hidden; }
+.notif-dropdown button { width: 100%; display: block; padding: 10px 12px; background: transparent; border: none; text-align: left; cursor: pointer; font-weight: 600; }
+.notif-dropdown button:hover { background: #fbfdff; }
+
+/* final small polish */
 .center { display:flex; align-items:center; justify-content:center; }
 .row { display:flex; gap:12px; align-items:center; }
-.col { display:flex; flex-direction:column; gap:8px; }
 
-/* Layout adjustments for very small screens */
-@media (max-width: 560px) {
-  :root {
-    --space-md: 12px;
-    --space-lg: 18px;
-    --touch-target: 48px;
-  }
-  body { font-size: 15px; }
-  .site-header .container { height: 60px; padding-left: 12px; padding-right: 12px; }
-  .btn { padding: 12px 14px; font-size: 0.95rem; border-radius: 12px; }
-  .avatar-circle { width: 96px; height: 96px; }
-  .profile-hero .avatar { width: 120px; height: 120px; }
-  .card { padding: 12px; }
-}
-
-/* Small improvements for medium screens */
-@media (min-width: 561px) and (max-width: 950px) {
-  .header-search { display:none; }
-  .grid-2 { grid-template-columns: 1fr; }
-  .avatar-circle { width: 110px; height: 110px; }
-}
-
-/* Provide a subtle focus outline for keyboard users (only show when focusing via keyboard) */
-:root:focus-within .btn:focus { outline-offset: 3px; }
-
-/* Ensure images don't overflow */
-img { max-width: 100%; height: auto; display: block; }
-
-/* ========================================================================
-   Mobile-First Media Query
-   - Emphasize stacked header behavior: on small screens header-bottom
-     collapses beneath the logo; toggle shows/hides it. This prevents
-     crowding in the header row and moves controls (search, actions) below.
-   ======================================================================== */
-
-/* Mobile Devices (Portrait and Landscape) */
-@media (max-width: 800px) {
-
-  :root {
-    /* adjust spacing for mobile */
-    --space-sm: 10px;
-    --space-md: 14px;
-    --space-lg: 20px;
-  }
-
-  /* Use header-inner to stack header-top + header-bottom */
-  .header-inner { display:flex; flex-direction:column; gap:8px; align-items:stretch; padding: 8px var(--space-sm); }
-  .header-top { height: 56px; }
-
-  /* smaller brand */
-  .logo .brand { font-size: 1rem; }
-  .logo .tagline { display:none; }
-
- /* header-bottom collapsed by default */
-.header-bottom {
-  position: fixed;
-  top: 80px; /* เว้นจากด้านบน */
-  left: 0;
-  width: 100%;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-
-  /* เว้นระยะด้านในเพื่อไม่ให้ปุ่มติดขอบ */
-  padding: 0.75rem 1rem;
-
-  display: flex;
-  align-items: center;
-  justify-content: space-between; /* กระจายปุ่มซ้าย-ขวาให้อยู่ในจอ */
-  
-  transform: translateY(-100%);
-  opacity: 0;
-  pointer-events: none;
-
-  transition: 
-    transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.3s ease;
-  z-index: 1000;
-}
-
-/* เมื่อเปิด */
-.header-bottom.open {
-  transform: translateY(0);
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* สไตล์ปุ่ม (ถ้าอยากให้ดูสวยขึ้นด้วย) */
-.header-bottom button {
-  padding: 0.5rem 1rem;
-  border-radius: 12px;
-  border: none;
-  background: #007bff;
-  color: #fff;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.header-bottom button:hover {
-  background: #0056b3;
-}
-
-  /* show mobile toggle button */
-  #mobileMenuToggle { display: inline-flex; }
-
-  /* header-search becomes full width when visible */
-  .header-search { width: 100%; min-width: auto; order: 1; }
-
-  /* nav/actions stacked below search */
-  #navBar { order: 2; display:flex; width:100%; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
-
-  /* Make posts stack vertically */
-  .card, .post { padding: var(--space-md); margin-bottom: var(--space-md); flex-direction: column; gap: var(--space-md); }
-  .post .post-left { width: 100%; display:flex; align-items:center; gap:12px; }
-  .post .post-body { order: 2; }
-  .post .post-excerpt { display:none; }
-  .post .post-img { max-width: 100%; height: auto; margin-top: var(--space-sm); }
-
-  /* Footer stack */
-  .site-footer .footer-inner { flex-direction: column; text-align: center; gap: var(--space-sm); }
-  .footer-links { flex-direction: column; gap: 8px; }
-
-  /* ---------------------------
-     Mobile sidebar styles
-     --------------------------- */
-  .mobile-sidebar {
-    position: fixed;
-    top: 0;
-    right: 0;
-    height: 100vh;
-    width: min(92vw, 420px);
-    max-width: 92vw;
-    transform: translateX(100%);
-    transition: transform 320ms cubic-bezier(.2,.9,.2,1);
-    z-index: 1400;
-    display: flex;
-    align-items: stretch;
-    justify-content: flex-end;
-    pointer-events: none;
-  }
-  .mobile-sidebar.open {
-    transform: translateX(0);
-    pointer-events: auto;
-  }
-  .mobile-sidebar-panel {
-    width: 100%;
-    height: 100%;
-    background: var(--surface);
-    box-shadow: -18px 0 40px rgba(16,24,40,0.12);
-    padding: 18px;
-    overflow: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    border-radius: 6px 0 0 6px;
-  }
-  .mobile-sidebar-header { padding-bottom: 6px; border-bottom: 1px solid rgba(15,23,42,0.04); }
-  .mobile-sidebar-content { padding-top: 8px; display: flex; flex-direction: column; gap: 8px; }
-
-  /* overlay behind sidebar */
-  .mobile-sidebar-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 1390;
-    background: rgba(0,0,0,0.45);
-    opacity: 0;
-    transition: opacity 220ms ease;
-    pointer-events: none;
-  }
-  .mobile-sidebar-overlay.show {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  /* ensure headerBottom is not interactable when sidebar open (visual only) */
-  .mobile-sidebar.open ~ .site-footer,
-  .mobile-sidebar.open ~ main {
-    filter: none;
-  }
-}
-
-/* Medium Screens and Tablets */
-@media (min-width: 801px) and (max-width: 1100px) {
-  .header-search { min-width: 200px; width: 30%; }
-  .header-inner { padding: 0 var(--space-md); }
-  .header-bottom { max-height: none; opacity: 1; pointer-events: auto; transform: none; }
-  #mobileMenuToggle { display: none; }
-}
-
-/* Desktop: header bottom always visible, toggle hidden */
-@media (min-width: 1101px) {
-  .header-bottom { max-height: none; opacity: 1; pointer-events: auto; transform: none; }
-  #mobileMenuToggle { display: none; }
-}
-
-/* End of stylesheet */
+/* End of stylesheet - refined visual system (modern & minimal) */
