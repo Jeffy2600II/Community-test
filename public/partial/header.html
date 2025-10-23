@@ -35,16 +35,26 @@
       <div id="navBar" class="header-actions" aria-hidden="false"></div>
     </div>
   </div>
-</header>
 
-<!-- Mobile Sidebar (slides from right) + overlay -->
-<div id="mobileSidebar" class="mobile-sidebar" role="dialog" aria-modal="true" aria-hidden="true">
-  <div class="mobile-sidebar-content" role="document">
-    <div class="mobile-sidebar-header" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(15,23,42,0.04);">
-      <div style="font-weight:700;">เมนู</div>
-      <button id="mobileSidebarClose" class="btn btn-ghost" aria-label="ปิดเมนู">ปิด</button>
+  <!-- Mobile off-canvas sidebar (slides in from the right on small screens) -->
+  <div id="mobileSidebar" class="mobile-sidebar" aria-hidden="true" role="dialog" aria-label="Mobile menu">
+    <div class="mobile-sidebar-inner">
+      <div class="mobile-sidebar-header">
+        <a class="logo" href="/" aria-label="COMMUNITY home">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+            <rect width="24" height="24" rx="6" fill="#2f80ed"></rect>
+            <path d="M7 13h10M7 9h10" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+          <div style="margin-left:8px;font-weight:700;">COMMUNITY</div>
+        </a>
+        <button id="mobileSidebarClose" class="btn btn-ghost" aria-label="ปิดเมนู">ปิด</button>
+      </div>
+      <div id="mobileSidebarNav" class="mobile-sidebar-nav" tabindex="0" aria-live="polite">
+        <!-- populated by JS with nav content (vertical layout on mobile) -->
+      </div>
     </div>
-    <div id="mobileSidebarNav" style="padding:12px;"></div>
   </div>
-</div>
-<div id="sidebarOverlay" class="sidebar-overlay hidden" tabindex="-1" aria-hidden="true"></div>
+
+  <!-- overlay inserted/managed by JS when sidebar opens (keeps DOM-friendly fallback) -->
+  <div id="mobileSidebarOverlay" class="mobile-sidebar-overlay hidden" aria-hidden="true"></div>
+</header>
