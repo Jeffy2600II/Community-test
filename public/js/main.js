@@ -1,19 +1,21 @@
-// public/js/main.js (updated: header mobile toggle + original nav logic + mobile sidebar toggle)
-//
-// - เพิ่มการจัดการ mobile menu toggle (id: mobileMenuToggle) เพื่อเปิด/ปิด headerBottom (เดิม)
-// - เพิ่มการจัดการ mobile sidebar toggle (auto-created) เมื่อเพจมี sidebar (.profile-hero)
-// - เมื่อเปิด mobile sidebar จะสร้าง overlay ปิดเมื่อคลิกนอกหรือกด Escape
-// - ไม่เปลี่ยน behavior เดิมสำหรับ headerBottom หากไม่มี sidebar
-// - เรียก setupHeaderInteractions() หลังจากโหลด partials
+// public/js/main.js
+// Updated: mobile sidebar (slide-in from right) + robust header partial handling
+// - Moves #navBar into the mobile sidebar when opened and moves it back when closed.
+// - Gracefully retries header setup if partials aren't available yet.
+// - Keeps dropdown/notification/account behaviors from original implementation.
 
-/* -------------------- Utilities -------------------- */
+// -------------------- Utilities --------------------
 async function loadPartial(id, file) {
   try {
     const resp = await fetch(file);
+    if (!resp.ok) throw new Error('partial fetch failed ' + resp.status);
     const html = await resp.text();
-    document.getElementById(id).innerHTML = html;
+    const slot = document.getElementById(id);
+    if (slot) slot.innerHTML = html;
+    return true;
   } catch (e) {
     console.error('loadPartial error', e && e.message);
+    return false;
   }
 }
 
@@ -23,185 +25,141 @@ function elFrom(html) {
   return div.firstChild;
 }
 
-/* -------------------- Globals -------------------- */
+// -------------------- Globals --------------------
 let globalAccounts = [];
 let globalActive = null;
 let dropdownEl = null;
 let dropdownVisible = false;
 let overlayEl = null;
-let escapeKeyListener = null;
+let dropdownEscapeListener = null;
 
-/* -------------------- Header interactions (mobile) -------------------- */
+// -------------------- Header interactions (mobile sidebar) --------------------
 function setupHeaderInteractions() {
-  const toggle = document.getElementById('mobileMenuToggle');
-  const headerBottom = document.getElementById('headerBottom');
-  if (!headerBottom) return;
+  try {
+    const toggle = document.getElementById('mobileMenuToggle');
+    const headerBottom = document.getElementById('headerBottom');
+    const mobileSidebar = document.getElementById('mobileSidebar');
+    const mobileSidebarContent = document.getElementById('mobileSidebarContent');
+    const mobileOverlay = document.getElementById('mobileSidebarOverlay');
+    const navBar = document.getElementById('navBar');
 
-  // existing headerBottom toggle behavior (unchanged)
-  if (toggle) {
-    toggle.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      const isOpen = headerBottom.classList.toggle('open');
-      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-
-      // when opening the mobile header area, close other dropdowns/overlays to avoid stacking
-      if (isOpen) {
-        hideDropdown();
-      }
-    });
-  }
-
-  // close headerBottom if clicked outside (mobile)
-  document.addEventListener('click', (ev) => {
-    if (!headerBottom.classList.contains('open')) return;
-    const path = ev.composedPath ? ev.composedPath() : (ev.path || []);
-    if (!path || path.length === 0) return;
-    if (!path.includes(headerBottom) && !path.includes(toggle)) {
-      headerBottom.classList.remove('open');
-      if (toggle) toggle.setAttribute('aria-expanded', 'false');
-    }
-  }, true);
-
-  // Sidebar: detect presence of an aside that should act as sidebar (profile pages)
-  const sidebarEl = document.querySelector('.profile-hero');
-  let sidebarToggle = document.getElementById('mobileSidebarToggle');
-  if (sidebarEl) {
-    // ensure the sidebar has an id for aria-controls
-    if (!sidebarEl.id) sidebarEl.id = 'siteSidebar';
-
-    // create overlay element for sidebar if not present
-    function ensureSidebarOverlay() {
-      let ov = document.querySelector('.sidebar-overlay');
-      if (!ov) {
-        ov = document.createElement('div');
-        ov.className = 'sidebar-overlay';
-        ov.addEventListener('click', function (ev) {
-          ev.preventDefault(); ev.stopPropagation();
-          closeSidebar();
-        }, { passive: true });
-        document.body.appendChild(ov);
-      }
-      return ov;
+    // If DOM nodes are not yet present (partials may not be loaded), retry once shortly.
+    if (!toggle || !headerBottom || !mobileSidebar || !mobileSidebarContent || !mobileOverlay || !navBar) {
+      setTimeout(() => {
+        // try again once
+        const retryToggle = document.getElementById('mobileMenuToggle');
+        if (retryToggle) setupHeaderInteractions();
+      }, 120);
+      return;
     }
 
-    // create toggle button if not exist (we add near existing mobileMenuToggle)
-    if (!sidebarToggle) {
-      sidebarToggle = document.createElement('button');
-      sidebarToggle.id = 'mobileSidebarToggle';
-      sidebarToggle.className = 'btn btn-icon';
-      sidebarToggle.type = 'button';
-      sidebarToggle.setAttribute('aria-controls', sidebarEl.id);
-      sidebarToggle.setAttribute('aria-expanded', 'false');
-      sidebarToggle.setAttribute('aria-label', 'Toggle sidebar');
-      // simple icon (stacked dots)
-      sidebarToggle.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1f2a37" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>`;
-      // place it next to the existing mobileMenuToggle (fallback: append to .header-top)
-      const hp = document.querySelector('.header-top');
-      if (hp) {
-        hp.appendChild(sidebarToggle);
-      } else {
-        document.body.appendChild(sidebarToggle);
+    // helpers for overlay accessibility
+    function showMobileOverlay() {
+      mobileOverlay.classList.remove('hidden');
+      mobileOverlay.classList.add('show');
+      mobileOverlay.setAttribute('aria-hidden', 'false');
+    }
+    function hideMobileOverlay() {
+      mobileOverlay.classList.remove('show');
+      mobileOverlay.setAttribute('aria-hidden', 'true');
+      setTimeout(() => mobileOverlay.classList.add('hidden'), 320);
+    }
+
+    // Move navBar into sidebar content (preserve listeners)
+    function moveNavToSidebar() {
+      if (!mobileSidebarContent.contains(navBar)) {
+        mobileSidebarContent.appendChild(navBar);
+      }
+    }
+    // Move navBar back to headerBottom
+    function moveNavToHeader() {
+      if (!headerBottom.contains(navBar)) {
+        headerBottom.appendChild(navBar);
       }
     }
 
-    // add close button inside sidebar for convenience (only visual; click closes)
-    if (!sidebarEl.querySelector('.sidebar-close')) {
-      const closeBtn = document.createElement('button');
-      closeBtn.className = 'sidebar-close';
-      closeBtn.type = 'button';
-      closeBtn.setAttribute('aria-label', 'ปิดแถบด้านข้าง');
-      closeBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>`;
-      closeBtn.addEventListener('click', (e) => { e.stopPropagation(); closeSidebar(); }, { passive: true });
-      sidebarEl.appendChild(closeBtn);
-    }
+    // track escape listener closure to remove later
+    let escapeListener = null;
 
     function openSidebar() {
-      document.body.classList.add('sidebar-open');
-      ensureSidebarOverlay();
-      sidebarToggle.setAttribute('aria-expanded', 'true');
-      document.body.style.overflow = 'hidden'; // prevent background scroll while sidebar is open
-      // close other overlays
-      hideDropdown();
-    }
-    function closeSidebar() {
-      document.body.classList.remove('sidebar-open');
-      const ov = document.querySelector('.sidebar-overlay');
-      if (ov) ov.remove();
-      if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'false');
-      document.body.style.overflow = ''; // restore
+      mobileSidebar.classList.add('open');
+      mobileSidebar.setAttribute('aria-hidden', 'false');
+      toggle.setAttribute('aria-expanded', 'true');
+      moveNavToSidebar();
+      showMobileOverlay();
+      // focus the content for keyboard users
+      try { mobileSidebarContent.focus(); } catch (e) {}
+      if (!escapeListener) {
+        escapeListener = function (ev) {
+          if (ev.key === 'Escape' && mobileSidebar.classList.contains('open')) {
+            ev.preventDefault();
+            closeSidebar();
+          }
+        };
+        document.addEventListener('keydown', escapeListener, true);
+      }
     }
 
-    // toggle behavior
-    sidebarToggle.addEventListener('click', function (ev) {
-      ev.stopPropagation();
-      const isOpen = document.body.classList.toggle('sidebar-open');
-      sidebarToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-      if (isOpen) {
-        ensureSidebarOverlay();
-        document.body.style.overflow = 'hidden';
-        hideDropdown();
-      } else {
-        const ov = document.querySelector('.sidebar-overlay');
-        if (ov) ov.remove();
-        document.body.style.overflow = '';
+    function closeSidebar() {
+      mobileSidebar.classList.remove('open');
+      mobileSidebar.setAttribute('aria-hidden', 'true');
+      toggle.setAttribute('aria-expanded', 'false');
+      hideMobileOverlay();
+      // move nav back to header
+      moveNavToHeader();
+      if (escapeListener) {
+        document.removeEventListener('keydown', escapeListener, true);
+        escapeListener = null;
       }
+      try { toggle.focus(); } catch (e) {}
+    }
+
+    // attach events
+    toggle.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const willOpen = !mobileSidebar.classList.contains('open');
+      if (willOpen) openSidebar(); else closeSidebar();
     });
 
-    // close sidebar when clicking outside or on resize to large screens
-    document.addEventListener('click', (ev) => {
-      if (!document.body.classList.contains('sidebar-open')) return;
-      const path = ev.composedPath ? ev.composedPath() : (ev.path || []);
-      if (!path || path.length === 0) return;
-      if (!path.includes(sidebarEl) && !path.includes(sidebarToggle)) {
+    const btnClose = document.getElementById('mobileSidebarClose');
+    if (btnClose) {
+      btnClose.addEventListener('click', (ev) => {
+        ev.preventDefault();
         closeSidebar();
-      }
-    }, true);
+      });
+    }
 
-    // escape key to close sidebar
-    document.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Escape' && document.body.classList.contains('sidebar-open')) {
-        closeSidebar();
-      }
-    }, true);
+    mobileOverlay.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      closeSidebar();
+    }, { passive: false });
 
-    // ensure sidebar state on resize: close on large screens and ensure toggle hidden when not needed
-    function sidebarResizeHandler() {
+    // ensure correct state on resize
+    function headerResizeHandler() {
       const w = window.innerWidth;
       if (w > 800) {
-        // ensure normal layout on larger screens
-        document.body.classList.remove('sidebar-open');
-        const ov = document.querySelector('.sidebar-overlay');
-        if (ov) ov.remove();
-        document.body.style.overflow = '';
-        if (sidebarToggle) sidebarToggle.style.display = 'none';
+        // desktop: ensure nav in header and toggle hidden
+        moveNavToHeader();
+        mobileSidebar.classList.remove('open');
+        mobileSidebar.setAttribute('aria-hidden', 'true');
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.style.display = 'none';
+        mobileOverlay.classList.remove('show');
+        mobileOverlay.classList.add('hidden');
       } else {
-        if (sidebarToggle) sidebarToggle.style.display = '';
+        toggle.style.display = '';
+        // keep headerBottom collapsed by default on small screens
+        headerBottom.classList.remove('open');
       }
     }
-    window.addEventListener('resize', sidebarResizeHandler);
-    // initial call
-    sidebarResizeHandler();
-  } // end if sidebar exists
-
-  // ensure headerBottom state on resize (original implementation)
-  function headerResizeHandler() {
-    const w = window.innerWidth;
-    if (w > 800) {
-      // on desktop/tablet show headerBottom
-      headerBottom.classList.add('open');
-      if (toggle) { toggle.setAttribute('aria-expanded', 'true'); toggle.style.display = 'none'; }
-    } else {
-      // on small screens hide headerBottom by default, show toggle
-      headerBottom.classList.remove('open');
-      if (toggle) { toggle.setAttribute('aria-expanded', 'false'); toggle.style.display = ''; }
-    }
+    headerResizeHandler();
+    window.addEventListener('resize', headerResizeHandler);
+  } catch (err) {
+    console.error('setupHeaderInteractions error:', err && err.message);
   }
-  window.addEventListener('resize', headerResizeHandler);
-  // initial call
-  headerResizeHandler();
 }
 
-/* -------------------- Fetch helpers -------------------- */
+// -------------------- Fetch helpers --------------------
 async function fetchAccounts() {
   try {
     const r = await fetch('/api/accounts');
@@ -228,7 +186,7 @@ async function fetchNotifications() {
   }
 }
 
-/* -------------------- Dropdown + Overlay (unchanged) -------------------- */
+// -------------------- Dropdown + Overlay --------------------
 function ensureDropdown() {
   if (dropdownEl && document.body.contains(dropdownEl)) return dropdownEl;
   dropdownEl = document.createElement('div');
@@ -264,20 +222,20 @@ function showOverlay() {
   const ov = createOverlay();
   if (!document.body.contains(ov)) document.body.appendChild(ov);
   if (dropdownEl && document.body.contains(dropdownEl)) document.body.appendChild(dropdownEl);
-  escapeKeyListener = function (ev) {
+  dropdownEscapeListener = function (ev) {
     if (ev.key === 'Escape' && dropdownVisible) {
       ev.preventDefault();
       hideDropdown();
     }
   };
-  document.addEventListener('keydown', escapeKeyListener, true);
+  document.addEventListener('keydown', dropdownEscapeListener, true);
 }
 
 function hideOverlay() {
   if (overlayEl && document.body.contains(overlayEl)) overlayEl.remove();
-  if (escapeKeyListener) {
-    document.removeEventListener('keydown', escapeKeyListener, true);
-    escapeKeyListener = null;
+  if (dropdownEscapeListener) {
+    document.removeEventListener('keydown', dropdownEscapeListener, true);
+    dropdownEscapeListener = null;
   }
 }
 
@@ -294,7 +252,7 @@ function hideDropdown() {
   hideOverlay();
 }
 
-/* -------------------- Notification helpers (unchanged) -------------------- */
+// -------------------- Notification helpers --------------------
 function isNotificationFromActive(n, activeUsername) {
   if (!activeUsername) return true;
   const a = String(activeUsername);
@@ -318,7 +276,7 @@ function computeNotificationUrl(n) {
   return null;
 }
 
-/* -------------------- Positioning (unchanged) -------------------- */
+// -------------------- Positioning --------------------
 async function positionDropdownRelativeTo(anchorEl) {
   const dd = ensureDropdown();
   const winW = window.innerWidth;
@@ -339,13 +297,17 @@ async function positionDropdownRelativeTo(anchorEl) {
   }
 }
 
-/* -------------------- Nav rendering (unchanged aside from minor style) -------------------- */
+// -------------------- Nav rendering --------------------
 async function renderNav() {
   const nav = document.getElementById('navBar');
-  if (!nav) return;
+  if (!nav) {
+    // navBar might not exist yet (partial not loaded) — retry shortly
+    setTimeout(renderNav, 120);
+    return;
+  }
   nav.innerHTML = '';
 
-  // Left-side (brief links)
+  // Left-side links
   const left = elFrom(`<div class="nav-left" style="display:flex;align-items:center;gap:12px;">
     <a href="/" class="small-link">หน้าแรก</a>
     <a href="/post/create" class="small-link">สร้างโพสต์</a>
@@ -361,14 +323,16 @@ async function renderNav() {
   const accData = await fetchAccounts();
   const notifData = await fetchNotifications();
 
-  // Notification bell
+  // Notification bell (simple SVG)
   const bell = document.createElement('div');
   bell.className = 'notify-bell';
   bell.setAttribute('role','button');
   bell.setAttribute('aria-label','Notifications');
   bell.style.cursor = 'pointer';
   bell.style.position = 'relative';
-  bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 [...]
+  bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 17H9"/><path d="M12 3v1"/><path d="M5 9a7 7 0 0014 0"/></svg>`;
+
+  // badge count calculation
   let badgeCount = 0;
   if (notifData && notifData.notifications) {
     let activeName = accData && accData.active ? accData.active : null;
@@ -396,7 +360,7 @@ async function renderNav() {
   }
   accountArea.appendChild(bell);
 
-  // If user accounts exist, render avatar + account dropdown; otherwise login/register
+  // Account area
   if (accData && accData.accounts && accData.accounts.length > 0) {
     globalAccounts = accData.accounts;
     globalActive = accData.active;
@@ -413,19 +377,22 @@ async function renderNav() {
     avatarBtn.style.background = 'transparent';
     avatarBtn.style.padding = '6px';
     avatarBtn.style.cursor = 'pointer';
-    avatarBtn.innerHTML = `<img src="${avatarUrl}" class="avatar-img" alt="${activeAcc.username}" style="width:32px;height:32px;border-radius:8px;object-fit:cover"> <span style="color:#1f2a37;font-weight:700">${activeAcc.username}</span>`;
+    // safe HTML: escaped values where appropriate (displayName may contain characters)
+    const safeName = (activeAcc.displayName || activeAcc.username).replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+    avatarBtn.innerHTML = `<img src="${avatarUrl}" class="avatar-img" alt="${activeAcc.username}" style="width:32px;height:32px;border-radius:8px;object-fit:cover"> <span style="color:#1f2a37;font-weight:700">${safeName}</span>`;
     accountArea.appendChild(avatarBtn);
 
     const dd = ensureDropdown();
     dd.innerHTML = '';
 
-    avatarBtn.onclick = async (ev) => {
+    avatarBtn.addEventListener('click', async (ev) => {
       ev.stopPropagation();
       if (dropdownVisible) { hideDropdown(); return; }
       dd.innerHTML = '';
+
       const header = document.createElement('div');
       header.className = 'dropdown-header';
-      header.innerHTML = `<img src="${avatarUrl}" class="avatar-img" style="width:48px;height:48px;border-radius:8px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${activeAcc.displayName || activeAcc.username}</div><div class="small" style="color:var(--muted)">${activeAcc.username}</div></div>`;
+      header.innerHTML = `<img src="${avatarUrl}" class="avatar-img" style="width:48px;height:48px;border-radius:8px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${safeName}</div><div class="small" style="color:var(--muted)">@${activeAcc.username}</div></div>`;
       dd.appendChild(header);
 
       const list = document.createElement('div');
@@ -434,14 +401,15 @@ async function renderNav() {
       list.style.display = 'flex';
       list.style.flexDirection = 'column';
       list.style.gap = '8px';
-      dd.appendChild(list);
 
+      // other saved accounts (if any)
       for (let acc of globalAccounts) {
         if (acc.username === globalActive) continue;
         const item = document.createElement('div');
         item.className = 'dropdown-item';
-        item.innerHTML = `<img src="${acc.profilePic || '/img/default_profile.png'}" class="avatar-img" style="width:36px;height:36px;border-radius:6px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${acc.displayName || acc.username}</div><div class="small" style="color:var(--muted)">${acc.username}</div></div>`;
-        item.onclick = async () => {
+        const safeDisp = (acc.displayName || acc.username).replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+        item.innerHTML = `<img src="${acc.profilePic || '/img/default_profile.png'}" class="avatar-img" style="width:36px;height:36px;border-radius:6px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${safeDisp}</div><div class="small" style="color:var(--muted)">@${acc.username}</div></div>`;
+        item.addEventListener('click', async () => {
           const confirmSwitch = confirm(`สลับไปใช้บัญชี ${acc.username} ?`);
           if (!confirmSwitch) return;
           try {
@@ -459,9 +427,11 @@ async function renderNav() {
           } catch {
             alert('เกิดข้อผิดพลาดขณะสลับบัญชี');
           }
-        };
+        });
         list.appendChild(item);
       }
+
+      dd.appendChild(list);
 
       const footer = document.createElement('div');
       footer.style.padding = '8px';
@@ -473,10 +443,10 @@ async function renderNav() {
 
       await positionDropdownRelativeTo(avatarBtn);
       showDropdown();
-    };
+    });
 
-    // Notification bell handling (unchanged)
-    bell.onclick = async (ev) => {
+    // Notification bell click: show recent notifications inside dropdown
+    bell.addEventListener('click', async (ev) => {
       ev.stopPropagation();
       const nd = await fetchNotifications();
       const dd = ensureDropdown();
@@ -528,7 +498,7 @@ async function renderNav() {
           it.appendChild(title);
           it.appendChild(msg);
           if (!n.read) it.style.background = '#fffef6';
-          it.onclick = async () => {
+          it.addEventListener('click', async () => {
             const dest = computeNotificationUrl(n);
             try {
               await fetch('/api/notifications/mark-read', {
@@ -540,7 +510,7 @@ async function renderNav() {
             hideDropdown();
             setTimeout(() => window.dispatchEvent(new Event('accountsChanged')), 120);
             if (dest) location.assign(dest);
-          };
+          });
           list.appendChild(it);
         }
         const footer = document.createElement('div');
@@ -556,7 +526,7 @@ async function renderNav() {
 
       const mar = dd.querySelector('#markAllRead');
       if (mar) {
-        mar.onclick = async (ev) => {
+        mar.addEventListener('click', async (ev) => {
           ev.preventDefault();
           try {
             await fetch('/api/notifications/mark-read', {
@@ -567,9 +537,9 @@ async function renderNav() {
           } catch (err) { console.warn('mark all read failed', err && err.message); }
           hideDropdown();
           await renderNav();
-        };
+        });
       }
-    };
+    });
 
   } else {
     accountArea.appendChild(elFrom('<a href="/login" class="btn btn-ghost">เข้าสู่ระบบ</a>'));
@@ -584,20 +554,26 @@ async function renderNav() {
   }, true);
 }
 
-/* -------------------- Events -------------------- */
+// -------------------- Events --------------------
 function setupGlobalRefreshOnMessage() {
   window.addEventListener('accountsChanged', async () => {
     await renderNav();
   });
 }
 
-/* -------------------- Init -------------------- */
+// -------------------- Init --------------------
 window.onload = async function() {
-  // load header/footer partials if present
-  await loadPartial('headerSlot', '/partial/header.html').catch(()=>{});
-  await loadPartial('footerSlot', '/partial/footer.html').catch(()=>{});
-  // header interactions must be setup after partial is injected
-  setupHeaderInteractions();
-  setupGlobalRefreshOnMessage();
-  await renderNav();
+  try {
+    // Load header/footer partials if available. Continue even if they fail.
+    await loadPartial('headerSlot', '/partial/header.html').catch(()=>{});
+    await loadPartial('footerSlot', '/partial/footer.html').catch(()=>{});
+
+    // Setup header interactions (will retry internally if partial wasn't ready)
+    setupHeaderInteractions();
+    setupGlobalRefreshOnMessage();
+    // Render nav (renderNav is resilient and will retry if #navBar not present yet)
+    await renderNav();
+  } catch (e) {
+    console.error('main init error', e && e.message);
+  }
 };
