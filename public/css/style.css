@@ -357,6 +357,70 @@ main {
   box-shadow: 0 8px 30px rgba(16,24,40,0.04);
 }
 
+/* --- NEW: Feed ordering override
+   Goal: In the feed (.feed .post) show profile (avatar + username) at the top,
+   then post title, then content. This keeps existing DOM structure but changes
+   visual order for feed items only. This does NOT change mobile sidebar or overlay
+   positions — only affects feed item layout.
+*/
+.feed .post {
+  /* transform the feed items into a vertical stack */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* make avatar + user block flow naturally above the body content */
+.feed .post .post-left {
+  width: auto; /* let avatar size be natural */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0; /* remove left-side spacing */
+  padding: 0;
+}
+
+/* ensure the avatar image keeps its previous visual size but with small radius */
+.feed .post .post-left .avatar-img {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+}
+
+/* post-body becomes a vertical stack; we re-order its internal pieces so meta (username)
+   appears first, then title, then excerpt (content). This relies on CSS ordering only. */
+.feed .post .post-body {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+}
+
+/* put the meta (username line) before title visually */
+.feed .post .post-body .post-meta { order: 0; margin-top: 0; color: var(--muted); display:flex; align-items:center; gap:8px; }
+
+/* title appears after meta */
+.feed .post .post-body .post-title { order: 1; margin: 0; font-size: 1.08rem; }
+
+/* excerpt/content comes last */
+.feed .post .post-body .post-excerpt { order: 2; margin-top: 4px; color: #38414b; }
+
+/* if there is a post image inside body, keep it after excerpt */
+.feed .post .post-body .post-img { order: 3; max-width: 100%; margin-top: 8px; }
+
+/* keep touch targets and actions consistent */
+.feed .post .post-actions { order: 4; margin-top: 8px; display:flex; gap:8px; align-items:center; }
+
+/* Post-left + body alignment for narrow screens (no change to sidebar) */
+@media (max-width: 800px) {
+  .feed .post .post-left .avatar-img { width: 56px; height: 56px; }
+}
+
+/* End of feed ordering override */
+/* -------------------------------------------------------------------- */
+
 /* Post actions */
 .post-actions {
   margin-top: 12px;
