@@ -25,7 +25,7 @@ while true; do
     } | git commit -F - 2>>$LOGFILE
 
     # 🔄 Pull ก่อน push เผื่อมี update จาก remote
-    if ! git pull --rebase origin main >>$LOGFILE 2>&1; then
+    if ! git pull --rebase com main >>$LOGFILE 2>&1; then
       echo "❌ Pull failed at $(date '+%Y-%m-%d %H:%M:%S')" >>$LOGFILE
       termux-notification \
         --title "Git AutoPush" \
@@ -35,7 +35,7 @@ while true; do
     fi
 
     # 🚀 Push ไป remote
-    if git push origin main >>$LOGFILE 2>&1; then
+    if git push com main >>$LOGFILE 2>&1; then
       # 🔔 แจ้งเตือนสำเร็จ
       termux-notification \
         --title "Git AutoPush" \
