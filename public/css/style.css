@@ -704,3 +704,79 @@ img { max-width: 100%; height: auto; display: block; }
 }
 
 /* End of stylesheet */
+
+/* ---------------------------------------------------------------------------
+   Additions: Mobile right-side off-canvas sidebar + overlay
+   - Scoped and mobile-first: only active on narrow screens.
+   - Keeps visual style consistent with existing design system.
+   --------------------------------------------------------------------------- */
+
+.mobile-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 360px;
+  max-width: 92vw;
+  height: 100vh;
+  background: var(--surface);
+  box-shadow: -20px 0 40px rgba(16,24,40,0.18);
+  transform: translateX(100%);
+  transition: transform 360ms cubic-bezier(.2,.9,.2,1);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+/* inner padding + layout */
+.mobile-sidebar-inner { padding: 16px; display:flex; flex-direction:column; gap:12px; min-height:100%; }
+.mobile-sidebar-header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:8px; border-bottom:1px solid rgba(15,23,42,0.04); }
+.mobile-sidebar-nav { display:flex; flex-direction:column; gap:10px; padding-top:12px; }
+
+/* open state */
+.mobile-sidebar.open { transform: translateX(0); }
+
+/* overlay that covers the page behind the sidebar */
+.mobile-sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8,12,20,0.56);
+  z-index: 1900;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms ease;
+}
+.mobile-sidebar-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Make nav content friendly for vertical layout */
+.mobile-sidebar-nav a,
+.mobile-sidebar-nav .btn,
+.mobile-sidebar-nav .small-link,
+.mobile-sidebar-nav .header-actions > * {
+  width: 100%;
+  text-align: left;
+  display: block;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+/* Slight visual grouping for account area inside sidebar */
+.mobile-sidebar-nav .dropdown-header,
+.mobile-sidebar-nav .dropdown-item {
+  padding: 10px;
+  border-radius: 10px;
+}
+
+/* Only enable visible behavior on small screens; desktop keeps sidebar hidden */
+@media (min-width: 801px) {
+  .mobile-sidebar { display: none !important; }
+  .mobile-sidebar-overlay { display: none !important; }
+}
+
+/* Improve touch target for mobile close button */
+#mobileSidebarClose { min-height: var(--touch-target); padding: 8px 12px; }
+
+/* End of additions for mobile sidebar */
