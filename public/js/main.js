@@ -1,22 +1,18 @@
-// public/js/main.js (refactored + improved UX helpers)
-//
-// - รวม helper functions (escapeHtml, fetchJson, elFrom) และ dropdown/overlay management
-// - ชัดเจนขึ้นสำหรับ header mobile toggle, positioning ของ dropdown, และการจัดการ notifications
-// - ลดซ้ำซ้อนของ computeNotificationUrl / isNotificationFromActive
-// - ปรับปรุง accessibility: aria-expanded, focus handling, keyboard support
-// - รักษา API ที่มีอยู่และใช้แนวทางที่เข้ากันกับโค้ดเดิม
+// public/js/main.js (updated: header mobile toggle + original nav logic + right-side mobile off-canvas sidebar)
+// - เพิ่มการจัดการ mobile menu toggle (id: mobileMenuToggle) เพื่อเปิด/ปิด headerBottom บนเดสก์ท็อป/แท็บเล็ต
+// - บนมือถือ (<=800px) ปุ่มจะเปิด sidebar ทางขวา (#mobileSidebar) พร้อม overlay (#mobileSidebarOverlay)
+// - เมื่อเปิด mobile sidebar จะปิด dropdowns อื่น ๆ เพื่อหลีกเลี่ยงการทับกัน
+// - renderNav ยังคงสร้าง nav หลัก แต่จะสำเนา/ปรับรูปแบบสั้น ๆ ไปยัง #mobileSidebarNav เพื่อแสดงใน sidebar
+// - ฟังก์ชัน dropdown/overlay เดิมถูกเก็บไว้และทำงานร่วมกันได้
 
 /* -------------------- Utilities -------------------- */
 async function loadPartial(id, file) {
   try {
     const resp = await fetch(file);
     const html = await resp.text();
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = html;
-    return html;
+    document.getElementById(id).innerHTML = html;
   } catch (e) {
     console.error('loadPartial error', e && e.message);
-    return null;
   }
 }
 
@@ -24,21 +20,6 @@ function elFrom(html) {
   const div = document.createElement('div');
   div.innerHTML = html.trim();
   return div.firstChild;
-}
-
-function escapeHtml(s) {
-  if (s === undefined || s === null) return '';
-  return String(s).replace(/[&<>"']/g, function (m) {
-    return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m]);
-  });
-}
-
-async function fetchJson(url, opts) {
-  try {
-    const r = await fetch(url, opts);
-    const tx = await r.text();
-    try { return JSON.parse(tx); } catch { return null; }
-  } catch (err) { console.warn('fetchJson error', url, err && err.message); return null; }
 }
 
 /* -------------------- Globals -------------------- */
@@ -49,28 +30,100 @@ let dropdownVisible = false;
 let overlayEl = null;
 let escapeKeyListener = null;
 
-/* -------------------- Header interactions (mobile) -------------------- */
+/* -------------------- Header interactions (mobile + sidebar) -------------------- */
 function setupHeaderInteractions() {
   const toggle = document.getElementById('mobileMenuToggle');
   const headerBottom = document.getElementById('headerBottom');
-  if (!toggle || !headerBottom) return;
+  const mobileSidebarClose = document.getElementById('mobileSidebarClose');
+  const mobileOverlay = document.getElementById('mobileSidebarOverlay');
+  const sidebar = document.getElementById('mobileSidebar');
+  if (!toggle) return;
 
+  // On small screens headerBottom is hidden by default (CSS). Toggle acts depending on width:
+  // - >800px: toggle headerBottom
+  // - <=800px: open/close right-side mobile sidebar
   toggle.addEventListener('click', (ev) => {
     ev.stopPropagation();
-    const isOpen = headerBottom.classList.toggle('open');
-    toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-    // close other dropdowns
-    if (isOpen) hideDropdown();
+    const w = window.innerWidth;
+    if (w > 800) {
+      if (!headerBottom) return;
+      const isOpen = headerBottom.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      if (isOpen) {
+        hideDropdown();
+      }
+    } else {
+      // mobile behavior: right-side sidebar
+      if (!sidebar) return;
+      const isOpen = sidebar.classList.toggle('open');
+      sidebar.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      if (isOpen) {
+        // show overlay and prevent body scroll
+        if (mobileOverlay) {
+          mobileOverlay.classList.remove('hidden');
+          mobileOverlay.classList.add('show');
+          mobileOverlay.setAttribute('aria-hidden', 'false');
+        }
+        document.body.style.overflow = 'hidden';
+        hideDropdown();
+        escapeKeyListener = function (ev) {
+          if (ev.key === 'Escape') { ev.preventDefault(); closeMobileSidebar(); }
+        };
+        document.addEventListener('keydown', escapeKeyListener, true);
+      } else {
+        if (mobileOverlay) {
+          mobileOverlay.classList.add('hidden');
+          mobileOverlay.classList.remove('show');
+          mobileOverlay.setAttribute('aria-hidden', 'true');
+        }
+        document.body.style.overflow = '';
+        if (escapeKeyListener) {
+          document.removeEventListener('keydown', escapeKeyListener, true);
+          escapeKeyListener = null;
+        }
+      }
+    }
   });
 
-  // close headerBottom if clicked outside (mobile)
+  // close sidebar via close button
+  if (mobileSidebarClose) {
+    mobileSidebarClose.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      closeMobileSidebar();
+      if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  // overlay click closes sidebar
+  if (mobileOverlay) {
+    mobileOverlay.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      closeMobileSidebar();
+      if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    }, { passive: false });
+  }
+
+  // close headerBottom / sidebar when clicking outside
   document.addEventListener('click', (ev) => {
-    if (!headerBottom.classList.contains('open')) return;
-    const path = ev.composedPath ? ev.composedPath() : (ev.path || []);
-    if (!path || path.length === 0) return;
-    if (!path.includes(headerBottom) && !path.includes(toggle)) {
-      headerBottom.classList.remove('open');
-      toggle.setAttribute('aria-expanded', 'false');
+    if (headerBottom && headerBottom.classList.contains('open') && window.innerWidth > 800) {
+      const path = ev.composedPath ? ev.composedPath() : (ev.path || []);
+      if (!path || path.length === 0) return;
+      if (!path.includes(headerBottom) && !path.includes(toggle)) {
+        headerBottom.classList.remove('open');
+        toggle.setAttribute('aria-expanded', 'false');
+      }
+    }
+    // if sidebar open and click outside -> close (overlay handles most cases)
+    const sb = document.getElementById('mobileSidebar');
+    if (sb && sb.classList.contains('open') && window.innerWidth <= 800) {
+      const path = ev.composedPath ? ev.composedPath() : (ev.path || []);
+      if (!path || path.length === 0) return;
+      if (!path.includes(sb) && !path.includes(toggle) && !path.includes(document.getElementById('mobileSidebarOverlay'))) {
+        closeMobileSidebar();
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+      }
     }
   }, true);
 
@@ -78,17 +131,76 @@ function setupHeaderInteractions() {
   function headerResizeHandler() {
     const w = window.innerWidth;
     if (w > 800) {
-      headerBottom.classList.add('open');
-      toggle.setAttribute('aria-expanded', 'true');
-      toggle.style.display = 'none';
+      // on desktop/tablet show headerBottom
+      if (headerBottom) {
+        headerBottom.classList.add('open');
+      }
+      if (toggle) {
+        toggle.setAttribute('aria-expanded', 'true');
+        toggle.style.display = 'none';
+      }
+      // ensure sidebar closed
+      closeMobileSidebar();
     } else {
-      headerBottom.classList.remove('open');
-      toggle.setAttribute('aria-expanded', 'false');
-      toggle.style.display = '';
+      // on small screens hide headerBottom by default, show toggle
+      if (headerBottom) headerBottom.classList.remove('open');
+      if (toggle) {
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.style.display = '';
+      }
+      // ensure sidebar closed initially
+      closeMobileSidebar();
     }
   }
   window.addEventListener('resize', headerResizeHandler);
+  // initial call
   headerResizeHandler();
+}
+
+/* -------------------- Mobile sidebar helpers -------------------- */
+function closeMobileSidebar() {
+  const sb = document.getElementById('mobileSidebar');
+  const ov = document.getElementById('mobileSidebarOverlay');
+  const toggle = document.getElementById('mobileMenuToggle');
+  if (!sb || !ov) return;
+  sb.classList.remove('open');
+  sb.setAttribute('aria-hidden', 'true');
+  ov.classList.add('hidden');
+  ov.classList.remove('show');
+  ov.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  if (escapeKeyListener) {
+    document.removeEventListener('keydown', escapeKeyListener, true);
+    escapeKeyListener = null;
+  }
+  if (toggle) toggle.setAttribute('aria-expanded', 'false');
+}
+
+/* -------------------- Fetch helpers -------------------- */
+async function fetchAccounts() {
+  try {
+    const r = await fetch('/api/accounts');
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (data && data.success) return data;
+    return null;
+  } catch (err) {
+    console.warn('fetchAccounts error', err && err.message);
+    return null;
+  }
+}
+
+async function fetchNotifications() {
+  try {
+    const r = await fetch('/api/notifications');
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (data && data.success) return data;
+    return null;
+  } catch (err) {
+    console.warn('fetchNotifications error', err && err.message);
+    return null;
+  }
 }
 
 /* -------------------- Dropdown + Overlay -------------------- */
@@ -169,7 +281,6 @@ function isNotificationFromActive(n, activeUsername) {
   if (n.item && n.item.owner && String(n.item.owner) === a) return false;
   return true;
 }
-
 function computeNotificationUrl(n) {
   if (!n || !n.meta) return null;
   const m = n.meta;
@@ -194,39 +305,12 @@ async function positionDropdownRelativeTo(anchorEl) {
     dd.style.top = (top + 8) + 'px';
   } else {
     const rect = anchorEl.getBoundingClientRect();
-    const ddWidth = Math.min(460, Math.max(320, rect.width * 2));
+    const ddWidth = Math.min(420, Math.max(320, rect.width * 2));
     dd.style.width = ddWidth + 'px';
     const right = window.innerWidth - rect.right - 12;
     dd.style.right = Math.max(12, right) + 'px';
     dd.style.left = '';
     dd.style.top = (rect.bottom + window.scrollY + 8) + 'px';
-  }
-}
-
-/* -------------------- Fetch helpers -------------------- */
-async function fetchAccounts() {
-  try {
-    const r = await fetch('/api/accounts');
-    if (!r.ok) return null;
-    const data = await r.json();
-    if (data && data.success) return data;
-    return null;
-  } catch (err) {
-    console.warn('fetchAccounts error', err && err.message);
-    return null;
-  }
-}
-
-async function fetchNotifications() {
-  try {
-    const r = await fetch('/api/notifications');
-    if (!r.ok) return null;
-    const data = await r.json();
-    if (data && data.success) return data;
-    return null;
-  } catch (err) {
-    console.warn('fetchNotifications error', err && err.message);
-    return null;
   }
 }
 
@@ -259,7 +343,7 @@ async function renderNav() {
   bell.setAttribute('aria-label','Notifications');
   bell.style.cursor = 'pointer';
   bell.style.position = 'relative';
-  bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 01-3.46 0"></path></svg>`;
+  bell.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path></svg>`;
 
   let badgeCount = 0;
   if (notifData && notifData.notifications) {
@@ -305,9 +389,7 @@ async function renderNav() {
     avatarBtn.style.background = 'transparent';
     avatarBtn.style.padding = '6px';
     avatarBtn.style.cursor = 'pointer';
-    avatarBtn.setAttribute('aria-haspopup', 'true');
-    avatarBtn.setAttribute('aria-expanded', 'false');
-    avatarBtn.innerHTML = `<img src="${avatarUrl}" class="avatar-img" alt="${escapeHtml(activeAcc.username)}" style="width:32px;height:32px;border-radius:8px;object-fit:cover"> <span style="color:#1f2a37;font-weight:700">${escapeHtml(activeAcc.displayName || activeAcc.username)}</span>`;
+    avatarBtn.innerHTML = `<img src="${avatarUrl}" class="avatar-img" alt="${activeAcc.username}" style="width:32px;height:32px;border-radius:8px;object-fit:cover"> <span style="color:#1f2a37;font-weight:700">${activeAcc.displayName || activeAcc.username}</span>`;
     accountArea.appendChild(avatarBtn);
 
     const dd = ensureDropdown();
@@ -315,12 +397,11 @@ async function renderNav() {
 
     avatarBtn.onclick = async (ev) => {
       ev.stopPropagation();
-      const open = dropdownVisible && dd && dd.parentElement;
-      if (open) { hideDropdown(); avatarBtn.setAttribute('aria-expanded', 'false'); return; }
+      if (dropdownVisible) { hideDropdown(); return; }
       dd.innerHTML = '';
       const header = document.createElement('div');
       header.className = 'dropdown-header';
-      header.innerHTML = `<img src="${avatarUrl}" class="avatar-img" style="width:48px;height:48px;border-radius:8px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${escapeHtml(activeAcc.displayName || activeAcc.username)}</div><div class="small">${escapeHtml(activeAcc.username)}</div></div>`;
+      header.innerHTML = `<img src="${avatarUrl}" class="avatar-img" style="width:48px;height:48px;border-radius:8px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${activeAcc.displayName || activeAcc.username}</div><div class="small" style="color:var(--muted)">${activeAcc.username}</div></div>`;
       dd.appendChild(header);
 
       const list = document.createElement('div');
@@ -335,8 +416,7 @@ async function renderNav() {
         if (acc.username === globalActive) continue;
         const item = document.createElement('div');
         item.className = 'dropdown-item';
-        item.innerHTML = `<img src="${acc.profilePic || '/img/default_profile.png'}" class="avatar-img" style="width:36px;height:36px;border-radius:6px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${escapeHtml(acc.displayName || acc.username)}</div><div class="small" style="color:var(--muted)">${escapeHtml(acc.username)}</div></div>`;
-        item.tabIndex = 0;
+        item.innerHTML = `<img src="${acc.profilePic || '/img/default_profile.png'}" class="avatar-img" style="width:36px;height:36px;border-radius:6px;object-fit:cover"><div style="flex:1"><div style="font-weight:700">${acc.displayName || acc.username}</div><div class="small" style="color:var(--muted)">${acc.username}</div></div>`;
         item.onclick = async () => {
           const confirmSwitch = confirm(`สลับไปใช้บัญชี ${acc.username} ?`);
           if (!confirmSwitch) return;
@@ -369,7 +449,6 @@ async function renderNav() {
 
       await positionDropdownRelativeTo(avatarBtn);
       showDropdown();
-      avatarBtn.setAttribute('aria-expanded', 'true');
     };
 
     // Notification bell handling
@@ -388,7 +467,7 @@ async function renderNav() {
       const unreadCount = visibleNotifs && visibleNotifs.length > 0 && Object.prototype.hasOwnProperty.call(visibleNotifs[0], 'read')
         ? visibleNotifs.filter(n => !n.read).length
         : (nd ? (nd.unread || 0) : 0);
-      header.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>การแจ้งเตือน</strong><div class="small">${unreadCount} รายการยังไม่อ่าน</div></div><div><button class="btn btn-ghost" id="notifRefreshSmall">รีเฟรช</button></div></div>`;
+      header.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>การแจ้งเตือน</strong><div class="small">${unreadCount} รายการยังไม่อ่าน</div></div></div>`;
       dd.appendChild(header);
 
       const list = document.createElement('div');
@@ -418,7 +497,7 @@ async function renderNav() {
           const title = document.createElement('div');
           title.style.display = 'flex';
           title.style.justifyContent = 'space-between';
-          title.innerHTML = `<div style="font-weight:700">${escapeHtml(n.type || 'การแจ้งเตือน')}</div><div class="small">${new Date(n.createdAt).toLocaleString()}</div>`;
+          title.innerHTML = `<div style="font-weight:700">${n.type || 'การแจ้งเตือน'}</div><div class="small">${new Date(n.createdAt).toLocaleString()}</div>`;
           const msg = document.createElement('div');
           msg.className = 'small';
           msg.textContent = n.message || '';
@@ -466,20 +545,51 @@ async function renderNav() {
           await renderNav();
         };
       }
-
-      const smallRef = dd.querySelector('#notifRefreshSmall');
-      if (smallRef) smallRef.addEventListener('click', async (e) => { e.preventDefault(); await renderNav(); hideDropdown(); });
     };
 
   } else {
     accountArea.appendChild(elFrom('<a href="/login" class="btn btn-ghost">เข้าสู่ระบบ</a>'));
-    accountArea.appendChild(elFrom('<a href="/register" class="btn btn-primary">สมัครสมาชิก</a>'));
+    accountArea.appendChild(elFrom('<a href="/register" class="btn">สมัครสมาชิก</a>'));
   }
 
   nav.appendChild(accountArea);
 
   // click outside to close dropdown
-  document.addEventListener('click', function () { if (dropdownVisible) hideDropdown(); }, true);
+  document.addEventListener('click', function () {
+    if (dropdownVisible) hideDropdown();
+  }, true);
+
+  // mirror nav into mobile sidebar for small screens (vertical layout)
+  try {
+    const mobileNav = document.getElementById('mobileSidebarNav');
+    if (mobileNav) {
+      mobileNav.innerHTML = '';
+      // clone only the left links and accountArea, sanitized for vertical layout
+      const leftClone = left.cloneNode(true);
+      leftClone.style.display = 'flex';
+      leftClone.style.flexDirection = 'column';
+      leftClone.querySelectorAll('a').forEach(a => { a.style.display = 'block'; a.style.padding = '10px 12px'; a.style.borderRadius = '10px'; });
+
+      const acctClone = accountArea.cloneNode(true);
+      // tidy cloned account area: remove event handlers (they won't be cloned), make items block-level
+      acctClone.querySelectorAll('button, a, .avatar-img').forEach(el => {
+        el.removeAttribute('onclick');
+        el.style.display = 'block';
+        if (el.tagName === 'IMG') el.style.width = '48px';
+      });
+
+      mobileNav.appendChild(leftClone);
+      mobileNav.appendChild(acctClone);
+
+      // add quick links for accounts & notifications as shortcuts
+      const extras = document.createElement('div');
+      extras.style.paddingTop = '8px';
+      extras.innerHTML = `<a href="/accounts" class="small-link" style="display:block;padding:10px 12px;border-radius:10px;">จัดการบัญชี</a><a href="/notifications" class="small-link" style="display:block;padding:10px 12px;border-radius:10px;margin-top:6px;">การแจ้งเตือน</a>`;
+      mobileNav.appendChild(extras);
+    }
+  } catch (e) {
+    console.warn('mirror to mobileSidebarNav failed', e && e.message);
+  }
 }
 
 /* -------------------- Events -------------------- */
@@ -498,4 +608,8 @@ window.onload = async function() {
   setupHeaderInteractions();
   setupGlobalRefreshOnMessage();
   await renderNav();
+
+  // attach close handler to mobile sidebar close control (in case renderNav ran earlier)
+  const mobileSidebarClose = document.getElementById('mobileSidebarClose');
+  if (mobileSidebarClose) mobileSidebarClose.addEventListener('click', () => { closeMobileSidebar(); });
 };
