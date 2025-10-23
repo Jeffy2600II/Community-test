@@ -13,7 +13,7 @@
         </div>
       </a>
 
-      <!-- Mobile menu toggle: now controls the right-side mobile drawer -->
+      <!-- Mobile menu toggle: appears on small screens and toggles mobile sidebar -->
       <button id="mobileMenuToggle" class="btn btn-icon" aria-expanded="false" aria-controls="mobileSidebar" aria-label="Toggle menu">
         <!-- simple hamburger icon -->
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1f2a37" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -22,8 +22,7 @@
       </button>
     </div>
 
-    <!-- Bottom row: search + dynamic nav/actions (kept for tablet/desktop)
-         On mobile this element will be hidden (we use the right-side drawer instead). -->
+    <!-- Bottom row: search + dynamic nav/actions (desktop / tablet) -->
     <div id="headerBottom" class="header-bottom" role="navigation" aria-label="Site actions">
       <div class="header-search" role="search" aria-label="Site search">
         <form onsubmit="event.preventDefault(); const q=this.query.value.trim(); if(q) location.href='/search?q='+encodeURIComponent(q);">
@@ -37,20 +36,19 @@
     </div>
   </div>
 
-  <!-- Right-side mobile drawer (new/explicit element)
-       - This drawer will be used on small screens (<=800px)
-       - The mobileMenuToggle button now targets this element.
-       - Content (navBar) will be moved into #mobileNavContainer on small screens by JS. -->
-  <div id="mobileSidebar" class="mobile-drawer" role="dialog" aria-modal="true" aria-hidden="true">
-    <div class="mobile-drawer-inner">
-      <div class="mobile-drawer-header" style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid rgba(15,23,42,0.04);">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect width="24" height="24" rx="6" fill="#2f80ed"></rect></svg>
-          <div style="font-weight:700">เมนู</div>
+  <!-- Mobile sidebar (slides in from right) -->
+  <div id="mobileSidebar" class="mobile-sidebar" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="mobile-sidebar-panel" role="document">
+      <div class="mobile-sidebar-header row" style="justify-content:space-between;align-items:center;">
+        <div style="font-weight:700;">เมนู</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button id="mobileSidebarClose" class="btn btn-ghost" aria-label="ปิดเมนู">ปิด</button>
         </div>
-        <button id="mobileSidebarClose" class="btn btn-ghost" aria-label="ปิดเมนู">✕</button>
       </div>
-      <div id="mobileNavContainer" class="mobile-nav-container" style="padding:12px; overflow:auto;"></div>
+      <div id="mobileSidebarContent" class="mobile-sidebar-content" tabindex="0"></div>
     </div>
   </div>
+
+  <!-- overlay that appears beneath the sidebar (covers page) -->
+  <div id="mobileSidebarOverlay" class="mobile-sidebar-overlay hidden" aria-hidden="true"></div>
 </header>
