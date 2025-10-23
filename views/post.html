@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>ดูโพสต์</title>
     <link rel="stylesheet" href="/css/style.css">
+    <style>
+      /* ในหน้าดูโพสต์ ใช้รูปแบบเดียวกับฟีดที่มี header inline */
+      .post-header { margin-bottom: 8px; }
+      .post .post-body { margin-top: 8px; }
+      .post-content { white-space: pre-wrap; word-break: break-word; }
+    </style>
 </head>
 <body>
   <div id="headerSlot"></div>
@@ -36,20 +42,40 @@ async function loadPost() {
     if (!data.success) return document.getElementById('postBox').innerText = 'ไม่พบโพสต์';
     const { post, comments, owner, myUsername: apiUsername } = data;
     myUsername = apiUsername;
-    // Title removed: show the full content as the main body.
-    let html = `<header class="row" style="justify-content:space-between;align-items:flex-start;">
-      <div>
-        <!-- Show a short lead extracted from content as a visual heading (first line) -->
-        <div style="font-size:1.25rem;font-weight:700;margin-bottom:6px;">${(post.content || '').split('\\n')[0].slice(0,200)}</div>
-        <div class="small">โดย <a href="/user/${post.username}">${post.username}</a> • ${new Date(post.createdAt).toLocaleString()}</div>
+
+    // แสดง header แบบเดียวกับฟีด: avatar + username + time (ไม่มีหัวข้อแยก)
+    let html = `<article class="post">
+      <div class="post-header" role="group" aria-label="ผู้โพสต์">
+        <a class="post-avatar" href="/user/${post.username}" aria-hidden="false">
+          <img src="/img/default_profile.png" class="avatar-img" alt="${post.username}" id="avatar-${post.username}-${post.id}">
+        </a>
+        <div class="post-header-meta">
+          <div class="post-username"><a href="/user/${post.username}">${post.username}</a></div>
+          <div class="post-time small">${new Date(post.createdAt).toLocaleString()}</div>
+        </div>
       </div>
-      <div class="row">
-        ${myUsername === post.username ? `<a class="btn btn-ghost" href="/post/${post.id}/edit">แก้ไข</a> <button class="btn btn-ghost" id="delBtn">ลบ</button>` : ''}
+
+      <div class="post-body">
+        ${post.image ? `<img src="${post.image}" class="post-img" alt="post image" loading="lazy">` : ''}
+        <div class="post-content mt-16">${post.content}</div>
+        <div class="post-actions mt-16">
+          ${myUsername === post.username ? `<a class="btn btn-ghost" href="/post/${post.id}/edit">แก้ไข</a> <button class="btn btn-ghost" id="delBtn">ลบ</button>` : ''}
+        </div>
       </div>
-    </header>
-    ${post.image ? `<img src="${post.image}" class="post-img" alt="post image" loading="lazy">` : ''}
-    <div class="mt-16">${post.content}</div>`;
+    </article>`;
     document.getElementById('postBox').innerHTML = html;
+
+    // โหลด avatar สำหรับ header (เหมือน feed)
+    (async () => {
+      try {
+        const up = await fetch(`/api/user/${encodeURIComponent(post.username)}`);
+        const ud = await up.json();
+        if (ud && ud.success && ud.profile && ud.profile.profilePic) {
+          const imgElem = document.getElementById("avatar-"+post.username+"-"+post.id);
+          if (imgElem) imgElem.src = ud.profile.profilePic;
+        }
+      } catch(e){}
+    })();
 
     if (myUsername === post.username) {
         const del = document.getElementById('delBtn');
