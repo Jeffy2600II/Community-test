@@ -449,6 +449,7 @@ textarea { min-height: 120px; resize: vertical; }
   background: var(--surface);
   border: 1px solid rgba(15,23,42,0.06);
   box-shadow: 0 20px 60px rgba(16,24,40,0.12);
+  z-index: 3000; /* ensure above mobile sidebar (which uses z-index 2000) */
 }
 .dropdown-header {
   padding: 12px;
@@ -467,6 +468,15 @@ textarea { min-height: 120px; resize: vertical; }
 }
 @media (hover: hover) {
   .dropdown-item:hover { background: #fbfdff; }
+}
+
+/* dropdown overlay (covers page while dropdown open; separate from mobileSidebarOverlay) */
+#dropdownOverlay {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 2950; /* below dropdown, above sidebar */
+  pointer-events: auto;
 }
 
 /* Notification badge */
@@ -703,10 +713,8 @@ img { max-width: 100%; height: auto; display: block; }
   #mobileMenuToggle { display: none; }
 }
 
-/* End of stylesheet */
-
 /* ---------------------------------------------------------------------------
-   Additions: Mobile right-side off-canvas sidebar + overlay
+   Mobile right-side off-canvas sidebar + overlay
    - Scoped and mobile-first: only active on narrow screens.
    - Keeps visual style consistent with existing design system.
    --------------------------------------------------------------------------- */
