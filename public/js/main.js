@@ -1,17 +1,12 @@
-// public/js/main.js (updated: mobile drawer integration + z-index fixes)
+// public/js/main.js (updated: mobile drawer integration)
 //
-// - Mobile drawer (#mobileSidebar) remains the single mobile menu (≤800px).
-// - Ensured overlay ordering so overlay dims page but stays BELOW the mobile drawer
-//   and below dropdown/menu panels. Menu and dropdowns will be above the overlay.
-// - Responsibilities:
-//   * mobileSidebar overlay id: #mobileSidebarOverlay (z-index: 1800)
-//   * mobile drawer: #mobileSidebar (z-index: 2000) — above overlay
-//   * dropdown overlay: #dropdownOverlay (z-index: 1600) — below dropdown panel
-//   * dropdown panel: #accountDropdown (z-index: 2300) — top-most UI
-//
-// - Also moves #navBar into the mobile drawer on small screens and back on resize.
-//
-// Note: rest of file logic (fetch/render nav, dropdowns, notifications) preserved.
+// - Reworked setupHeaderInteractions to use a right-side mobile drawer (#mobileSidebar)
+//   instead of toggling headerBottom on small screens. This avoids duplication and
+//   ensures the "mobile sidebar that slides from the right" is the single mobile menu.
+// - Moves #navBar into #mobileNavContainer when window width <= 800 and moves it back
+//   when > 800. The renderNav() still renders into #navBar, so moving the element
+//   keeps behavior consistent without duplicating content.
+// - Keeps existing dropdown logic and ensures dropdowns are closed when drawer opens.
 
  /* -------------------- Utilities -------------------- */
 async function loadPartial(id, file) {
@@ -73,9 +68,7 @@ function setupHeaderInteractions() {
     o.style.position = 'fixed';
     o.style.inset = '0';
     o.style.background = 'rgba(0,0,0,0.32)';
-    // IMPORTANT: overlay z-index intentionally LOWER than the mobile drawer
-    // so that the drawer (menu) is displayed above the dimming overlay.
-    o.style.zIndex = '1800';
+    o.style.zIndex = '1350';
     o.addEventListener('click', function () {
       mobileSidebar.classList.remove('open');
       toggle.setAttribute('aria-expanded', 'false');
@@ -183,8 +176,7 @@ function ensureDropdown() {
   dropdownEl.className = 'dropdown-panel';
   dropdownEl.style.display = 'none';
   dropdownEl.style.position = 'absolute';
-  // Make dropdown panel top-most so it appears above overlays and drawers
-  dropdownEl.style.zIndex = '2300';
+  dropdownEl.style.zIndex = '1400';
   dropdownEl.style.boxShadow = '0 8px 24px rgba(15,23,42,0.08)';
   dropdownEl.style.background = '#fff';
   dropdownEl.style.borderRadius = '10px';
@@ -200,8 +192,7 @@ function createOverlay() {
   overlayEl.style.position = 'fixed';
   overlayEl.style.inset = '0';
   overlayEl.style.background = 'transparent';
-  // overlay used for dropdowns should be below dropdown panel but above page
-  overlayEl.style.zIndex = '1600';
+  overlayEl.style.zIndex = '1300';
   overlayEl.style.pointerEvents = 'auto';
   overlayEl.addEventListener('click', function (ev) {
     ev.preventDefault(); ev.stopPropagation(); hideDropdown();
