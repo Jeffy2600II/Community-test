@@ -357,39 +357,39 @@ main {
   box-shadow: 0 8px 30px rgba(16,24,40,0.04);
 }
 
-/* --- NEW: Feed ordering override
-   Goal: In the feed (.feed .post) show profile (avatar + username) at the top,
-   then post title, then content. This keeps existing DOM structure but changes
-   visual order for feed items only. This does NOT change mobile sidebar or overlay
-   positions — only affects feed item layout.
+/* --- NEW: Feed ordering & date placement (profile, then title, then content)
+   We only change visual order for feed items (.feed .post) to match:
+   1) profile (avatar + username)
+   2) title
+   3) content/excerpt
+   Also make the post date/time smaller and render under the username (like FB).
+   This is a visual-only change (no DOM/JS modifications) and scoped to .feed .post.
 */
 .feed .post {
-  /* transform the feed items into a vertical stack */
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
 }
 
-/* make avatar + user block flow naturally above the body content */
+/* Profile row (avatar + username) appears at the top */
 .feed .post .post-left {
-  width: auto; /* let avatar size be natural */
+  width: auto;
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 0; /* remove left-side spacing */
+  margin: 0;
   padding: 0;
 }
 
-/* ensure the avatar image keeps its previous visual size but with small radius */
+/* Slightly larger avatar in feed header */
 .feed .post .post-left .avatar-img {
   width: 56px;
   height: 56px;
   border-radius: 10px;
 }
 
-/* post-body becomes a vertical stack; we re-order its internal pieces so meta (username)
-   appears first, then title, then excerpt (content). This relies on CSS ordering only. */
+/* Make the body a vertical stack */
 .feed .post .post-body {
   width: 100%;
   display: flex;
@@ -398,24 +398,65 @@ main {
   padding: 0;
 }
 
-/* put the meta (username line) before title visually */
-.feed .post .post-body .post-meta { order: 0; margin-top: 0; color: var(--muted); display:flex; align-items:center; gap:8px; }
+/* Meta (username + date): place stacked, make date smaller.
+   We intentionally set meta to column so username is on top and date below.
+   Username (anchor) is emphasized (larger & bold); date inherits the smaller meta size.
+*/
+.feed .post .post-body .post-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-size: 0.78rem; /* smaller for date by default */
+  color: var(--muted);
+  margin: 0; /* remove extra top margin to tighten spacing */
+  order: 0; /* ensure meta appears before title */
+}
 
-/* title appears after meta */
-.feed .post .post-body .post-title { order: 1; margin: 0; font-size: 1.08rem; }
+/* Username (anchor) emphasized and visually larger than the date */
+.feed .post .post-body .post-meta a {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+  line-height: 1.15;
+}
 
-/* excerpt/content comes last */
-.feed .post .post-body .post-excerpt { order: 2; margin-top: 4px; color: #38414b; }
+/* Title after meta */
+.feed .post .post-body .post-title {
+  order: 1;
+  margin: 0;
+  font-size: 1.08rem;
+}
 
-/* if there is a post image inside body, keep it after excerpt */
-.feed .post .post-body .post-img { order: 3; max-width: 100%; margin-top: 8px; }
+/* Excerpt/content last */
+.feed .post .post-body .post-excerpt {
+  order: 2;
+  margin-top: 4px;
+  color: #38414b;
+}
 
-/* keep touch targets and actions consistent */
-.feed .post .post-actions { order: 4; margin-top: 8px; display:flex; gap:8px; align-items:center; }
+/* Post image (if any) after excerpt */
+.feed .post .post-body .post-img {
+  order: 3;
+  max-width: 100%;
+  margin-top: 8px;
+}
 
-/* Post-left + body alignment for narrow screens (no change to sidebar) */
+/* Actions after content */
+.feed .post .post-actions {
+  order: 4;
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Responsive tweaks */
 @media (max-width: 800px) {
   .feed .post .post-left .avatar-img { width: 56px; height: 56px; }
+  .feed .post .post-body .post-meta { font-size: 0.80rem; }
+  .feed .post .post-body .post-meta a { font-size: 1.0rem; }
 }
 
 /* End of feed ordering override */
