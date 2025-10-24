@@ -382,10 +382,10 @@ main {
 .feed .post-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px; /* slightly reduced */
   width: 100%;
-  /* slightly tighter bottom spacing to keep header compact */
-  margin-bottom: 6px;
+  /* tighter bottom spacing to keep header compact */
+  margin-bottom: 4px; /* reduced from 6px to bring username/time closer to content */
 }
 
 /* avatar link (keeps .avatar-img class for compatibility) */
@@ -395,32 +395,32 @@ main {
   justify-content: center;
   text-decoration: none;
 }
-/* AVATAR SIZE: slightly reduced so header is less visually dominant than content */
+/* AVATAR SIZE: significantly reduced so header is much less dominant than content */
 .feed .post-header .post-avatar .avatar-img {
-  width: 40px;   /* reduced from 48px */
-  height: 40px;  /* reduced from 48px */
-  border-radius: 10px;
+  width: 32px;   /* reduced further from 40px to 32px */
+  height: 32px;  /* reduced further from 40px to 32px */
+  border-radius: 8px;
   object-fit: cover;
   border: 1px solid rgba(15,23,42,0.06);
   flex-shrink: 0;
 }
 
 /* meta area right of avatar: username + time inline */
-/* Reduced gap so username and timestamp sit closer together */
+/* Reduced gap so username and timestamp sit very close together */
 .feed .post-header-meta {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 6px; /* reduced from 10px */
+  gap: 4px; /* reduced again from 6px to 4px */
   flex-wrap: wrap;
   min-width: 0; /* allow truncation on small screens */
 }
 
-/* username emphasized (slightly smaller than before so content stands out) */
+/* username emphasized (smaller to keep attention on content) */
 .feed .post-header-meta .post-username a {
   font-weight: 700;
   color: var(--text);
-  font-size: 0.92rem; /* reduced from 0.98rem */
+  font-size: 0.80rem; /* reduced to emphasize content */
   text-decoration: none;
   white-space: nowrap;
   overflow: hidden;
@@ -431,7 +431,7 @@ main {
 /* timestamp small and muted, inline to the right (reduced size) */
 .feed .post-header-meta .post-time {
   color: var(--muted);
-  font-size: 0.74rem; /* reduced from 0.82rem */
+  font-size: 0.64rem; /* reduced further for subtle appearance */
   white-space: nowrap;
 }
 
@@ -451,9 +451,10 @@ main {
 
 /* responsive adjustments */
 @media (max-width: 800px) {
-  .feed .post-header .post-avatar .avatar-img { width: 48px; height: 48px; } /* slightly larger avatar on small screens for touch */
-  .feed .post-header-meta .post-username a { font-size: 1.00rem; }
-  .feed .post-header-meta .post-time { font-size: 0.78rem; }
+  /* On narrow screens give slightly larger header touch targets */
+  .feed .post-header .post-avatar .avatar-img { width: 40px; height: 40px; } /* touch target kept comfortable */
+  .feed .post-header-meta .post-username a { font-size: 0.95rem; }
+  .feed .post-header-meta .post-time { font-size: 0.72rem; }
 }
 
 /* ------------------------------------------------------------------ */
