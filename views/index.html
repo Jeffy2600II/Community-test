@@ -19,7 +19,29 @@
     .post-header { margin-bottom: 6px; }
 
     .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
-    .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; }
+    .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; display:block; }
+
+    /* gallery for multiple images: responsive grid */
+    .post-gallery {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+      /* responsive columns: try to show up to 3 columns on wide screens */
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      align-items: stretch;
+    }
+    .post-gallery .post-img {
+      width: 100%;
+      height: 140px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin: 0;
+    }
+    /* if only one image, make it taller / natural ratio */
+    .post .post-gallery.only-one .post-img {
+      height: auto;
+      object-fit: contain;
+    }
 
     /* make whole post show pointer, but interactive children keep their own cursor */
     .post a, .post button, .post input, .post textarea { cursor: auto; }
@@ -52,6 +74,7 @@
       .post-avatar .avatar-img { width:44px; height:44px; }
       .post-username a { font-size:0.95rem; }
       .post-time { font-size:0.80rem; }
+      .post-gallery .post-img { height:120px; }
     }
   </style>
 </head>
@@ -216,14 +239,28 @@
         contentDiv.innerHTML = formatted;
         body.appendChild(contentDiv);
 
-        // optional image
-        if (post.image) {
+        // images: support post.images (array) or legacy post.image
+        const imgs = Array.isArray(post.images) ? post.images.slice() : (post.image ? [post.image] : []);
+        if (imgs.length === 1) {
           const im = document.createElement('img');
           im.className = 'post-img';
-          im.src = post.image;
+          im.src = imgs[0];
           im.alt = 'post image';
           im.loading = 'lazy';
           body.appendChild(im);
+        } else if (imgs.length > 1) {
+          const gallery = document.createElement('div');
+          gallery.className = 'post-gallery';
+          if (imgs.length === 1) gallery.classList.add('only-one');
+          for (const src of imgs) {
+            const im = document.createElement('img');
+            im.className = 'post-img';
+            im.src = src;
+            im.alt = 'post image';
+            im.loading = 'lazy';
+            gallery.appendChild(im);
+          }
+          body.appendChild(gallery);
         }
 
         // hidden actions placeholder
