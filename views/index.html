@@ -26,7 +26,7 @@
     .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
     .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
     /* popup should align to the right of the post when kebab is on the right */
-    .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
+    .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); min-width:160px; z-index:2200; overflow:hidden; }
     .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
     .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
 
@@ -154,7 +154,7 @@
         const header = document.createElement('div');
         header.className = 'post-header';
 
-        // avatar (add data-username attribute so selection is robust even if username contains hyphens)
+        // avatar
         const avatarLink = document.createElement('a');
         avatarLink.className = 'post-avatar';
         avatarLink.href = '/user/' + encodeURIComponent(post.username || '');
@@ -163,9 +163,7 @@
         const img = document.createElement('img');
         img.className = 'avatar-img';
         img.alt = post.username || '';
-        // set both id and data-username to be resilient
         img.id = 'avatar-' + (post.username || 'u') + '-' + (post.id || 'x');
-        img.dataset.username = post.username || '';
         img.src = '/img/default_profile.png';
         avatarLink.appendChild(img);
         header.appendChild(avatarLink);
@@ -256,72 +254,26 @@
       loadAvatarsAndWireKebab(myUsername);
     }
 
-    /**
-     * Robust avatar loader:
-     * - Uses data-username attribute (safer than parsing id with hyphens)
-     * - Deduplicates by username
-     * - Fetches /api/user/:username and applies profilePic to all matching imgs
-     * - Adds image error handler to detect 404s / broken files
-     */
     async function loadAvatarsAndWireKebab(myUsername) {
-      const avatarImgs = Array.from(document.querySelectorAll('img[data-username]'));
+      const avatarImgs = Array.from(document.querySelectorAll('img[id^="avatar-"]'));
       const seen = new Set();
-      const usernames = [];
-
-      // collect unique usernames (skip empty)
       for (const img of avatarImgs) {
-        const username = (img.dataset.username || '').trim();
-        if (!username) continue;
+        const parts = img.id.split('-');
+        if (parts.length < 3) continue;
+        const username = parts.slice(1, parts.length - 1).join('-');
         if (seen.has(username)) continue;
         seen.add(username);
-        usernames.push(username);
-      }
-
-      // fetch profile for each username (sequential-ish but could be parallel)
-      for (const username of usernames) {
         (async () => {
           try {
-            const url = '/api/user/' + encodeURIComponent(username);
-            const up = await fetch(url);
-            if (!up.ok) {
-              console.warn('Failed to fetch', url, 'status', up.status);
-              return;
-            }
+            const up = await fetch('/api/user/' + encodeURIComponent(username));
+            if (!up.ok) return;
             const ud = await up.json();
-            if (!ud || !ud.success) {
-              console.warn('/api/user/ response for', username, ud);
-              return;
+            if (ud && ud.success && ud.profile && ud.profile.profilePic) {
+              document.querySelectorAll('img[id^="avatar-' + username + '"]').forEach(i => {
+                i.src = ud.profile.profilePic;
+              });
             }
-            if (!ud.profile) {
-              console.warn('No profile returned for', username);
-              return;
-            }
-
-            const pic = ud.profile.profilePic;
-            if (!pic) {
-              // Profile exists but no picture set
-              // Info log to help debugging
-              console.info('profilePic empty for', username);
-              return;
-            }
-
-            // apply to all images that match data-username
-            document.querySelectorAll('img[data-username="' + CSS.escape(username) + '"]').forEach(i => {
-              // if already set to that src, skip
-              if (i.src && (new URL(i.src, location.href)).pathname === pic) return;
-              // attach error handler to detect failed image loads
-              i.addEventListener('error', function onErr() {
-                console.warn('Avatar image failed to load for', username, 'url=', pic, 'element id=', i.id);
-                // fallback to default
-                i.removeEventListener('error', onErr);
-                i.src = '/img/default_profile.png';
-              }, { once: true });
-              // set src (use full path as returned by API)
-              i.src = pic;
-            });
-          } catch (err) {
-            console.error('error fetching profile for', username, err && err.message);
-          }
+          } catch (e) {}
         })();
       }
 
