@@ -29,8 +29,9 @@
             <textarea name="content" id="contentInput" placeholder="เขียนสิ่งที่คุณต้องการแบ่งปันที่นี่..." required></textarea>
 
             <div class="input-file mt-16">
-              <label class="btn btn-ghost">
-                แนบรูปหลายรูป (เลือกหลายไฟล์ได้) <input id="fileInput" type="file" name="postImage" multiple style="display:none">
+              <label class="btn btn-ghost" id="chooseFilesBtn">
+                แนบรูปหลายรูป (เลือกหลายไฟล์ได้)
+                <input id="fileInput" type="file" name="postImage" multiple style="display:none">
               </label>
               <span class="small-note">สามารถลากเลือกหรือกดปุ่มเพื่อเลือกหลายรูปภาพได้</span>
             </div>
@@ -59,6 +60,7 @@
   // utility
   function escapeHtml(s){ if (s===null||s===undefined) return ''; return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
   function formatNow(){ return new Date().toLocaleString(); }
+  function genId() { return 'f_' + Date.now().toString(36) + '_' + Math.floor(Math.random()*10000).toString(36); }
 
   const contentInput = document.getElementById('contentInput');
   const fileInput = document.getElementById('fileInput');
@@ -66,9 +68,11 @@
   const previewPost = document.getElementById('previewPost');
   const msg = document.getElementById('msg');
   const postForm = document.getElementById('postForm');
+  const chooseFilesBtn = document.getElementById('chooseFilesBtn');
 
-  // state
-  let files = []; // File objects selected (new)
+  // state: store objects so removal targets a specific id (not index)
+  let files = []; // [{id, file, url}]
+
   // helpers
   function makePreviewArticle(username, avatarUrl, contentHtml, images, createdAt) {
     const art = document.createElement('article');
@@ -100,13 +104,25 @@
     body.appendChild(contentDiv);
 
     if (images && images.length) {
-      for (const src of images) {
+      if (images.length === 1) {
         const im = document.createElement('img');
         im.className = 'post-img';
-        im.src = src;
+        im.src = images[0];
         im.alt = 'post image';
         im.loading = 'lazy';
         body.appendChild(im);
+      } else {
+        const gallery = document.createElement('div');
+        gallery.className = 'post-gallery';
+        for (const src of images) {
+          const im = document.createElement('img');
+          im.className = 'post-img';
+          im.src = src;
+          im.alt = 'post image';
+          im.loading = 'lazy';
+          gallery.appendChild(im);
+        }
+        body.appendChild(gallery);
       }
     }
 
@@ -127,13 +143,14 @@
   // render selected thumbnails
   function renderSelectedThumbnails() {
     selectedImages.innerHTML = '';
-    files.forEach((f, idx) => {
+    for (const item of files) {
       const box = document.createElement('div');
       box.className = 'image-thumb';
+      box.dataset.fileId = item.id;
+
       const img = document.createElement('img');
-      const url = URL.createObjectURL(f);
-      img.src = url;
-      img.alt = f.name;
+      img.src = item.url;
+      img.alt = item.file.name || '';
       box.appendChild(img);
 
       const btn = document.createElement('button');
@@ -142,20 +159,27 @@
       btn.innerText = '✕';
       btn.addEventListener('click', (ev) => {
         ev.preventDefault();
-        // revoke object URL
-        try { URL.revokeObjectURL(url); } catch(e){}
-        files.splice(idx,1);
-        renderSelectedThumbnails();
-        updatePreview();
+        // remove only this item using its id
+        removeFileById(item.id);
       });
       box.appendChild(btn);
       selectedImages.appendChild(box);
-    });
+    }
   }
 
-  // gather image srcs for preview (object URLs)
+  function removeFileById(id) {
+    const idx = files.findIndex(x => x.id === id);
+    if (idx === -1) return;
+    // revoke object URL
+    try { URL.revokeObjectURL(files[idx].url); } catch(e){}
+    files.splice(idx,1);
+    renderSelectedThumbnails();
+    updatePreview();
+  }
+
+  // gather image srcs for preview (stored urls)
   function previewImageSrcs() {
-    return files.map(f => URL.createObjectURL(f));
+    return files.map(f => f.url);
   }
 
   // update live preview
@@ -169,29 +193,28 @@
     const art = makePreviewArticle(username, avatar, content, images, formatNow());
     previewPost.innerHTML = '';
     previewPost.appendChild(art);
-
-    // revoke the temporary object URLs created earlier (for thumb rendering we created URLs twice),
-    // but keep them until next update — to avoid revoking still-in-use URLs, we will not aggressively revoke here.
   }
 
   // file input change
   fileInput.addEventListener('change', (ev) => {
     const list = Array.from(ev.target.files || []);
-    // append new files
-    for (const f of list) files.push(f);
+    for (const f of list) {
+      const url = URL.createObjectURL(f);
+      files.push({ id: genId(), file: f, url });
+    }
     renderSelectedThumbnails();
     updatePreview();
     // reset input so same file can be re-selected if removed
     fileInput.value = '';
   });
 
+  // clicking the label forwards click to hidden input
+  chooseFilesBtn.addEventListener('click', (e) => {
+    fileInput.click();
+  });
+
   // live update when typing
   contentInput.addEventListener('input', () => updatePreview());
-
-  // enable clicking the ghost label to open file dialog
-  document.querySelectorAll('.input-file input[type="file"]').forEach(inp => {
-    inp.addEventListener('click', (e) => { e.stopPropagation(); });
-  });
 
   // initialize preview
   (async function initPreview(){
@@ -207,10 +230,10 @@
     const fd = new FormData();
     fd.append('content', contentInput.value || '');
     // append each file under two kinds of fields to maximize backend compatibility
-    files.forEach(f => {
-      fd.append('postImage', f);         // common single-field multiple entries
-      fd.append('postImages[]', f);      // array style
-    });
+    for (const item of files) {
+      fd.append('postImage', item.file);         // common single-field multiple entries
+      fd.append('postImages[]', item.file);      // array style
+    }
     try {
       const res = await fetch('/api/post/create', { method: 'POST', body: fd });
       const data = await res.json();
