@@ -6,11 +6,7 @@
    - Username + timestamp are inline and can sit close to the content
    - Post images: responsive, never cropped; constrained by max-height (viewport-based)
    - Mobile: stricter max-height so tall images fit comfortably on-screen
-   ------------------------------------------------------------------------
-   Added:
-   - --header-height variable for consistent sticky profile area top offset
-   - profile-hero made "tall" (full viewport column) and sticky on wide screens
-   - grid-2 aligns items to start so the left profile column reserves vertical space
+   - Added: reserved vertical profile column (sticky profile hero) on wide screens
    ======================================================================== */
 
 :root{
@@ -367,7 +363,7 @@ main {
    - We intentionally remove the large left gutter approach so that the header
      (username + time) can sit directly beside the avatar and the content can
      be placed closer under it.
-   ----------------------------------------------------------------------- */
+   ------------------------------------------------------------------ */
 
 /* Make the header a normal inline row (avatar + meta + kebab) */
 .feed .post {
@@ -565,7 +561,7 @@ textarea { min-height: 120px; resize: vertical; }
   display:grid;
   grid-template-columns: 320px 1fr;
   gap: var(--space-md);
-  align-items: start; /* ensure left column stretches/aligns to top so it can reserve vertical whitespace */
+  align-items: stretch; /* ensure left column stretches/aligns to top so it can reserve vertical whitespace */
 }
 
 /* Profile hero - now sticky and tall on wide screens to reserve a full vertical band.
@@ -582,13 +578,16 @@ textarea { min-height: 120px; resize: vertical; }
   border: 1px solid rgba(15,23,42,0.03);
 
   /* Make it behave as a vertical reserved column: sticky and full-height (viewport) */
-  position: -webkit-sticky;
   position: sticky;
   top: calc(var(--header-height) + var(--space-md));
   align-self: start;
-  /* height computed to take the remaining viewport height below the header */
-  height: calc(100vh - (var(--header-height) + (var(--space-md) * 2)));
-  min-height: 420px; /* ensures it's visually prominent; adjust as you prefer */
+  /* reserve vertical space: use min-height so grid will allocate it */
+  min-height: calc(100vh - (var(--header-height) + (var(--space-md) * 2)));
+  height: auto;
+  overflow: auto;
+
+  /* ensure it's above content if overlap occurs */
+  z-index: 2;
 }
 
 /* profile avatar sizing inside the tall column */
@@ -601,7 +600,11 @@ textarea { min-height: 120px; resize: vertical; }
   box-shadow: var(--shadow-2);
 }
 
-/* When the left column is tall, ensure the main column has comfortable padding on small widths */
+.grid-2 {
+  display:grid;
+  grid-template-columns: 320px 1fr;
+  gap: var(--space-md);
+}
 @media (max-width: 1100px) { .grid-2 { grid-template-columns: 1fr; } }
 
 /* On small screens, disable sticky/reserved-height to avoid layout issues and allow natural flow */
@@ -609,9 +612,10 @@ textarea { min-height: 120px; resize: vertical; }
   .profile-hero {
     position: static;
     top: 0;
-    height: auto;
     min-height: 0;
+    height: auto;
     border-radius: 10px;
+    z-index: 1;
   }
 }
 
@@ -737,7 +741,6 @@ a { color: var(--accent); text-decoration: none; }
     --space-md: 12px;
     --space-lg: 18px;
     --touch-target: 48px;
-    --header-height: 60px; /* smaller header on very small screens */
   }
   body { font-size: 15px; }
   .site-header .container { height: 60px; padding-left: 12px; padding-right: 12px; }
@@ -882,6 +885,7 @@ img { max-width: 100%; height: auto; display: block; }
   .card { gap: 12px; }
   .post { gap: 12px; }
   .profile-hero { padding-left: calc(var(--space-md)); padding-right: calc(var(--space-md)); border-radius: 10px; }
+  .profile-hero { position: static; min-height: 0; height: auto; overflow: visible; }
 }
 
 /* Desktop / tablet adjustments */
