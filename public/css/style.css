@@ -1,10 +1,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
 
 /* ========================================================================
-   style.css — Tuned feed header spacing & sizing
-   - Increased right spacing after avatar by enlarging the left gutter
-   - Slightly reduced username & timestamp font-size for a more balanced look
-   - Kept avatar visible and comfortably sized
+   style.css — Full stylesheet (updated spacing for post header + content)
+   - Primary change: reduce spacing between the header row (avatar / name / time)
+     and the post content so the content sits much closer to the username/timestamp.
+     Target: only a few pixels (<= ~20–30px). Default set to 6px for comfortable look.
+   - Reduced header gap to 6px to bring username/time closer to avatar.
+   - Reduced top spacing for excerpts and post images.
+   - Added a couple of stronger selectors with !important to help override inline
+     page-scoped <style> rules that appear after this file (where necessary).
+   - Kept the rest of the stylesheet intact and unchanged except for small
+     spacing/sizing tweaks described above.
    ======================================================================== */
 
 :root{
@@ -343,12 +349,13 @@ main {
 /* Post title / meta / excerpt */
 .post .post-title { font-size: 1.05rem; margin:0; color: var(--text); font-weight:700; }
 .post .post-meta { color: var(--muted); font-size: 0.9rem; margin-top:6px; display:flex; gap:8px; align-items:center; }
-.post .post-excerpt { margin-top: 12px; color: #38414b; }
+/* tighten excerpt spacing slightly */
+.post .post-excerpt { margin-top: 8px; color: #38414b; }
 .post .post-img {
   max-width: 280px;
   border-radius: 10px;
   object-fit: cover;
-  margin-top: 12px;
+  margin-top: 8px;
   box-shadow: 0 8px 30px rgba(16,24,40,0.04);
 }
 
@@ -372,15 +379,18 @@ main {
 
   /* enlarged gutter width to increase the space to the right of avatar */
   position: relative;
-  padding-left: 80px; /* <-- increased from 56px to 80px to give more right spacing after the avatar */
+  padding-left: 80px; /* left gutter for absolute avatar */
 }
 
 /* header row: avatar + meta inline */
 /* align-items: flex-start so username/date sit at the top edge (pinned) */
+/* Use stronger selector and !important for gap because some pages include
+   page-scoped <style> rules (inline) that set .post-header gap after this file.
+   The change is intentionally limited to gap only. */
 .feed .post-header {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 6px !important; /* tightened from 10px to 6px to bring name/time closer to avatar */
   width: 100%;
   margin-bottom: 4px;
 }
@@ -399,7 +409,7 @@ main {
 
 /* AVATAR: keep a comfortable, slightly larger avatar */
 .feed .post-header .post-avatar .avatar-img {
-  width: 36px;   /* kept at 36px for visibility */
+  width: 36px;
   height: 36px;
   border-radius: 9999px; /* full circle */
   object-fit: cover;
@@ -412,18 +422,18 @@ main {
 .feed .post-header-meta {
   display: flex;
   flex-direction: row;
-  align-items: flex-start; /* pin items to top edge */
+  align-items: flex-start;
   gap: 10px;
   flex-wrap: nowrap;
-  min-width: 0; /* allow truncation on small screens */
-  margin-top: 2px; /* small nudge to visually align with avatar top */
+  min-width: 0;
+  margin-top: 2px;
 }
 
-/* username — slightly reduced from previous increase to better fit overall scale */
+/* username — slightly reduced for balanced look */
 .feed .post-header-meta .post-username a {
   font-weight: 600;
   color: var(--text);
-  font-size: 0.72rem; /* <-- reduced from 0.78rem to 0.72rem per request */
+  font-size: 0.72rem;
   line-height: 1;
   text-decoration: none;
   white-space: nowrap;
@@ -436,7 +446,7 @@ main {
 /* timestamp slightly reduced to match username */
 .feed .post-header-meta .post-time {
   color: var(--muted);
-  font-size: 0.72rem; /* <-- reduced from 0.78rem to 0.72rem */
+  font-size: 0.72rem;
   line-height: 1;
   white-space: nowrap;
   opacity: 0.9;
@@ -453,12 +463,15 @@ main {
 }
 
 /* body below header: maintain comfortable spacing */
+/* Use a small margin-top so the content moves much closer to the header (6px).
+   Added !important selector to ensure this spacing takes effect even when pages
+   contain inline page-scoped styles that otherwise set larger margins. */
 .feed .post .post-body {
   display:flex;
   flex-direction: column;
   gap: 8px;
   padding: 0;
-  margin-top: 0;
+  margin-top: 6px !important; /* tightened spacing: small distance (6px) between header and content */
 }
 
 /* Ensure single-post view uses same sizing adjustments */
@@ -479,10 +492,15 @@ main {
   align-items: flex-start;
   margin-top: 2px;
 }
+/* single-post content spacing — keep small and consistent */
 .post .post-header-meta .post-username a,
 .post .post-header-meta .post-time {
   font-size: 0.72rem;
   vertical-align: top;
+}
+/* Ensure single-post body spacing is likewise tightened */
+.post .post-body {
+  margin-top: 6px !important;
 }
 
 /* responsive adjustments */
