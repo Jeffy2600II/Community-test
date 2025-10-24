@@ -26,7 +26,7 @@
     .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
     .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
     /* popup should align to the right of the post when kebab is on the right */
-    .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); min-width:160px; z-index:2200; overflow:hidden; }
+    .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
     .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
     .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
 
@@ -164,7 +164,12 @@
         img.className = 'avatar-img';
         img.alt = post.username || '';
         img.id = 'avatar-' + (post.username || 'u') + '-' + (post.id || 'x');
+        // start with local default (so something always shows)
         img.src = '/img/default_profile.png';
+        // add error handler to ensure we fallback to default if remote fails later
+        img.onerror = function () {
+          try { this.onerror = null; this.src = '/img/default_profile.png'; } catch (e) {}
+        };
         avatarLink.appendChild(img);
         header.appendChild(avatarLink);
 
@@ -254,7 +259,91 @@
       loadAvatarsAndWireKebab(myUsername);
     }
 
+    /**
+     * Robust avatar loading:
+     * - Start with local default image (already set).
+     * - Collect unique usernames from images (id^="avatar-") and fetch /api/user/<username> once per username.
+     * - Use a timeout wrapper for fetch to avoid hanging if API is slow or failing.
+     * - On success and if a profilePic exists, set it for all matching imgs; otherwise keep default.
+     * - Ensure each <img> has an onerror fallback to local default.
+     */
     async function loadAvatarsAndWireKebab(myUsername) {
+      const avatarImgs = Array.from(document.querySelectorAll('img[id^="avatar-"]'));
+      if (!avatarImgs.length) return;
+      const map = new Map(); // username -> [img nodes]
+
+      // parse username from id pattern avatar-<username>-<postid>
+      for (const img of avatarImgs) {
+        const id = img.id || '';
+        const parts = id.split('-');
+        if (parts.length < 3) continue;
+        const username = parts.slice(1, parts.length - 1).join('-');
+        if (!map.has(username)) map.set(username, []);
+        map.get(username).push(img);
+
+        // defensive onerror (if image src later 404s)
+        if (!img.onerror) {
+          img.onerror = function () {
+            try { this.onerror = null; this.src = '/img/default_profile.png'; } catch (e) {}
+          };
+        }
+      }
+
+      // helper: fetch with timeout
+      function fetchWithTimeout(url, opts = {}, timeout = 5000) {
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('timeout')), timeout);
+          fetch(url, opts).then(r => {
+            clearTimeout(timer);
+            resolve(r);
+          }).catch(err => {
+            clearTimeout(timer);
+            reject(err);
+          });
+        });
+      }
+
+      const requests = [];
+      for (const username of map.keys()) {
+        const url = '/api/user/' + encodeURIComponent(username);
+        // we push username so we can map responses later
+        requests.push({ username, promise: fetchWithTimeout(url, {}, 6000).catch(err => ({ __fetchError: err })) });
+      }
+
+      // run fetches in parallel and process results as they settle
+      await Promise.all(requests.map(r => r.promise.then(()=>{},()=>{}))).catch(()=>{}); // ensure all started
+
+      for (const req of requests) {
+        const username = req.username;
+        let resp;
+        try {
+          resp = await req.promise;
+          // if our catch returned an error object, it's not a Response
+          if (!resp || resp.__fetchError) throw resp && resp.__fetchError ? resp.__fetchError : new Error('fetch failed');
+          if (!resp.ok) throw new Error('non-ok ' + resp.status);
+          const j = await resp.json();
+          if (j && j.success && j.profile && j.profile.profilePic) {
+            const pic = j.profile.profilePic;
+            const nodes = map.get(username) || [];
+            for (const n of nodes) {
+              try { n.src = pic; } catch (e) { /* ignore */ }
+            }
+            continue;
+          } else {
+            // no profilePic or success==false -> leave default
+            // optional: could set title attribute or similar
+            continue;
+          }
+        } catch (e) {
+          // fetch failed / timeout / parse error => keep default; log for debugging
+          console.warn('avatar load failed for', username, e && e.message ? e.message : e);
+          continue;
+        }
+      }
+    }
+
+    async function loadAvatarsAndWireKebab_old(myUsername) {
+      // kept for reference; original implementation used individual fetches without timeout
       const avatarImgs = Array.from(document.querySelectorAll('img[id^="avatar-"]'));
       const seen = new Set();
       for (const img of avatarImgs) {
@@ -276,76 +365,76 @@
           } catch (e) {}
         })();
       }
-
-      // kebab behavior (delegated)
-      const feed = document.getElementById('feed');
-      feed.addEventListener('click', function (ev) {
-        const kebab = ev.target.closest('.post-kebab');
-        if (!kebab) return;
-        ev.preventDefault();
-        ev.stopPropagation();
-
-        const postEl = kebab.closest('.post');
-        if (!postEl) return;
-        const postId = postEl.dataset.postId;
-        const owner = postEl.dataset.postOwner;
-
-        if (openPopup && openPopup.dataset.postId === postId) {
-          closePopup();
-          return;
-        }
-        closePopup();
-
-        const popup = document.createElement('div');
-        popup.className = 'post-popup';
-        popup.dataset.postId = postId;
-
-        const isOwner = (myUsername && owner && myUsername === owner);
-
-        if (isOwner) {
-          const editA = document.createElement('a');
-          editA.href = '/post/' + encodeURIComponent(postId) + '/edit';
-          editA.textContent = 'แก้ไขโพสต์';
-          popup.appendChild(editA);
-
-          const delBtn = document.createElement('button');
-          delBtn.type = 'button';
-          delBtn.textContent = 'ลบโพสต์';
-          delBtn.addEventListener('click', async function (e) {
-            e.preventDefault();
-            if (!confirm('ลบโพสต์นี้?')) return;
-            try {
-              await fetch('/api/post/' + encodeURIComponent(postId), { method: 'DELETE' });
-              const el = document.querySelector('.post[data-post-id="' + postId + '"]');
-              if (el) el.remove();
-            } catch (err) {
-              alert('เกิดข้อผิดพลาดขณะลบโพสต์');
-            } finally {
-              closePopup();
-            }
-          });
-          popup.appendChild(delBtn);
-        } else {
-          const profileA = document.createElement('a');
-          profileA.href = '/user/' + encodeURIComponent(owner || '');
-          profileA.textContent = 'ไปยังโปรไฟล์';
-          popup.appendChild(profileA);
-
-          const reportBtn = document.createElement('button');
-          reportBtn.type = 'button';
-          reportBtn.textContent = 'รายงานโพสต์';
-          reportBtn.addEventListener('click', function () {
-            alert('ฟีเจอร์รายงานยังไม่เปิดใช้งาน');
-            closePopup();
-          });
-          popup.appendChild(reportBtn);
-        }
-
-        postEl.appendChild(popup);
-        openPopup = popup;
-        kebab.setAttribute('aria-expanded','true');
-      }, true);
     }
+
+    // kebab behavior (delegated)
+    const feed = document.getElementById('feed');
+    feed.addEventListener('click', function (ev) {
+      const kebab = ev.target.closest('.post-kebab');
+      if (!kebab) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      const postEl = kebab.closest('.post');
+      if (!postEl) return;
+      const postId = postEl.dataset.postId;
+      const owner = postEl.dataset.postOwner;
+
+      if (openPopup && openPopup.dataset.postId === postId) {
+        closePopup();
+        return;
+      }
+      closePopup();
+
+      const popup = document.createElement('div');
+      popup.className = 'post-popup';
+      popup.dataset.postId = postId;
+
+      const isOwner = (myUsername && owner && myUsername === owner);
+
+      if (isOwner) {
+        const editA = document.createElement('a');
+        editA.href = '/post/' + encodeURIComponent(postId) + '/edit';
+        editA.textContent = 'แก้ไขโพสต์';
+        popup.appendChild(editA);
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.textContent = 'ลบโพสต์';
+        delBtn.addEventListener('click', async function (e) {
+          e.preventDefault();
+          if (!confirm('ลบโพสต์นี้?')) return;
+          try {
+            await fetch('/api/post/' + encodeURIComponent(postId), { method: 'DELETE' });
+            const el = document.querySelector('.post[data-post-id="' + postId + '"]');
+            if (el) el.remove();
+          } catch (err) {
+            alert('เกิดข้อผิดพลาดขณะลบโพสต์');
+          } finally {
+            closePopup();
+          }
+        });
+        popup.appendChild(delBtn);
+      } else {
+        const profileA = document.createElement('a');
+        profileA.href = '/user/' + encodeURIComponent(owner || '');
+        profileA.textContent = 'ไปยังโปรไฟล์';
+        popup.appendChild(profileA);
+
+        const reportBtn = document.createElement('button');
+        reportBtn.type = 'button';
+        reportBtn.textContent = 'รายงานโพสต์';
+        reportBtn.addEventListener('click', function () {
+          alert('ฟีเจอร์รายงานยังไม่เปิดใช้งาน');
+          closePopup();
+        });
+        popup.appendChild(reportBtn);
+      }
+
+      postEl.appendChild(popup);
+      openPopup = popup;
+      kebab.setAttribute('aria-expanded','true');
+    }, true);
 
     attachGlobalPopupHandlers();
     document.addEventListener('DOMContentLoaded', renderFeed);
