@@ -1,7 +1,8 @@
-// server.js (full, updated to use jimp instead of sharp)
+// server.js (updated: support multiple post images + safe edit/delete handling)
 // Requires: npm install express body-parser cookie-parser multer jimp jsonwebtoken uuid
-// Note: jimp is pure-JS; if you need EXIF auto-rotation for mobile images, you can install exif-parser
-//       (npm i exif-parser) — the code tries to require it optionally.
+// Optional: exif-parser to honor orientation (install if desired)
+// Note: This file is based on the original provided server.js but updated to accept multiple
+//       post image uploads and to process deleteImages[] when editing a post.
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -11,7 +12,6 @@ const fs = require('fs');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-// replaced sharp with jimp
 const Jimp = require('jimp');
 
 const app = express();
@@ -81,11 +81,7 @@ function ensureJsonFile(p, initial = '[]') {
   return p;
 }
 
-/* ------------------------
-   Optional EXIF orientation support (try to require exif-parser)
-   - Jimp does not auto-rotate using EXIF orientation. If you want auto-rotation,
-     install exif-parser and this code will attempt to rotate appropriately.
-   ------------------------ */
+/* Optional EXIF orientation support */
 let ExifParser = null;
 try {
   ExifParser = require('exif-parser');
@@ -98,7 +94,6 @@ async function applyExifOrientationIfNeeded(buffer, jimpImage) {
     const parser = ExifParser.create(buffer);
     const result = parser.parse();
     const ori = result.tags && result.tags.Orientation;
-    // orientation values: 1 (no), 3 (180), 6 (90 CW), 8 (270)
     if (ori === 3) jimpImage.rotate(180);
     else if (ori === 6) jimpImage.rotate(90);
     else if (ori === 8) jimpImage.rotate(270);
@@ -109,7 +104,7 @@ async function applyExifOrientationIfNeeded(buffer, jimpImage) {
 }
 
 /* ------------------------
-   Search helpers (unchanged)
+   Search helpers
    ------------------------ */
 function findUserByUsername(usernameRaw) {
   const username = decodeURIComponent(usernameRaw);
@@ -144,7 +139,7 @@ function findUserByEmail(email) {
 }
 
 /* ------------------------
-   JSON helpers (unchanged)
+   JSON helpers
    ------------------------ */
 function getFollowersForUser(userId) {
   const p = getFollowersPath(userId);
@@ -187,7 +182,7 @@ function isFollowing(followerUserId, targetUserId) {
 }
 
 /* ------------------------
-   Notifications (unchanged)
+   Notifications
    ------------------------ */
 function ensureUserNotificationsFile(userId) {
   const p = path.join(getUserDir(userId), 'notifications.json');
@@ -196,7 +191,6 @@ function ensureUserNotificationsFile(userId) {
 }
 function addNotificationToUser(userId, type, message, meta = {}) {
   try {
-    // avoid self-notifications (meta may contain actor info)
     const profilePath = getUserProfilePath(userId);
     let recipientUsername = null;
     if (fs.existsSync(profilePath)) {
@@ -246,7 +240,7 @@ function markNotificationsRead(userId, ids = []) {
   return arr;
 }
 
-/* Accounts cookie helpers (unchanged) */
+/* Accounts cookie helpers */
 function readAccountsFromReq(req) {
   try {
     const s = req.cookies.accounts;
@@ -267,7 +261,7 @@ function filterValidAccounts(accounts) {
   return out;
 }
 
-/* Sliding session middleware (unchanged except we didn't touch cookie logic) */
+/* Sliding session middleware */
 app.use((req, res, next) => {
   try {
     const currentAccounts = readAccountsFromReq(req);
@@ -305,7 +299,7 @@ app.use((req, res, next) => {
 });
 
 /* ------------------------
-   Auth / HTML routes (unchanged)
+   Auth / HTML routes
    ------------------------ */
 function authMiddleware(req, res, next) {
   const token = req.cookies.token;
@@ -331,7 +325,7 @@ app.get('/post/:id/edit', authMiddleware, (req, res) => res.sendFile(path.join(_
 app.get('/post/:id', (req, res) => res.sendFile(path.join(__dirname, 'views/post.html')));
 
 /* ------------------------
-   API routes (unchanged for auth/accounts)
+   API routes (auth/accounts)
    ------------------------ */
 
 app.post('/api/register', (req, res) => {
@@ -564,16 +558,8 @@ app.post('/api/profile/update', authMiddleware, (req, res) => {
 });
 
 /*
- Upload profile picture endpoint behavior (Jimp-based):
- - Accepts multipart/form-data with:
-    - 'profilePic' (required) => the image to use for the cropped avatar (may already be cropped client-side)
-    - optional 'original' file field => if provided, server will save this as original.jpg and also create/update avatar.jpg
-    - optional form field 'replaceOriginal' = '1' => when set and original exists, overwrite original with profilePic buffer
- - If 'original' not provided:
-    - If user has no existing original, server will save the incoming profilePic as original too
-    - If original exists and replaceOriginal is set -> overwrite original with incoming profilePic
- - Jimp will be used to create a square avatar (center-crop) sized 400x400 (same as previous behavior).
-*/
+ Profile picture upload (unchanged from prior code)...
+ */
 app.post('/api/profile/upload-pic', authMiddleware, uploadMemory.fields([{ name: 'profilePic', maxCount: 1 }, { name: 'original', maxCount: 1 }]), async (req, res) => {
   const userId = req.user.id;
   const profFiles = req.files || {};
@@ -585,7 +571,6 @@ app.post('/api/profile/upload-pic', authMiddleware, uploadMemory.fields([{ name:
   const replaceOriginal = (req.body && (req.body.replaceOriginal === '1' || req.body.replaceOriginal === 'true'));
 
   try {
-    // ensure user exists
     const profilePath = getUserProfilePath(userId);
     if (!fs.existsSync(profilePath)) return res.json({ success: false, msg: 'Profile not found' });
 
@@ -593,28 +578,19 @@ app.post('/api/profile/upload-pic', authMiddleware, uploadMemory.fields([{ name:
     const croppedPath = getUserProfilePicCroppedPath(userId);
     const originalPath = getUserProfilePicOriginalPath(userId);
 
-    // If explicit original file provided, write it
     if (originalFiles.length > 0) {
       fs.writeFileSync(originalPath, originalFiles[0].buffer);
     } else {
-      // If no original provided:
-      // - If user has no original saved yet -> save incoming profilePic as original as well
-      // - If user has original and replaceOriginal flag set -> overwrite original with incoming profilePic
       if (!fs.existsSync(originalPath) || replaceOriginal) {
         fs.writeFileSync(originalPath, profilePicFile.buffer);
       }
-      // otherwise: keep existing original (do nothing)
     }
 
-    // Create avatar.jpg from provided profilePic buffer (ensure square, center-crop then resize)
-    // We'll create a 400x400 JPEG for avatar (to match previous behavior)
     try {
       const img = await Jimp.read(profilePicFile.buffer);
       await applyExifOrientationIfNeeded(profilePicFile.buffer, img);
-
       const w = img.bitmap.width || 0;
       const h = img.bitmap.height || 0;
-
       if (w > 0 && h > 0) {
         const min = Math.min(w, h);
         const left = Math.floor((w - min) / 2);
@@ -624,7 +600,6 @@ app.post('/api/profile/upload-pic', authMiddleware, uploadMemory.fields([{ name:
         await img.clone().resize(400, 400).quality(92).writeAsync(croppedPath);
       }
     } catch (e) {
-      // If Jimp fails to process (rare), fallback to saving raw buffer as avatar (not ideal)
       try {
         fs.writeFileSync(croppedPath, profilePicFile.buffer);
       } catch (e2) {
@@ -633,7 +608,6 @@ app.post('/api/profile/upload-pic', authMiddleware, uploadMemory.fields([{ name:
       }
     }
 
-    // update profile.json to reflect paths (public-accessible via /data)
     const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
     profile.profilePic = `/data/users/${userId}/profile_pic/avatar.jpg`;
     profile.profilePicOriginal = `/data/users/${userId}/profile_pic/original.jpg`;
@@ -646,7 +620,6 @@ app.post('/api/profile/upload-pic', authMiddleware, uploadMemory.fields([{ name:
   }
 });
 
-// Remove profile picture (both original & avatar)
 app.post('/api/profile/remove-pic', authMiddleware, (req, res) => {
   try {
     const userId = req.user.id;
@@ -664,7 +637,7 @@ app.post('/api/profile/remove-pic', authMiddleware, (req, res) => {
   }
 });
 
-/* Follow / Unfollow (unchanged) */
+/* Follow / Unfollow */
 app.post('/api/user/:username/follow', authMiddleware, (req, res) => {
   const target = findUserByUsername(req.params.username);
   if (!target) return res.json({ success: false, msg: 'Target not found' });
@@ -688,7 +661,7 @@ app.post('/api/user/:username/unfollow', authMiddleware, (req, res) => {
   res.json({ success: true, followersCount: getFollowersForUser(target._userId).length });
 });
 
-/* Notifications (unchanged) */
+/* Notifications */
 app.get('/api/notifications', authMiddleware, (req, res) => {
   const userId = req.user.id;
   const nots = getNotificationsForUser(userId);
@@ -702,15 +675,44 @@ app.post('/api/notifications/mark-read', authMiddleware, (req, res) => {
 });
 
 /* ------------------------
-   Posts & Comments (image processing replaced with Jimp)
+   Posts & Comments (support multiple images)
    ------------------------ */
 
-// Create post (store post in data/posts/{postId}/post.json, store post image in data/posts/{postId}/images/main.jpg)
-app.post('/api/post/create', authMiddleware, uploadMemory.single('postImage'), async (req, res) => {
+/**
+ * Helper: save uploaded files (array of multer file objects) into post images directory.
+ * Returns array of public paths (e.g., /data/posts/{postId}/images/image-0.jpg)
+ */
+async function saveUploadedPostFiles(postId, uploadedFiles) {
+  if (!uploadedFiles || !uploadedFiles.length) return [];
+  const imgDir = getPostImagesDir(postId);
+  const savedPaths = [];
+  for (let i = 0; i < uploadedFiles.length; i++) {
+    const f = uploadedFiles[i];
+    const filename = `image-${Date.now()}-${i}.jpg`;
+    const dest = path.join(imgDir, filename);
+    try {
+      const img = await Jimp.read(f.buffer);
+      await applyExifOrientationIfNeeded(f.buffer, img);
+      const MAX = 1200;
+      if (img.bitmap.width > MAX || img.bitmap.height > MAX) {
+        await img.clone().scaleToFit(MAX, MAX).quality(88).writeAsync(dest);
+      } else {
+        await img.clone().quality(88).writeAsync(dest);
+      }
+    } catch (e) {
+      // fallback write raw buffer
+      try { fs.writeFileSync(dest, f.buffer); } catch (e2) { console.error('save fallback failed', e2 && e2.message); }
+    }
+    savedPaths.push(`/data/posts/${postId}/images/${filename}`);
+  }
+  return savedPaths;
+}
+
+// Create post (now supports multiple images)
+app.post('/api/post/create', authMiddleware, uploadMemory.fields([{ name: 'postImage', maxCount: 20 }, { name: 'postImages[]', maxCount: 20 }]), async (req, res) => {
   try {
     const userId = req.user.id;
     const username = req.user.username;
-    // Title is optional now; we require content only
     const { title, content } = req.body;
     if (!content) return res.json({ success: false, msg: 'Missing content' });
 
@@ -718,38 +720,30 @@ app.post('/api/post/create', authMiddleware, uploadMemory.single('postImage'), a
     const postDir = getPostDir(postId);
     fs.mkdirSync(postDir, { recursive: true });
 
-    let imgPathPublic = '';
-    if (req.file) {
-      const imgDir = getPostImagesDir(postId);
-      const dest = path.join(imgDir, 'main.jpg');
-      try {
-        const img = await Jimp.read(req.file.buffer);
-        await applyExifOrientationIfNeeded(req.file.buffer, img);
-        // resize to fit inside 1200x1200 to avoid huge uploads
-        const MAX = 1200;
-        if (img.bitmap.width > MAX || img.bitmap.height > MAX) {
-          await img.clone().scaleToFit(MAX, MAX).quality(88).writeAsync(dest);
-        } else {
-          await img.clone().quality(88).writeAsync(dest);
-        }
-        imgPathPublic = `/data/posts/${postId}/images/main.jpg`;
-      } catch (e) {
-        console.error('post image processing failed', e && e.message);
-        // fallback: save raw buffer
-        const imgDir = getPostImagesDir(postId);
-        const dest = path.join(imgDir, 'main.jpg');
-        fs.writeFileSync(dest, req.file.buffer);
-        imgPathPublic = `/data/posts/${postId}/images/main.jpg`;
-      }
+    // collect uploaded files from multiple possible fields
+    const files = [];
+    if (req.files) {
+      if (Array.isArray(req.files['postImage'])) files.push(...req.files['postImage']);
+      if (Array.isArray(req.files['postImages[]'])) files.push(...req.files['postImages[]']);
+      // also accept any other files (defensive)
+      Object.keys(req.files).forEach(k => {
+        if (!['postImage', 'postImages[]'].includes(k) && Array.isArray(req.files[k])) files.push(...req.files[k]);
+      });
     }
 
+    let images = [];
+    if (files.length > 0) {
+      images = await saveUploadedPostFiles(postId, files);
+    }
+
+    // legacy compatibility: keep single 'image' field pointing to first image
     const post = {
       id: postId,
       username,
-      // store title if provided, otherwise keep empty string for compatibility
       title: title || '',
       content,
-      image: imgPathPublic,
+      image: images.length ? images[0] : '',
+      images: images,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -767,7 +761,6 @@ app.post('/api/post/create', authMiddleware, uploadMemory.single('postImage'), a
     try {
       const followers = getFollowersForUser(userId) || [];
       for (let fid of followers) {
-        // Use title if present, otherwise use excerpt of content for notification message
         const snippet = (post.title && post.title.trim().length > 0) ? post.title : (post.content || '').slice(0, 60);
         addNotificationToUser(fid, 'new_post', `${username} โพสต์ใหม่: "${snippet}"`, { postId, actorId: userId, actorUsername: username });
       }
@@ -780,8 +773,8 @@ app.post('/api/post/create', authMiddleware, uploadMemory.single('postImage'), a
   }
 });
 
-// Edit post (allow changing image; if image changed, remove old image file and save new into same post image folder)
-app.post('/api/post/:id/edit', authMiddleware, uploadMemory.single('postImage'), async (req, res) => {
+// Edit post: accept new files (many) and deleteImages[] markers to remove existing images
+app.post('/api/post/:id/edit', authMiddleware, uploadMemory.fields([{ name: 'postImage', maxCount: 20 }, { name: 'postImages[]', maxCount: 20 }]), async (req, res) => {
   try {
     const userId = req.user.id;
     const username = req.user.username;
@@ -792,39 +785,74 @@ app.post('/api/post/:id/edit', authMiddleware, uploadMemory.single('postImage'),
     if (post.username !== username) return res.json({ success: false, msg: 'Not owner' });
 
     const { title, content } = req.body;
-    // Content optional update, but we don't allow emptying content to nothing
-    if (typeof content !== 'undefined' && content !== null) {
-      post.content = content;
-    }
-    // If client provides title (legacy), allow updating it; otherwise keep existing
+    if (typeof content !== 'undefined' && content !== null) post.content = content;
     if (typeof title !== 'undefined') post.title = title || '';
 
-    if (req.file) {
-      // remove old image file if exists
-      if (post.image) {
+    // normalize existing images array
+    if (!Array.isArray(post.images)) {
+      post.images = [];
+      if (post.image) post.images.push(post.image);
+    }
+
+    // handle deleteImages[] from client (may be string or array)
+    let deletes = [];
+    if (req.body) {
+      if (Array.isArray(req.body['deleteImages[]'])) deletes = req.body['deleteImages[]'];
+      else if (Array.isArray(req.body.deleteImages)) deletes = req.body.deleteImages;
+      else if (typeof req.body['deleteImages[]'] === 'string') deletes = [req.body['deleteImages[]']];
+      else if (typeof req.body.deleteImages === 'string') deletes = [req.body.deleteImages];
+    }
+    // perform deletion: match by exact URL, by filename suffix, or by index
+    if (deletes.length > 0) {
+      for (const d of deletes) {
         try {
-          const localPath = path.join(__dirname, post.image);
-          if (fs.existsSync(localPath)) fs.unlinkSync(localPath);
-        } catch (e) {}
-      }
-      const imgDir = getPostImagesDir(postId);
-      const dest = path.join(imgDir, 'main.jpg');
-      try {
-        const img = await Jimp.read(req.file.buffer);
-        await applyExifOrientationIfNeeded(req.file.buffer, img);
-        const MAX = 1200;
-        if (img.bitmap.width > MAX || img.bitmap.height > MAX) {
-          await img.clone().scaleToFit(MAX, MAX).quality(88).writeAsync(dest);
-        } else {
-          await img.clone().quality(88).writeAsync(dest);
-        }
-        post.image = `/data/posts/${postId}/images/main.jpg`;
-      } catch (e) {
-        // fallback: write raw buffer
-        fs.writeFileSync(dest, req.file.buffer);
-        post.image = `/data/posts/${postId}/images/main.jpg`;
+          // try to find by exact match first
+          let idx = post.images.findIndex(u => u === d);
+          if (idx === -1) {
+            // try match by filename suffix
+            idx = post.images.findIndex(u => {
+              try {
+                const p = path.basename(u);
+                if (!p) return false;
+                return (p === d) || u.endsWith(d) || p === String(d);
+              } catch (e) { return false; }
+            });
+          }
+          // if still not found but d is numeric index
+          if (idx === -1 && !isNaN(Number(d))) {
+            const nd = Number(d);
+            if (nd >= 0 && nd < post.images.length) idx = nd;
+          }
+          if (idx !== -1) {
+            // remove file from disk
+            const urlPath = post.images[idx];
+            try {
+              const local = path.join(__dirname, urlPath);
+              if (fs.existsSync(local)) fs.unlinkSync(local);
+            } catch (e) { /* ignore unlink errors */ }
+            post.images.splice(idx, 1);
+          }
+        } catch (e) { console.warn('deleteImages handling error', e && e.message); }
       }
     }
+
+    // collect uploaded new files and append them
+    const files = [];
+    if (req.files) {
+      if (Array.isArray(req.files['postImage'])) files.push(...req.files['postImage']);
+      if (Array.isArray(req.files['postImages[]'])) files.push(...req.files['postImages[]']);
+      Object.keys(req.files).forEach(k => {
+        if (!['postImage', 'postImages[]'].includes(k) && Array.isArray(req.files[k])) files.push(...req.files[k]);
+      });
+    }
+
+    if (files.length > 0) {
+      const newPaths = await saveUploadedPostFiles(postId, files);
+      post.images = post.images.concat(newPaths);
+    }
+
+    // maintain legacy field
+    post.image = post.images.length ? post.images[0] : '';
 
     post.updatedAt = new Date().toISOString();
     fs.writeFileSync(postPath, JSON.stringify(post, null, 2), 'utf8');
@@ -845,7 +873,6 @@ app.delete('/api/post/:id', authMiddleware, (req, res) => {
   const post = JSON.parse(fs.readFileSync(postPath, 'utf8'));
   if (post.username !== username) return res.json({ success: false, msg: 'Not owner' });
 
-  // remove associated image files (they live inside post dir)
   try {
     fs.rmSync(getPostDir(postId), { recursive: true, force: true });
   } catch (e) { /* ignore */ }
@@ -872,6 +899,11 @@ app.get('/api/post/:id', (req, res) => {
   if (token) {
     try { myUsername = jwt.verify(token, SECRET).username; } catch {}
   }
+  // Ensure backward compatibility: if post.images missing but post.image exists, synthesize images array
+  if (!Array.isArray(post.images)) {
+    post.images = [];
+    if (post.image) post.images.push(post.image);
+  }
   res.json({ success: true, post, comments, owner: post.username, myUsername });
 });
 
@@ -882,7 +914,15 @@ app.get('/api/posts', (req, res) => {
   for (let postId of postDirs) {
     const ppath = getPostPath(postId);
     if (fs.existsSync(ppath)) {
-      try { posts.push(JSON.parse(fs.readFileSync(ppath, 'utf8'))); } catch {}
+      try { 
+        const p = JSON.parse(fs.readFileSync(ppath, 'utf8'));
+        // synthesize images array if missing (backward compat)
+        if (!Array.isArray(p.images)) {
+          p.images = [];
+          if (p.image) p.images.push(p.image);
+        }
+        posts.push(p);
+      } catch {}
     }
   }
   posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -899,7 +939,14 @@ app.get('/api/user/:username/posts', (req, res) => {
     for (let pid of postIds) {
       const postPath = getPostPath(pid);
       if (fs.existsSync(postPath)) {
-        try { posts.push(JSON.parse(fs.readFileSync(postPath, 'utf8'))); } catch {}
+        try { 
+          const p = JSON.parse(fs.readFileSync(postPath, 'utf8'));
+          if (!Array.isArray(p.images)) {
+            p.images = [];
+            if (p.image) p.images.push(p.image);
+          }
+          posts.push(p);
+        } catch {}
       }
     }
   }
