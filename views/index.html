@@ -6,29 +6,28 @@
   <title>Community Home</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
-    /* Feed & content visuals */
-    .post { position: relative; padding: 12px; border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); }
-    .post-header { display:flex; align-items:center; gap:8px; width:100%; /* gap ลดจาก 12px เป็น 8px เพื่อให้ header ดูชิดขึ้นเล็กน้อย */ }
-    .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit: cover; }
+    /* Feed & content visuals - updated to match new header layout (avatar inline, no left gutter) */
+    .post { position: relative; padding: 12px; border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); cursor: pointer; }
+    .post-header { display:flex; align-items:flex-start; gap:12px; width:100%; margin-bottom:6px; }
+    .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit: cover; flex-shrink:0; }
     .post-header-meta { display:flex; flex-direction:column; gap:2px; min-width:0; }
     .post-username a { font-weight:700; color:var(--text); text-decoration:none; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px; }
     .post-time { color:var(--muted); font-size:0.88rem; }
 
-    /* ลดระยะห่างระหว่าง header (ชื่อ/เวลา) กับเนื้อหาโพสต์ให้ชิดขึ้น (ไม่เกิน 20-30px ตามที่ร้องขอ)
-       ที่นี่ตั้ง margin-top ของ .post-body เป็น 6px และให้ .post-header มี margin-bottom เล็กน้อยด้วย */
-    .post-body { margin-top: 6px; line-height:1.55; }
+    /* Reduce gap between header and body so content sits closer to username/time */
+    .post-body { margin-top: 4px; line-height:1.55; }
     .post-header { margin-bottom: 6px; }
 
     .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
     .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; }
 
     /* make whole post show pointer, but interactive children keep their own cursor */
-    .post { cursor: pointer; }
     .post a, .post button, .post input, .post textarea { cursor: auto; }
 
     /* Kebab placed on the right side of the header */
     .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
     .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
+
     /* popup should align to the right of the post when kebab is on the right */
     .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
     .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
@@ -50,6 +49,9 @@
 
     @media (max-width:560px) {
       .post-username a { max-width:140px; }
+      .post-avatar .avatar-img { width:44px; height:44px; }
+      .post-username a { font-size:0.95rem; }
+      .post-time { font-size:0.80rem; }
     }
   </style>
 </head>
@@ -167,8 +169,6 @@
         const img = document.createElement('img');
         img.className = 'avatar-img';
         img.alt = post.username || '';
-        // set both id and data-username to be resilient
-        img.id = 'avatar-' + (post.username || 'u') + '-' + (post.id || 'x');
         img.dataset.username = post.username || '';
         img.src = '/img/default_profile.png';
         avatarLink.appendChild(img);
@@ -214,7 +214,6 @@
         const contentDiv = document.createElement('div');
         contentDiv.className = 'post-content';
         contentDiv.innerHTML = formatted;
-        // NOTE: do NOT stop propagation on contentDiv; overall article's click handler will navigate
         body.appendChild(contentDiv);
 
         // optional image
@@ -224,7 +223,6 @@
           im.src = post.image;
           im.alt = 'post image';
           im.loading = 'lazy';
-          // clicking image should navigate to post (we let article handle it)
           body.appendChild(im);
         }
 
@@ -238,17 +236,14 @@
 
         // attach click/key handlers on article to navigate to post unless interactive child clicked
         art.addEventListener('click', function (ev) {
-          // if click was on an interactive element, ignore (let that element act)
           if (ev.target.closest('a, button, input, textarea, select, .post-popup, .post-kebab')) return;
-          // otherwise navigate
           window.location.href = '/post/' + encodeURIComponent(post.id);
         });
-        // keyboard: Enter or Space opens post (but not when focused on an interactive child)
         art.addEventListener('keydown', function (ev) {
           if (ev.key === 'Enter' || ev.key === ' ') {
             const active = document.activeElement;
             if (active && active !== art && active.closest && active.closest('a, button, input, textarea, select, .post-popup, .post-kebab')) {
-              return; // interactive child focused — let it handle
+              return;
             }
             ev.preventDefault();
             window.location.href = '/post/' + encodeURIComponent(post.id);
@@ -281,7 +276,7 @@
         usernames.push(username);
       }
 
-      // fetch profile for each username (sequential-ish but could be parallel)
+      // fetch profile for each username (parallel-friendly)
       for (const username of usernames) {
         (async () => {
           try {
@@ -304,7 +299,6 @@
             const pic = ud.profile.profilePic;
             if (!pic) {
               // Profile exists but no picture set
-              // Info log to help debugging
               console.info('profilePic empty for', username);
               return;
             }
@@ -312,15 +306,16 @@
             // apply to all images that match data-username
             document.querySelectorAll('img[data-username="' + CSS.escape(username) + '"]').forEach(i => {
               // if already set to that src, skip
-              if (i.src && (new URL(i.src, location.href)).pathname === pic) return;
-              // attach error handler to detect failed image loads
+              try {
+                const currentPath = (new URL(i.src, location.href)).pathname;
+                const picPath = (new URL(pic, location.href)).pathname;
+                if (currentPath === picPath) return;
+              } catch (e) {}
               i.addEventListener('error', function onErr() {
                 console.warn('Avatar image failed to load for', username, 'url=', pic, 'element id=', i.id);
-                // fallback to default
                 i.removeEventListener('error', onErr);
                 i.src = '/img/default_profile.png';
               }, { once: true });
-              // set src (use full path as returned by API)
               i.src = pic;
             });
           } catch (err) {
