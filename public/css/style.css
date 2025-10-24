@@ -1,11 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
 
 /* ========================================================================
-   style.css — Updated: tuned feed header sizing
-   - Increase username & timestamp font sizes slightly for better legibility
-   - Increase avatar/profile image size in the feed
-   - Reduce the left "gutter" reserved for profile so the profile area is smaller
-   - Keep avatar positioned at top-left of the post card; content sits close
+   style.css — Tuned feed header spacing & sizing
+   - Increased right spacing after avatar by enlarging the left gutter
+   - Slightly reduced username & timestamp font-size for a more balanced look
+   - Kept avatar visible and comfortably sized
    ======================================================================== */
 
 :root{
@@ -364,15 +363,16 @@ main {
 /* ------------------------------------------------------------------ */
 /* Feed header structure & alignment (avatar + username + time inline) */
 /* ------------------------------------------------------------------ */
-/* Reserve a left gutter for avatar but make it smaller (reduced whitespace) */
+/* Reserve a left gutter for avatar but make it slightly larger on the right
+   so the content has more breathing room to the right of the profile image. */
 .feed .post {
   display: flex;
   flex-direction: column;
   gap: 8px;
 
-  /* reduced gutter width: makes the profile area smaller (less left whitespace) */
+  /* enlarged gutter width to increase the space to the right of avatar */
   position: relative;
-  padding-left: 56px; /* <-- reduced from 72px to 56px */
+  padding-left: 80px; /* <-- increased from 56px to 80px to give more right spacing after the avatar */
 }
 
 /* header row: avatar + meta inline */
@@ -397,9 +397,9 @@ main {
   z-index: 2;
 }
 
-/* AVATAR: increase size for better visibility */
+/* AVATAR: keep a comfortable, slightly larger avatar */
 .feed .post-header .post-avatar .avatar-img {
-  width: 36px;   /* increased from 20px to 36px */
+  width: 36px;   /* kept at 36px for visibility */
   height: 36px;
   border-radius: 9999px; /* full circle */
   object-fit: cover;
@@ -413,17 +413,17 @@ main {
   display: flex;
   flex-direction: row;
   align-items: flex-start; /* pin items to top edge */
-  gap: 8px;
+  gap: 10px;
   flex-wrap: nowrap;
   min-width: 0; /* allow truncation on small screens */
   margin-top: 2px; /* small nudge to visually align with avatar top */
 }
 
-/* username — slightly larger than before for legibility */
+/* username — slightly reduced from previous increase to better fit overall scale */
 .feed .post-header-meta .post-username a {
   font-weight: 600;
   color: var(--text);
-  font-size: 0.78rem; /* <-- increased from 0.62rem to 0.78rem */
+  font-size: 0.72rem; /* <-- reduced from 0.78rem to 0.72rem per request */
   line-height: 1;
   text-decoration: none;
   white-space: nowrap;
@@ -433,10 +433,10 @@ main {
   vertical-align: top;
 }
 
-/* timestamp subtle and slightly larger to match username */
+/* timestamp slightly reduced to match username */
 .feed .post-header-meta .post-time {
   color: var(--muted);
-  font-size: 0.78rem; /* <-- increased from 0.62rem to 0.78rem */
+  font-size: 0.72rem; /* <-- reduced from 0.78rem to 0.72rem */
   line-height: 1;
   white-space: nowrap;
   opacity: 0.9;
@@ -446,13 +446,13 @@ main {
 
 /* If there is a displayName, keep it visually similar */
 .feed .post-header-meta .post-displayname {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: var(--muted);
   margin-right: 4px;
   align-self: flex-start;
 }
 
-/* body below header: pull content up closer to header (maintain comfortable spacing) */
+/* body below header: maintain comfortable spacing */
 .feed .post .post-body {
   display:flex;
   flex-direction: column;
@@ -481,7 +481,7 @@ main {
 }
 .post .post-header-meta .post-username a,
 .post .post-header-meta .post-time {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   vertical-align: top;
 }
 
@@ -489,10 +489,10 @@ main {
 @media (max-width: 800px) {
   /* on small screens adjust gutter and avatar for touch targets */
   .feed .post {
-    padding-left: 56px; /* keep compact gutter on mobile too */
+    padding-left: 64px; /* keep a slightly reduced gutter on mobile for balance */
   }
   .feed .post-header .post-avatar .avatar-img { width: 44px; height: 44px; }
-  .feed .post-header-meta .post-username a { font-size: 0.90rem; }
+  .feed .post-header-meta .post-username a { font-size: 0.88rem; }
   .feed .post-header-meta .post-time { font-size: 0.80rem; }
 }
 
