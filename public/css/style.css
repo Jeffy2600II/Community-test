@@ -6,7 +6,6 @@
    - Username + timestamp are inline and can sit close to the content
    - Post images: responsive, never cropped; constrained by max-height (viewport-based)
    - Mobile: stricter max-height so tall images fit comfortably on-screen
-   - Added: reserved vertical profile column (sticky profile hero) on wide screens
    ======================================================================== */
 
 :root{
@@ -39,9 +38,6 @@
   --transition: 180ms cubic-bezier(.2,.9,.2,1);
   --readable-line: 1.5rem;
   --touch-target: 44px;
-
-  /* header height used for sticky offsets (keeps profile sticky offset consistent) */
-  --header-height: 68px;
 }
 
 /* Respect user reduced motion */
@@ -556,16 +552,6 @@ textarea { min-height: 120px; resize: vertical; }
 /* ------------------------------------------------------------------ */
 /* Profile hero, grid & responsive helpers                              */
 /* ------------------------------------------------------------------ */
-/* Make the grid's left column (profile) reserve a vertical column and align items to start */
-.grid-2 {
-  display:grid;
-  grid-template-columns: 320px 1fr;
-  gap: var(--space-md);
-  align-items: stretch; /* ensure left column stretches/aligns to top so it can reserve vertical whitespace */
-}
-
-/* Profile hero - now sticky and tall on wide screens to reserve a full vertical band.
-   On narrow screens it falls back to normal stacked behavior. */
 .profile-hero {
   background: linear-gradient(180deg,#fff,#fbfdff);
   padding: var(--space-md);
@@ -576,21 +562,7 @@ textarea { min-height: 120px; resize: vertical; }
   align-items:center;
   text-align:center;
   border: 1px solid rgba(15,23,42,0.03);
-
-  /* Make it behave as a vertical reserved column: sticky and full-height (viewport) */
-  position: sticky;
-  top: calc(var(--header-height) + var(--space-md));
-  align-self: start;
-  /* reserve vertical space: use min-height so grid will allocate it */
-  min-height: calc(100vh - (var(--header-height) + (var(--space-md) * 2)));
-  height: auto;
-  overflow: auto;
-
-  /* ensure it's above content if overlap occurs */
-  z-index: 2;
 }
-
-/* profile avatar sizing inside the tall column */
 .profile-hero .avatar {
   width: 140px;
   height: 140px;
@@ -606,18 +578,6 @@ textarea { min-height: 120px; resize: vertical; }
   gap: var(--space-md);
 }
 @media (max-width: 1100px) { .grid-2 { grid-template-columns: 1fr; } }
-
-/* On small screens, disable sticky/reserved-height to avoid layout issues and allow natural flow */
-@media (max-width: 800px) {
-  .profile-hero {
-    position: static;
-    top: 0;
-    min-height: 0;
-    height: auto;
-    border-radius: 10px;
-    z-index: 1;
-  }
-}
 
 /* ------------------------------------------------------------------ */
 /* Dropdowns / notifications / badges                                   */
@@ -885,7 +845,6 @@ img { max-width: 100%; height: auto; display: block; }
   .card { gap: 12px; }
   .post { gap: 12px; }
   .profile-hero { padding-left: calc(var(--space-md)); padding-right: calc(var(--space-md)); border-radius: 10px; }
-  .profile-hero { position: static; min-height: 0; height: auto; overflow: visible; }
 }
 
 /* Desktop / tablet adjustments */
