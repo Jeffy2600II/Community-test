@@ -1,8 +1,12 @@
-// server.js (updated: support multiple post images + safe edit/delete handling)
+// server.js (updated: deduplicate uploaded post files to avoid double-save when client
+// sends the same file in multiple multipart fields)
+//
 // Requires: npm install express body-parser cookie-parser multer jimp jsonwebtoken uuid
-// Optional: exif-parser to honor orientation (install if desired)
-// Note: This file is based on the original provided server.js but updated to accept multiple
-//       post image uploads and to process deleteImages[] when editing a post.
+// Optional: exif-parser to honor orientation
+//
+// Note: This is the full server.js used by the project with one change:
+// - saveUploadedPostFiles now deduplicates incoming multer file objects by an MD5
+//   fingerprint (buffer) + size + originalname before processing/writing them.
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -13,6 +17,7 @@ const path = require('path');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const Jimp = require('jimp');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -558,7 +563,7 @@ app.post('/api/profile/update', authMiddleware, (req, res) => {
 });
 
 /*
- Profile picture upload (unchanged from prior code)...
+ Profile picture upload (unchanged)...
  */
 app.post('/api/profile/upload-pic', authMiddleware, uploadMemory.fields([{ name: 'profilePic', maxCount: 1 }, { name: 'original', maxCount: 1 }]), async (req, res) => {
   const userId = req.user.id;
@@ -675,20 +680,50 @@ app.post('/api/notifications/mark-read', authMiddleware, (req, res) => {
 });
 
 /* ------------------------
-   Posts & Comments (support multiple images)
+   Posts & Comments (support multiple images, dedupe incoming uploads)
    ------------------------ */
 
 /**
+ * Compute MD5 fingerprint for a buffer
+ */
+function fingerprintBuffer(buf) {
+  try {
+    return crypto.createHash('md5').update(buf).digest('hex');
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
  * Helper: save uploaded files (array of multer file objects) into post images directory.
+ * Deduplicates incoming files by fingerprint+size+originalname to avoid double-saving the same buffer.
  * Returns array of public paths (e.g., /data/posts/{postId}/images/image-0.jpg)
  */
 async function saveUploadedPostFiles(postId, uploadedFiles) {
   if (!uploadedFiles || !uploadedFiles.length) return [];
+  // Deduplicate using a Map keyed by fingerprint|size|originalname
+  const uniqueMap = new Map();
+  for (const f of uploadedFiles) {
+    try {
+      const fp = fingerprintBuffer(f.buffer) || '';
+      const key = `${fp}|${f.size || 0}|${(f.originalname || '')}`;
+      if (!uniqueMap.has(key)) uniqueMap.set(key, f);
+      else {
+        // duplicate detected - skip
+      }
+    } catch (e) {
+      // on error, still add by fallback key using size+name
+      const key = `fallback|${f.size||0}|${f.originalname||''}|${Math.random().toString(36).slice(2,6)}`;
+      uniqueMap.set(key, f);
+    }
+  }
+
   const imgDir = getPostImagesDir(postId);
   const savedPaths = [];
-  for (let i = 0; i < uploadedFiles.length; i++) {
-    const f = uploadedFiles[i];
-    const filename = `image-${Date.now()}-${i}.jpg`;
+  let idx = 0;
+  for (const f of uniqueMap.values()) {
+    const filename = `image-${Date.now()}-${idx}.jpg`;
+    idx++;
     const dest = path.join(imgDir, filename);
     try {
       const img = await Jimp.read(f.buffer);
@@ -725,7 +760,6 @@ app.post('/api/post/create', authMiddleware, uploadMemory.fields([{ name: 'postI
     if (req.files) {
       if (Array.isArray(req.files['postImage'])) files.push(...req.files['postImage']);
       if (Array.isArray(req.files['postImages[]'])) files.push(...req.files['postImages[]']);
-      // also accept any other files (defensive)
       Object.keys(req.files).forEach(k => {
         if (!['postImage', 'postImages[]'].includes(k) && Array.isArray(req.files[k])) files.push(...req.files[k]);
       });
@@ -914,9 +948,8 @@ app.get('/api/posts', (req, res) => {
   for (let postId of postDirs) {
     const ppath = getPostPath(postId);
     if (fs.existsSync(ppath)) {
-      try { 
+      try {
         const p = JSON.parse(fs.readFileSync(ppath, 'utf8'));
-        // synthesize images array if missing (backward compat)
         if (!Array.isArray(p.images)) {
           p.images = [];
           if (p.image) p.images.push(p.image);
@@ -939,7 +972,7 @@ app.get('/api/user/:username/posts', (req, res) => {
     for (let pid of postIds) {
       const postPath = getPostPath(pid);
       if (fs.existsSync(postPath)) {
-        try { 
+        try {
           const p = JSON.parse(fs.readFileSync(postPath, 'utf8'));
           if (!Array.isArray(p.images)) {
             p.images = [];
