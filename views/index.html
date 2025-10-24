@@ -6,19 +6,16 @@
   <title>Community Home</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
-    /* Feed & content visuals */
-    .post { position: relative; padding: 12px; border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); }
-    .post-header { display:flex; align-items:center; gap:8px; width:100%; /* gap ลดจาก 12px เป็น 8px เพื่อให้ header ดูชิดขึ้นเล็กน้อย */ }
+    /* Feed & content visuals (page-scoped overrides kept small) */
+    .post { border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); padding: 12px; }
+    /* We rely on global CSS to provide grid layout for .post; keep local rules minimal */
     .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit: cover; }
+    .post-header { display:flex; align-items:center; gap:8px; width:100%; }
     .post-header-meta { display:flex; flex-direction:column; gap:2px; min-width:0; }
     .post-username a { font-weight:700; color:var(--text); text-decoration:none; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px; }
     .post-time { color:var(--muted); font-size:0.88rem; }
 
-    /* ลดระยะห่างระหว่าง header (ชื่อ/เวลา) กับเนื้อหาโพสต์ให้ชิดขึ้น (ไม่เกิน 20-30px ตามที่ร้องขอ)
-       ที่นี่ตั้ง margin-top ของ .post-body เป็น 6px และให้ .post-header มี margin-bottom เล็กน้อยด้วย */
-    .post-body { margin-top: 6px; line-height:1.55; }
-    .post-header { margin-bottom: 6px; }
-
+    .post-body { line-height:1.55; margin-top: 6px; } /* content sits close to header */
     .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
     .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; }
 
@@ -29,7 +26,6 @@
     /* Kebab placed on the right side of the header */
     .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
     .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
-    /* popup should align to the right of the post when kebab is on the right */
     .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
     .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
     .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
@@ -37,17 +33,7 @@
     /* Hide inline actions in feed (we use popup) */
     .post-actions { display:none; }
 
-    /* Excerpt clamp for long posts (if you want CSS clamp instead of JS truncation) */
-    .post-excerpt a.post-link {
-      color: inherit;
-      text-decoration: none;
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      -webkit-line-clamp: 5;
-    }
-
+    /* small responsive tweak */
     @media (max-width:560px) {
       .post-username a { max-width:140px; }
     }
@@ -154,11 +140,7 @@
         art.dataset.postOwner = post.username || '';
         art.tabIndex = 0; // make focusable for keyboard
 
-        // header
-        const header = document.createElement('div');
-        header.className = 'post-header';
-
-        // avatar (add data-username attribute so selection is robust even if username contains hyphens)
+        // avatar (moved out as a separate child so layout can be grid-based)
         const avatarLink = document.createElement('a');
         avatarLink.className = 'post-avatar';
         avatarLink.href = '/user/' + encodeURIComponent(post.username || '');
@@ -167,12 +149,18 @@
         const img = document.createElement('img');
         img.className = 'avatar-img';
         img.alt = post.username || '';
-        // set both id and data-username to be resilient
         img.id = 'avatar-' + (post.username || 'u') + '-' + (post.id || 'x');
         img.dataset.username = post.username || '';
         img.src = '/img/default_profile.png';
         avatarLink.appendChild(img);
-        header.appendChild(avatarLink);
+
+        // create main container (right column)
+        const main = document.createElement('div');
+        main.className = 'post-main';
+
+        // header (inside post-main)
+        const header = document.createElement('div');
+        header.className = 'post-header';
 
         // meta
         const meta = document.createElement('div');
@@ -188,7 +176,6 @@
         timeDiv.textContent = new Date(post.createdAt).toLocaleString();
         meta.appendChild(nameDiv);
         meta.appendChild(timeDiv);
-        header.appendChild(meta);
 
         // kebab button (right)
         const kebab = document.createElement('button');
@@ -199,9 +186,9 @@
         kebab.title = 'ตัวเลือกโพสต์';
         kebab.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`;
-        header.appendChild(kebab);
 
-        art.appendChild(header);
+        header.appendChild(meta);
+        header.appendChild(kebab);
 
         // body
         const body = document.createElement('div');
@@ -214,7 +201,6 @@
         const contentDiv = document.createElement('div');
         contentDiv.className = 'post-content';
         contentDiv.innerHTML = formatted;
-        // NOTE: do NOT stop propagation on contentDiv; overall article's click handler will navigate
         body.appendChild(contentDiv);
 
         // optional image
@@ -224,7 +210,6 @@
           im.src = post.image;
           im.alt = 'post image';
           im.loading = 'lazy';
-          // clicking image should navigate to post (we let article handle it)
           body.appendChild(im);
         }
 
@@ -233,7 +218,13 @@
         actions.className = 'post-actions';
         body.appendChild(actions);
 
-        art.appendChild(body);
+        // assemble main
+        main.appendChild(header);
+        main.appendChild(body);
+
+        // assemble article: avatar (left column) + main (right column)
+        art.appendChild(avatarLink);
+        art.appendChild(main);
         feedEl.appendChild(art);
 
         // attach click/key handlers on article to navigate to post unless interactive child clicked
