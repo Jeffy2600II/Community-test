@@ -2,9 +2,10 @@
 
 /* ========================================================================
    style.css — Tuned feed header spacing & sizing
-   - Increased right spacing after avatar by enlarging the left gutter
-   - Slightly reduced username & timestamp font-size for a more balanced look
-   - Kept avatar visible and comfortably sized
+   - Avatar stays visible and fixed on the left (no absolute positioning)
+   - Username + timestamp are inline and can sit close to the content
+   - Removed the large left gutter approach so content can be placed closer
+   - Responsive adjustments keep touch targets comfortable
    ======================================================================== */
 
 :root{
@@ -361,69 +362,63 @@ main {
 }
 
 /* ------------------------------------------------------------------ */
-/* Feed header structure & alignment (avatar + username + time inline) */
-/* ------------------------------------------------------------------ */
-/* Reserve a left gutter for avatar but make it slightly larger on the right
-   so the content has more breathing room to the right of the profile image. */
+/* New feed header layout: avatar + meta inline (no absolute positioning)
+   - We intentionally remove the large left gutter approach so that the header
+     (username + time) can sit directly beside the avatar and the content can
+     be placed closer under it.
+   ------------------------------------------------------------------ */
+
+/* Make the header a normal inline row (avatar + meta + kebab) */
 .feed .post {
   display: flex;
   flex-direction: column;
   gap: 8px;
-
-  /* enlarged gutter width to increase the space to the right of avatar */
-  position: relative;
-  padding-left: 80px; /* <-- increased from 56px to 80px to give more right spacing after the avatar */
+  padding-left: calc(var(--space-md) - 2px); /* default card padding */
 }
 
 /* header row: avatar + meta inline */
-/* align-items: flex-start so username/date sit at the top edge (pinned) */
 .feed .post-header {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
-/* avatar link — place the avatar inside the left gutter and pin it to the top */
+/* avatar — keep it in flow (no absolute) so content can be positioned relative to it */
 .feed .post-header .post-avatar {
-  position: absolute;
-  left: 12px; /* distance from card left edge into gutter */
-  top: 12px;  /* align avatar to the top edge of the post card */
+  position: static;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   text-decoration: none;
   z-index: 2;
-}
-
-/* AVATAR: keep a comfortable, slightly larger avatar */
-.feed .post-header .post-avatar .avatar-img {
-  width: 36px;   /* kept at 36px for visibility */
-  height: 36px;
-  border-radius: 9999px; /* full circle */
-  object-fit: cover;
-  border: 1px solid rgba(15,23,42,0.06);
   flex-shrink: 0;
 }
 
-/* meta area right of avatar: username + time inline */
-/* display row and align to flex-start so both username and date start at the top edge */
-.feed .post-header-meta {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start; /* pin items to top edge */
-  gap: 10px;
-  flex-wrap: nowrap;
-  min-width: 0; /* allow truncation on small screens */
-  margin-top: 2px; /* small nudge to visually align with avatar top */
+/* AVATAR: comfortable size, circular */
+.feed .post-header .post-avatar .avatar-img {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(15,23,42,0.06);
 }
 
-/* username — slightly reduced from previous increase to better fit overall scale */
+/* meta area right of avatar: username + time stacked (column) */
+.feed .post-header-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0; /* allow truncation on small screens */
+  margin-top: 0;
+}
+
+/* username */
 .feed .post-header-meta .post-username a {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text);
-  font-size: 0.72rem; /* <-- reduced from 0.78rem to 0.72rem per request */
+  font-size: 0.96rem;
   line-height: 1;
   text-decoration: none;
   white-space: nowrap;
@@ -431,28 +426,29 @@ main {
   text-overflow: ellipsis;
   display: inline-block;
   vertical-align: top;
+  max-width: 60ch;
 }
 
-/* timestamp slightly reduced to match username */
+/* timestamp */
 .feed .post-header-meta .post-time {
   color: var(--muted);
-  font-size: 0.72rem; /* <-- reduced from 0.78rem to 0.72rem */
+  font-size: 0.88rem;
   line-height: 1;
   white-space: nowrap;
-  opacity: 0.9;
+  opacity: 0.95;
   display: inline-block;
   vertical-align: top;
 }
 
-/* If there is a displayName, keep it visually similar */
+/* DisplayName (optional) */
 .feed .post-header-meta .post-displayname {
-  font-size: 0.72rem;
+  font-size: 0.92rem;
   color: var(--muted);
   margin-right: 4px;
   align-self: flex-start;
 }
 
-/* body below header: maintain comfortable spacing */
+/* Body (content) sits directly under header with small gap */
 .feed .post .post-body {
   display:flex;
   flex-direction: column;
@@ -461,38 +457,42 @@ main {
   margin-top: 0;
 }
 
-/* Ensure single-post view uses same sizing adjustments */
+/* Ensure single-post view uses same layout (remove absolute avatar) */
 .post .post-header {
+  display: flex;
   align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 .post .post-header .post-avatar {
-  position: absolute;
-  left: 12px;
-  top: 12px;
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .post .post-header .post-avatar .avatar-img {
-  width: 36px;
-  height: 36px;
-  border-radius: 9999px;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
 }
 .post .post-header-meta {
   align-items: flex-start;
-  margin-top: 2px;
+  margin-top: 0;
 }
 .post .post-header-meta .post-username a,
 .post .post-header-meta .post-time {
-  font-size: 0.72rem;
+  font-size: 0.96rem;
   vertical-align: top;
 }
 
 /* responsive adjustments */
 @media (max-width: 800px) {
-  /* on small screens adjust gutter and avatar for touch targets */
+  /* On small screens keep avatar slightly larger for touch targets */
   .feed .post {
-    padding-left: 64px; /* keep a slightly reduced gutter on mobile for balance */
+    padding-left: 12px;
   }
-  .feed .post-header .post-avatar .avatar-img { width: 44px; height: 44px; }
-  .feed .post-header-meta .post-username a { font-size: 0.88rem; }
+  .feed .post-header .post-avatar .avatar-img { width:44px; height:44px; border-radius:10px; }
+  .feed .post-header-meta .post-username a { font-size: 0.92rem; max-width: 40ch; }
   .feed .post-header-meta .post-time { font-size: 0.80rem; }
 }
 
