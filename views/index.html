@@ -6,15 +6,16 @@
   <title>Community Home</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
-    /* Feed & content visuals */
-    .post { position: relative; padding: 12px; border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); }
-    .post-header { display:flex; align-items:center; gap:12px; width:100%; }
+    /* Feed & content visuals (page-scoped overrides kept small) */
+    .post { border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); padding: 12px; }
+    /* We rely on global CSS to provide grid layout for .post; keep local rules minimal */
     .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit: cover; }
+    .post-header { display:flex; align-items:center; gap:8px; width:100%; }
     .post-header-meta { display:flex; flex-direction:column; gap:2px; min-width:0; }
     .post-username a { font-weight:700; color:var(--text); text-decoration:none; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px; }
     .post-time { color:var(--muted); font-size:0.88rem; }
 
-    .post-body { margin-top:10px; line-height:1.55; }
+    .post-body { line-height:1.55; margin-top: 6px; } /* content sits close to header */
     .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
     .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; }
 
@@ -25,25 +26,14 @@
     /* Kebab placed on the right side of the header */
     .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
     .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
-    /* popup should align to the right of the post when kebab is on the right */
-    .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); min-width:160px; z-index:2200; overflow:hidden; }
+    .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
     .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
     .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
 
     /* Hide inline actions in feed (we use popup) */
     .post-actions { display:none; }
 
-    /* Excerpt clamp for long posts (if you want CSS clamp instead of JS truncation) */
-    .post-excerpt a.post-link {
-      color: inherit;
-      text-decoration: none;
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      -webkit-line-clamp: 5;
-    }
-
+    /* small responsive tweak */
     @media (max-width:560px) {
       .post-username a { max-width:140px; }
     }
@@ -150,11 +140,7 @@
         art.dataset.postOwner = post.username || '';
         art.tabIndex = 0; // make focusable for keyboard
 
-        // header
-        const header = document.createElement('div');
-        header.className = 'post-header';
-
-        // avatar
+        // avatar (moved out as a separate child so layout can be grid-based)
         const avatarLink = document.createElement('a');
         avatarLink.className = 'post-avatar';
         avatarLink.href = '/user/' + encodeURIComponent(post.username || '');
@@ -164,9 +150,17 @@
         img.className = 'avatar-img';
         img.alt = post.username || '';
         img.id = 'avatar-' + (post.username || 'u') + '-' + (post.id || 'x');
+        img.dataset.username = post.username || '';
         img.src = '/img/default_profile.png';
         avatarLink.appendChild(img);
-        header.appendChild(avatarLink);
+
+        // create main container (right column)
+        const main = document.createElement('div');
+        main.className = 'post-main';
+
+        // header (inside post-main)
+        const header = document.createElement('div');
+        header.className = 'post-header';
 
         // meta
         const meta = document.createElement('div');
@@ -182,7 +176,6 @@
         timeDiv.textContent = new Date(post.createdAt).toLocaleString();
         meta.appendChild(nameDiv);
         meta.appendChild(timeDiv);
-        header.appendChild(meta);
 
         // kebab button (right)
         const kebab = document.createElement('button');
@@ -193,9 +186,9 @@
         kebab.title = 'ตัวเลือกโพสต์';
         kebab.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`;
-        header.appendChild(kebab);
 
-        art.appendChild(header);
+        header.appendChild(meta);
+        header.appendChild(kebab);
 
         // body
         const body = document.createElement('div');
@@ -208,7 +201,6 @@
         const contentDiv = document.createElement('div');
         contentDiv.className = 'post-content';
         contentDiv.innerHTML = formatted;
-        // NOTE: do NOT stop propagation on contentDiv; overall article's click handler will navigate
         body.appendChild(contentDiv);
 
         // optional image
@@ -218,7 +210,6 @@
           im.src = post.image;
           im.alt = 'post image';
           im.loading = 'lazy';
-          // clicking image should navigate to post (we let article handle it)
           body.appendChild(im);
         }
 
@@ -227,7 +218,13 @@
         actions.className = 'post-actions';
         body.appendChild(actions);
 
-        art.appendChild(body);
+        // assemble main
+        main.appendChild(header);
+        main.appendChild(body);
+
+        // assemble article: avatar (left column) + main (right column)
+        art.appendChild(avatarLink);
+        art.appendChild(main);
         feedEl.appendChild(art);
 
         // attach click/key handlers on article to navigate to post unless interactive child clicked
@@ -254,26 +251,72 @@
       loadAvatarsAndWireKebab(myUsername);
     }
 
+    /**
+     * Robust avatar loader:
+     * - Uses data-username attribute (safer than parsing id with hyphens)
+     * - Deduplicates by username
+     * - Fetches /api/user/:username and applies profilePic to all matching imgs
+     * - Adds image error handler to detect 404s / broken files
+     */
     async function loadAvatarsAndWireKebab(myUsername) {
-      const avatarImgs = Array.from(document.querySelectorAll('img[id^="avatar-"]'));
+      const avatarImgs = Array.from(document.querySelectorAll('img[data-username]'));
       const seen = new Set();
+      const usernames = [];
+
+      // collect unique usernames (skip empty)
       for (const img of avatarImgs) {
-        const parts = img.id.split('-');
-        if (parts.length < 3) continue;
-        const username = parts.slice(1, parts.length - 1).join('-');
+        const username = (img.dataset.username || '').trim();
+        if (!username) continue;
         if (seen.has(username)) continue;
         seen.add(username);
+        usernames.push(username);
+      }
+
+      // fetch profile for each username (sequential-ish but could be parallel)
+      for (const username of usernames) {
         (async () => {
           try {
-            const up = await fetch('/api/user/' + encodeURIComponent(username));
-            if (!up.ok) return;
-            const ud = await up.json();
-            if (ud && ud.success && ud.profile && ud.profile.profilePic) {
-              document.querySelectorAll('img[id^="avatar-' + username + '"]').forEach(i => {
-                i.src = ud.profile.profilePic;
-              });
+            const url = '/api/user/' + encodeURIComponent(username);
+            const up = await fetch(url);
+            if (!up.ok) {
+              console.warn('Failed to fetch', url, 'status', up.status);
+              return;
             }
-          } catch (e) {}
+            const ud = await up.json();
+            if (!ud || !ud.success) {
+              console.warn('/api/user/ response for', username, ud);
+              return;
+            }
+            if (!ud.profile) {
+              console.warn('No profile returned for', username);
+              return;
+            }
+
+            const pic = ud.profile.profilePic;
+            if (!pic) {
+              // Profile exists but no picture set
+              // Info log to help debugging
+              console.info('profilePic empty for', username);
+              return;
+            }
+
+            // apply to all images that match data-username
+            document.querySelectorAll('img[data-username="' + CSS.escape(username) + '"]').forEach(i => {
+              // if already set to that src, skip
+              if (i.src && (new URL(i.src, location.href)).pathname === pic) return;
+              // attach error handler to detect failed image loads
+              i.addEventListener('error', function onErr() {
+                console.warn('Avatar image failed to load for', username, 'url=', pic, 'element id=', i.id);
+                // fallback to default
+                i.removeEventListener('error', onErr);
+                i.src = '/img/default_profile.png';
+              }, { once: true });
+              // set src (use full path as returned by API)
+              i.src = pic;
+            });
+          } catch (err) {
+            console.error('error fetching profile for', username, err && err.message);
+          }
         })();
       }
 
