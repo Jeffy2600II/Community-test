@@ -8,13 +8,17 @@
   <style>
     /* Feed & content visuals */
     .post { position: relative; padding: 12px; border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); }
-    .post-header { display:flex; align-items:center; gap:12px; width:100%; }
+    .post-header { display:flex; align-items:center; gap:8px; width:100%; /* gap ลดจาก 12px เป็น 8px เพื่อให้ header ดูชิดขึ้นเล็กน้อย */ }
     .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit: cover; }
     .post-header-meta { display:flex; flex-direction:column; gap:2px; min-width:0; }
     .post-username a { font-weight:700; color:var(--text); text-decoration:none; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px; }
     .post-time { color:var(--muted); font-size:0.88rem; }
 
-    .post-body { margin-top:10px; line-height:1.55; }
+    /* ลดระยะห่างระหว่าง header (ชื่อ/เวลา) กับเนื้อหาโพสต์ให้ชิดขึ้น (ไม่เกิน 20-30px ตามที่ร้องขอ)
+       ที่นี่ตั้ง margin-top ของ .post-body เป็น 6px และให้ .post-header มี margin-bottom เล็กน้อยด้วย */
+    .post-body { margin-top: 6px; line-height:1.55; }
+    .post-header { margin-bottom: 6px; }
+
     .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
     .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; }
 
