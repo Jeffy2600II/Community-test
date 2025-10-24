@@ -13,6 +13,7 @@
       .image-thumb button.remove { position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.6); color:#fff; border:none; width:26px; height:26px; border-radius:6px; cursor:pointer; }
       textarea[name="content"] { min-height:140px; width:100%; padding:10px; border-radius:8px; border:1px solid rgba(15,23,42,0.06); font-size:1rem; }
       .small-note { color:var(--muted); font-size:0.92rem; margin-top:8px; }
+      .image-thumb .badge { position:absolute; left:6px; top:6px; background: rgba(0,0,0,0.5); color:#fff; padding:2px 6px; border-radius:6px; font-size:12px; }
     </style>
 </head>
 <body>
@@ -32,7 +33,7 @@
               <span class="small-note">คุณสามารถลบรูปเดิมหรือเพิ่มรูปใหม่ได้</span>
             </div>
 
-            <div id="selectedImages" class="image-gallery" aria-live="polite" aria-label="รูปที่เลือก"></div>
+            <div id="selectedImages" class="image-gallery" aria-live="polite" aria-label="รูปที่เลือกระหว่างแก้ไข"></div>
 
             <!-- container for hidden inputs to signal deletion of existing images -->
             <div id="deleteMarkers"></div>
@@ -53,18 +54,18 @@
   const postId = (location.pathname.split('/').slice(-2)[0] || '').replace(/[^a-zA-Z0-9\-_]/g,'');
   function escapeHtml(s){ if (s===null||s===undefined) return ''; return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
   function formatNow(){ return new Date().toLocaleString(); }
+  function genId(prefix='id'){ return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8); }
 
   const contentInput = document.getElementById('contentInput');
   const fileInput = document.getElementById('fileInput');
   const selectedImages = document.getElementById('selectedImages');
   const deleteMarkers = document.getElementById('deleteMarkers');
-  const previewPostContainer = document.createElement('div');
   const msg = document.getElementById('msg');
   const editForm = document.getElementById('editPostForm');
 
   // state
-  let newFiles = []; // newly added File objects
-  let existingImages = []; // { id?, url } from server
+  let existingImages = []; // { id, url } - images already saved on server
+  let newFiles = []; // { id, file, url } - newly added files in this edit session
   let profileCache = null;
 
   async function getMyProfile() {
@@ -77,30 +78,28 @@
     return null;
   }
 
-  function createThumbBox(srcOrFile, isExisting, index) {
+  function createThumbBoxForExisting(entry, index) {
     const box = document.createElement('div'); box.className = 'image-thumb';
-    const img = document.createElement('img');
-    if (isExisting) img.src = srcOrFile.url || srcOrFile;
-    else img.src = URL.createObjectURL(srcOrFile);
-    img.alt = isExisting ? (srcOrFile.id || 'existing') : srcOrFile.name;
+    box.dataset.id = entry.id || entry.url;
+    const img = document.createElement('img'); img.src = entry.url; img.alt = entry.url;
     box.appendChild(img);
 
-    const btn = document.createElement('button'); btn.className = 'remove'; btn.innerText = '✕'; btn.title='ลบรูป';
+    const badge = document.createElement('div'); badge.className = 'badge small'; badge.innerText = 'เดิม';
+    box.appendChild(badge);
+
+    const btn = document.createElement('button'); btn.className = 'remove'; btn.title='ลบรูป'; btn.innerText='✕';
+    btn.dataset.id = entry.id || entry.url;
     btn.addEventListener('click', (ev) => {
       ev.preventDefault();
-      if (isExisting) {
-        // mark for deletion
-        const marker = document.createElement('input');
-        marker.type = 'hidden';
-        marker.name = 'deleteImages[]';
-        marker.value = srcOrFile.id || srcOrFile.url || index;
-        deleteMarkers.appendChild(marker);
-        // remove from existingImages
-        existingImages = existingImages.filter((e, i) => !(i === index || e.id === srcOrFile.id));
-      } else {
-        // remove new file
-        newFiles.splice(index,1);
-      }
+      const id = btn.dataset.id;
+      // mark this existing image for deletion (backend will process deleteImages[])
+      const marker = document.createElement('input');
+      marker.type = 'hidden';
+      marker.name = 'deleteImages[]';
+      marker.value = entry.url || id;
+      deleteMarkers.appendChild(marker);
+      // remove from existingImages
+      existingImages = existingImages.filter(e => (e.id || e.url) !== id);
       renderThumbnails();
       updatePreview();
     });
@@ -108,25 +107,46 @@
     return box;
   }
 
+  function createThumbBoxForNew(entry) {
+    const box = document.createElement('div'); box.className = 'image-thumb';
+    box.dataset.id = entry.id;
+    const img = document.createElement('img'); img.src = entry.url; img.alt = entry.file.name;
+    box.appendChild(img);
+
+    const btn = document.createElement('button'); btn.className = 'remove'; btn.title='ลบรูป'; btn.innerText='✕';
+    btn.dataset.id = entry.id;
+    btn.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      const id = btn.dataset.id;
+      const idx = newFiles.findIndex(f => f.id === id);
+      if (idx !== -1) {
+        const removed = newFiles.splice(idx, 1)[0];
+        try { URL.revokeObjectURL(removed.url); } catch(e){}
+        renderThumbnails();
+        updatePreview();
+      }
+    });
+    box.appendChild(btn);
+    return box;
+  }
+
   function renderThumbnails() {
     selectedImages.innerHTML = '';
-    // render existing first
     existingImages.forEach((e, idx) => {
-      const box = createThumbBox(e, true, idx);
+      const box = createThumbBoxForExisting(e, idx);
       selectedImages.appendChild(box);
     });
-    // render new files
-    newFiles.forEach((f, idx) => {
-      const box = createThumbBox(f, false, idx);
+    newFiles.forEach(n => {
+      const box = createThumbBoxForNew(n);
       selectedImages.appendChild(box);
     });
   }
 
   function previewImageSrcs() {
-    const srcs = [];
-    for (const e of existingImages) srcs.push(e.url || e);
-    for (const f of newFiles) srcs.push(URL.createObjectURL(f));
-    return srcs;
+    const out = [];
+    for (const e of existingImages) out.push(e.url);
+    for (const n of newFiles) out.push(n.url);
+    return out;
   }
 
   function makePreviewArticle(username, avatarUrl, contentHtml, images, createdAt) {
@@ -157,13 +177,25 @@
     body.appendChild(contentDiv);
 
     if (images && images.length) {
-      for (const src of images) {
+      if (images.length === 1) {
         const im = document.createElement('img');
         im.className = 'post-img';
-        im.src = src;
+        im.src = images[0];
         im.alt = 'post image';
         im.loading = 'lazy';
         body.appendChild(im);
+      } else {
+        const gallery = document.createElement('div');
+        gallery.className = 'post-gallery';
+        for (const src of images) {
+          const im = document.createElement('img');
+          im.className = 'post-img';
+          im.src = src;
+          im.alt = 'post image';
+          im.loading = 'lazy';
+          gallery.appendChild(im);
+        }
+        body.appendChild(gallery);
       }
     }
 
@@ -177,24 +209,24 @@
     const username = profileCache ? (profileCache.username || '(ฉัน)') : '(ฉัน)';
     const avatar = profileCache ? (profileCache.profilePic || '/img/default_profile.png') : '/img/default_profile.png';
     const images = previewImageSrcs();
-    const art = makePreviewArticle(username, avatar, contentHtml, images, formatNow());
-    // replace or append preview
-    const existing = document.querySelector('#previewPostPreview');
-    // we'll place preview right above the form
-    let container = document.getElementById('previewContainer');
-    if (!container) {
-      container = document.createElement('div'); container.id = 'previewContainer'; container.className='card mt-16';
-      const wrap = document.createElement('div');
-      wrap.className = 'preview-wrap';
-      const title = document.createElement('div'); title.className='section-title'; title.innerHTML = '<span>ตัวอย่างโพสต์ (Preview)</span>';
-      container.appendChild(title);
-      const body = document.createElement('div'); body.id = 'previewPostArea';
-      container.appendChild(body);
-      editForm.parentElement.insertBefore(container, editForm.nextSibling);
+    // place preview below form if not present
+    let previewArea = document.getElementById('editPreviewArea');
+    if (!previewArea) {
+      previewArea = document.createElement('div');
+      previewArea.id = 'editPreviewArea';
+      previewArea.className = 'card mt-16';
+      const title = document.createElement('div');
+      title.className = 'section-title';
+      title.innerHTML = '<span>ตัวอย่างโพสต์ (Preview)</span>';
+      previewArea.appendChild(title);
+      const body = document.createElement('div');
+      body.id = 'editPreviewBody';
+      previewArea.appendChild(body);
+      editForm.parentElement.insertBefore(previewArea, editForm.nextSibling);
     }
-    const area = document.getElementById('previewPostArea');
-    area.innerHTML = '';
-    area.appendChild(art);
+    const body = document.getElementById('editPreviewBody');
+    body.innerHTML = '';
+    body.appendChild(makePreviewArticle(username, avatar, contentHtml, images, formatNow()));
   }
 
   // load post data
@@ -206,14 +238,17 @@
       if (!j.success) { msg.innerText = 'ไม่พบโพสต์'; return; }
       const post = j.post || {};
       contentInput.value = post.content || '';
-      // support single image key 'image' or 'images' array
+      // existing images: use images array or legacy image
+      existingImages = [];
       if (Array.isArray(post.images) && post.images.length) {
-        existingImages = post.images.map((u, idx) => ({ id: post.imageIds && post.imageIds[idx] ? post.imageIds[idx] : undefined, url: u }));
+        existingImages = post.images.map(u => ({ id: u, url: u }));
       } else if (post.image) {
-        existingImages = [{ id: undefined, url: post.image }];
-      } else existingImages = [];
+        existingImages = [{ id: post.image, url: post.image }];
+      }
       renderThumbnails();
-      profileCache = j.myProfile || null;
+      profileCache = j.myUsername ? null : null;
+      // load profile separately in updatePreview
+      profileCache = await getMyProfile();
       updatePreview();
     } catch (e) {
       console.error(e);
@@ -224,14 +259,15 @@
   // file input
   fileInput.addEventListener('change', (ev) => {
     const list = Array.from(ev.target.files || []);
-    for (const f of list) newFiles.push(f);
+    for (const f of list) {
+      const id = genId('new');
+      const url = URL.createObjectURL(f);
+      newFiles.push({ id, file: f, url });
+    }
     renderThumbnails();
     updatePreview();
     fileInput.value = '';
   });
-
-  // render initial
-  loadPost();
 
   // submit
   editForm.addEventListener('submit', async (ev) => {
@@ -239,12 +275,14 @@
     msg.style.color = '#000'; msg.innerText = 'กำลังอัปเดต...';
     const fd = new FormData();
     fd.append('content', contentInput.value || '');
-    // include delete markers already added as hidden inputs? They won't be in FormData automatically because we're not submitting the form directly.
-    // So collect delete markers from deleteMarkers container
+    // include deleteMarkers (we already appended hidden inputs to DOM, but since we're building FormData manually, collect them)
     const deletes = Array.from(deleteMarkers.querySelectorAll('input[name="deleteImages[]"]')).map(i => i.value);
     deletes.forEach(d => fd.append('deleteImages[]', d));
     // append new files
-    newFiles.forEach(f => { fd.append('postImage', f); fd.append('postImages[]', f); });
+    newFiles.forEach(n => {
+      fd.append('postImage', n.file);
+      fd.append('postImages[]', n.file);
+    });
     try {
       const res = await fetch('/api/post/' + encodeURIComponent(postId) + '/edit', { method: 'POST', body: fd });
       const data = await res.json();
@@ -261,6 +299,15 @@
 
   // helper to ensure preview updates when typing
   contentInput.addEventListener('input', () => updatePreview());
+
+  // cleanup object URLs on unload
+  window.addEventListener('beforeunload', () => {
+    newFiles.forEach(f => { try { if (f.url && f.url.startsWith('blob:')) URL.revokeObjectURL(f.url); } catch(e){} });
+  });
+
+  // initial load
+  loadPost();
+
 })();
 </script>
 </body>
