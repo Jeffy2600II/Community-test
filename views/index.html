@@ -15,8 +15,12 @@
     .post-time { color:var(--muted); font-size:0.88rem; }
 
     .post-body { margin-top:10px; line-height:1.55; }
-    .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; cursor: pointer; }
+    .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
     .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; }
+
+    /* make whole post show pointer, but interactive children keep their own cursor */
+    .post { cursor: pointer; }
+    .post a, .post button, .post input, .post textarea { cursor: auto; }
 
     /* Kebab placed on the right side of the header */
     .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
@@ -144,6 +148,7 @@
         art.className = 'post';
         art.dataset.postId = post.id;
         art.dataset.postOwner = post.username || '';
+        art.tabIndex = 0; // make focusable for keyboard
 
         // header
         const header = document.createElement('div');
@@ -196,16 +201,14 @@
         const body = document.createElement('div');
         body.className = 'post-body';
 
-        // content
+        // content (truncated by JS)
         const fullContent = post.content || '';
         const truncated = truncateText(fullContent, 1000);
         const formatted = escapeAndFormat(truncated);
         const contentDiv = document.createElement('div');
         contentDiv.className = 'post-content';
         contentDiv.innerHTML = formatted;
-        contentDiv.addEventListener('click', function () {
-          window.location.href = '/post/' + encodeURIComponent(post.id);
-        });
+        // NOTE: do NOT stop propagation on contentDiv; overall article's click handler will navigate
         body.appendChild(contentDiv);
 
         // optional image
@@ -215,6 +218,7 @@
           im.src = post.image;
           im.alt = 'post image';
           im.loading = 'lazy';
+          // clicking image should navigate to post (we let article handle it)
           body.appendChild(im);
         }
 
@@ -225,6 +229,25 @@
 
         art.appendChild(body);
         feedEl.appendChild(art);
+
+        // attach click/key handlers on article to navigate to post unless interactive child clicked
+        art.addEventListener('click', function (ev) {
+          // if click was on an interactive element, ignore (let that element act)
+          if (ev.target.closest('a, button, input, textarea, select, .post-popup, .post-kebab')) return;
+          // otherwise navigate
+          window.location.href = '/post/' + encodeURIComponent(post.id);
+        });
+        // keyboard: Enter or Space opens post (but not when focused on an interactive child)
+        art.addEventListener('keydown', function (ev) {
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            const active = document.activeElement;
+            if (active && active !== art && active.closest && active.closest('a, button, input, textarea, select, .post-popup, .post-kebab')) {
+              return; // interactive child focused — let it handle
+            }
+            ev.preventDefault();
+            window.location.href = '/post/' + encodeURIComponent(post.id);
+          }
+        });
       }
 
       // after DOM created, load avatars and wire kebab
