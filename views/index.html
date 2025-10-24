@@ -6,30 +6,99 @@
   <title>Community Home</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
-    /* Feed & content visuals */
-    .post { position: relative; padding: 12px; border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); }
-    .post-header { display:flex; align-items:center; gap:8px; width:100%; /* gap ลดจาก 12px เป็น 8px เพื่อให้ header ดูชิดขึ้นเล็กน้อย */ }
-    .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit: cover; }
-    .post-header-meta { display:flex; flex-direction:column; gap:2px; min-width:0; }
-    .post-username a { font-weight:700; color:var(--text); text-decoration:none; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px; }
-    .post-time { color:var(--muted); font-size:0.88rem; }
+    /* Feed & content visuals (adjusted to reduce spacing between header and content) */
+    /* Key goals:
+       - Keep header (avatar + name + time) compact
+       - Make post content sit close under the header (<= ~20px total)
+       - Prevent avatar from forcing extra vertical space by fixing its size and pinning top alignment
+    */
+    .post {
+      position: relative;
+      /* reduced padding so header and body sit closer together */
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: linear-gradient(180deg,#fff,#fcfdff);
+      margin-bottom: 12px;
+      border: 1px solid rgba(15,23,42,0.03);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 6px; /* small gap between header and body; keeps spacing <= ~20px */
+    }
 
-    /* ลดระยะห่างระหว่าง header (ชื่อ/เวลา) กับเนื้อหาโพสต์ให้ชิดขึ้น (ไม่เกิน 20-30px ตามที่ร้องขอ)
-       ที่นี่ตั้ง margin-top ของ .post-body เป็น 6px และให้ .post-header มี margin-bottom เล็กน้อยด้วย */
-    .post-body { margin-top: 6px; line-height:1.55; }
-    .post-header { margin-bottom: 6px; }
+    /* Header: avatar + meta */
+    .post-header {
+      display:flex;
+      align-items:flex-start; /* pin username/time to the top of avatar */
+      gap:8px;                 /* compact horizontal gap */
+      width:100%;
+      margin-bottom: 4px;      /* small bottom margin — keeps header and body close */
+    }
+
+    /* Keep avatar a fixed size so taller images don't grow the header height */
+    .post-avatar .avatar-img {
+      width:40px;
+      height:40px;
+      border-radius:8px;
+      object-fit:cover;
+      flex-shrink:0;
+    }
+
+    /* header meta area (username + time) stays compact and aligned to top */
+    .post-header-meta {
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+      min-width:0;
+      margin-top: 0; /* ensure no extra push */
+    }
+
+    .post-username a {
+      font-weight:700;
+      color:var(--text);
+      text-decoration:none;
+      display:inline-block;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      max-width:240px;
+    }
+    .post-time {
+      color:var(--muted);
+      font-size:0.88rem;
+      line-height:1;
+    }
+
+    /* Make the body sit very close to header (small margin-top) */
+    .post-body {
+      margin-top: 2px; /* small nudge — together with header-bottom keeps total gap small */
+      line-height:1.55;
+      display:block;
+    }
 
     .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
+
     .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; }
 
-    /* make whole post show pointer, but interactive children keep their own cursor */
-    .post { cursor: pointer; }
+    /* interactive children keep their own cursor */
     .post a, .post button, .post input, .post textarea { cursor: auto; }
 
     /* Kebab placed on the right side of the header */
-    .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
+    .post-kebab {
+      background: transparent;
+      border: none;
+      cursor:pointer;
+      width:36px;
+      height:36px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:8px;
+      margin-left:auto;
+      flex-shrink:0;
+    }
     .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
-    /* popup should align to the right of the post when kebab is on the right */
+
     .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
     .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
     .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
@@ -50,6 +119,9 @@
 
     @media (max-width:560px) {
       .post-username a { max-width:140px; }
+      .post { padding: 10px; }
+      .post-avatar .avatar-img { width:44px; height:44px; }
+      .post-body { margin-top: 6px; } /* slightly more space on small screens for readability */
     }
   </style>
 </head>
@@ -265,7 +337,7 @@
      * - Uses data-username attribute (safer than parsing id with hyphens)
      * - Deduplicates by username
      * - Fetches /api/user/:username and applies profilePic to all matching imgs
-     * - Adds image error handler to detect 404s / broken files
+     * - Adds image error handler to detect 404s /broken files
      */
     async function loadAvatarsAndWireKebab(myUsername) {
       const avatarImgs = Array.from(document.querySelectorAll('img[data-username]'));
