@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>สร้างโพสต์ใหม่</title>
     <link rel="stylesheet" href="/css/style.css">
+    <style>
+      /* small local styles for preview + gallery */
+      .preview-wrap { margin-top: 18px; }
+      .image-gallery { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+      .image-thumb { position:relative; width:120px; height:90px; border-radius:8px; overflow:hidden; background:#f6f7fb; display:flex;align-items:center;justify-content:center; }
+      .image-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+      .image-thumb button.remove { position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.6); color:#fff; border:none; width:26px; height:26px; border-radius:6px; cursor:pointer; }
+      .preview-post { margin-top:12px; }
+      textarea[name="content"] { min-height:140px; width:100%; padding:10px; border-radius:8px; border:1px solid rgba(15,23,42,0.06); font-size:1rem; }
+      .small-note { color:var(--muted); font-size:0.92rem; margin-top:8px; }
+    </style>
 </head>
 <body>
   <div id="headerSlot"></div>
@@ -12,38 +23,212 @@
     <div class="container" style="max-width:800px;margin-top:24px;">
       <div class="card">
         <div class="section-title"><span>สร้างโพสต์ใหม่</span></div>
+
         <form id="postForm" enctype="multipart/form-data">
-            <!-- หัวข้อถูกเอาออก: ใช้ textarea เพียงช่องเดียวสำหรับเนื้อหา -->
             <label class="small">เนื้อหา</label>
-            <textarea name="content" placeholder="เขียนสิ่งที่คุณต้องการแบ่งปันที่นี่..." required></textarea>
+            <textarea name="content" id="contentInput" placeholder="เขียนสิ่งที่คุณต้องการแบ่งปันที่นี่..." required></textarea>
+
             <div class="input-file mt-16">
               <label class="btn btn-ghost">
-                แนบรูป (ถ้ามี) <input type="file" name="postImage">
+                แนบรูปหลายรูป (เลือกหลายไฟล์ได้) <input id="fileInput" type="file" name="postImage" multiple style="display:none">
               </label>
+              <span class="small-note">สามารถลากเลือกหรือกดปุ่มเพื่อเลือกหลายรูปภาพได้</span>
             </div>
+
+            <div id="selectedImages" class="image-gallery" aria-live="polite" aria-label="รูปที่เลือก"></div>
+
             <div class="text-right mt-16">
               <button type="submit" class="btn btn-primary">โพสต์</button>
             </div>
             <p id="msg" class="small" style="margin-top:8px"></p>
         </form>
+
+        <div class="preview-wrap">
+          <div class="section-title"><span>ตัวอย่างโพสต์</span></div>
+          <div id="previewPost" class="preview-post"></div>
+        </div>
+
       </div>
     </div>
   </main>
   <div id="footerSlot"></div>
+
 <script src="/js/main.js"></script>
 <script>
-document.getElementById('postForm').onsubmit = async e => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    // backend now accepts posts without title; content is required
-    const res = await fetch('/api/post/create', {
-        method: 'POST',
-        body: fd
+(function(){
+  // utility
+  function escapeHtml(s){ if (s===null||s===undefined) return ''; return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+  function formatNow(){ return new Date().toLocaleString(); }
+
+  const contentInput = document.getElementById('contentInput');
+  const fileInput = document.getElementById('fileInput');
+  const selectedImages = document.getElementById('selectedImages');
+  const previewPost = document.getElementById('previewPost');
+  const msg = document.getElementById('msg');
+  const postForm = document.getElementById('postForm');
+
+  // state
+  let files = []; // File objects selected (new)
+  // helpers
+  function makePreviewArticle(username, avatarUrl, contentHtml, images, createdAt) {
+    const art = document.createElement('article');
+    art.className = 'post';
+    art.setAttribute('data-preview','1');
+
+    // header
+    const header = document.createElement('div'); header.className='post-header';
+    const avatarLink = document.createElement('a'); avatarLink.className='post-avatar'; avatarLink.href='#';
+    const img = document.createElement('img'); img.className='avatar-img'; img.alt = username || '';
+    img.src = avatarUrl || '/img/default_profile.png';
+    avatarLink.appendChild(img);
+    header.appendChild(avatarLink);
+
+    const meta = document.createElement('div'); meta.className='post-header-meta';
+    const nameDiv = document.createElement('div'); nameDiv.className='post-username';
+    const nameLink = document.createElement('a'); nameLink.href = '#'; nameLink.textContent = username || '(ฉัน)';
+    nameDiv.appendChild(nameLink);
+    const timeDiv = document.createElement('div'); timeDiv.className='post-time small'; timeDiv.textContent = createdAt || '';
+    meta.appendChild(nameDiv); meta.appendChild(timeDiv);
+    header.appendChild(meta);
+
+    art.appendChild(header);
+
+    // body
+    const body = document.createElement('div'); body.className='post-body';
+    const contentDiv = document.createElement('div'); contentDiv.className='post-content';
+    contentDiv.innerHTML = contentHtml || '';
+    body.appendChild(contentDiv);
+
+    if (images && images.length) {
+      for (const src of images) {
+        const im = document.createElement('img');
+        im.className = 'post-img';
+        im.src = src;
+        im.alt = 'post image';
+        im.loading = 'lazy';
+        body.appendChild(im);
+      }
+    }
+
+    art.appendChild(body);
+    return art;
+  }
+
+  async function getMyProfile() {
+    try {
+      const r = await fetch('/api/profile');
+      if (!r.ok) return null;
+      const j = await r.json();
+      if (j && j.success) return j.profile;
+    } catch (e) {}
+    return null;
+  }
+
+  // render selected thumbnails
+  function renderSelectedThumbnails() {
+    selectedImages.innerHTML = '';
+    files.forEach((f, idx) => {
+      const box = document.createElement('div');
+      box.className = 'image-thumb';
+      const img = document.createElement('img');
+      const url = URL.createObjectURL(f);
+      img.src = url;
+      img.alt = f.name;
+      box.appendChild(img);
+
+      const btn = document.createElement('button');
+      btn.className = 'remove';
+      btn.title = 'ลบรูปนี้';
+      btn.innerText = '✕';
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        // revoke object URL
+        try { URL.revokeObjectURL(url); } catch(e){}
+        files.splice(idx,1);
+        renderSelectedThumbnails();
+        updatePreview();
+      });
+      box.appendChild(btn);
+      selectedImages.appendChild(box);
     });
-    const data = await res.json();
-    document.getElementById('msg').innerText = data.success ? 'โพสต์สำเร็จ' : data.msg;
-    if (data.success) setTimeout(() => location.replace('/post/'+data.postId), 1200);
-};
+  }
+
+  // gather image srcs for preview (object URLs)
+  function previewImageSrcs() {
+    return files.map(f => URL.createObjectURL(f));
+  }
+
+  // update live preview
+  let profileCache = null;
+  async function updatePreview() {
+    const content = escapeHtml(contentInput.value).replace(/\n/g,'<br>');
+    if (!profileCache) profileCache = await getMyProfile();
+    const username = profileCache ? (profileCache.username || '(ฉัน)') : '(ฉัน)';
+    const avatar = profileCache ? (profileCache.profilePic || '/img/default_profile.png') : '/img/default_profile.png';
+    const images = previewImageSrcs();
+    const art = makePreviewArticle(username, avatar, content, images, formatNow());
+    previewPost.innerHTML = '';
+    previewPost.appendChild(art);
+
+    // revoke the temporary object URLs created earlier (for thumb rendering we created URLs twice),
+    // but keep them until next update — to avoid revoking still-in-use URLs, we will not aggressively revoke here.
+  }
+
+  // file input change
+  fileInput.addEventListener('change', (ev) => {
+    const list = Array.from(ev.target.files || []);
+    // append new files
+    for (const f of list) files.push(f);
+    renderSelectedThumbnails();
+    updatePreview();
+    // reset input so same file can be re-selected if removed
+    fileInput.value = '';
+  });
+
+  // live update when typing
+  contentInput.addEventListener('input', () => updatePreview());
+
+  // enable clicking the ghost label to open file dialog
+  document.querySelectorAll('.input-file input[type="file"]').forEach(inp => {
+    inp.addEventListener('click', (e) => { e.stopPropagation(); });
+  });
+
+  // initialize preview
+  (async function initPreview(){
+    profileCache = await getMyProfile();
+    updatePreview();
+  })();
+
+  // submit handler
+  postForm.addEventListener('submit', async function(e){
+    e.preventDefault();
+    msg.style.color = '#000';
+    msg.innerText = 'กำลังอัปโหลด...';
+    const fd = new FormData();
+    fd.append('content', contentInput.value || '');
+    // append each file under two kinds of fields to maximize backend compatibility
+    files.forEach(f => {
+      fd.append('postImage', f);         // common single-field multiple entries
+      fd.append('postImages[]', f);      // array style
+    });
+    try {
+      const res = await fetch('/api/post/create', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data && data.success) {
+        msg.style.color = '#080';
+        msg.innerText = 'โพสต์สำเร็จ';
+        setTimeout(() => location.replace('/post/' + (data.postId || '')), 900);
+      } else {
+        msg.style.color = '#d00';
+        msg.innerText = data && data.msg ? data.msg : 'ไม่สำเร็จ ลองอีกครั้ง';
+      }
+    } catch (err) {
+      msg.style.color = '#d00';
+      msg.innerText = 'เกิดข้อผิดพลาดเครือข่าย';
+    }
+  });
+
+})();
 </script>
 </body>
 </html>
