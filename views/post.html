@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ดูโพสต์</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+      /* Single post: use same inline header layout as feed */
+      .post-header { display:flex; align-items:flex-start; gap:12px; margin-bottom:8px; }
+      .post-header .post-avatar { position: static; display:inline-flex; align-items:center; justify-content:center; }
+      .post-header .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit:cover; }
+      .post-header-meta { display:flex; flex-direction:column; gap:4px; min-width:0; }
+      .post .post-body { margin-top: 6px; display:flex; flex-direction:column; gap:8px; }
+      .post-content { white-space: pre-wrap; word-break: break-word; color:#38414b; }
+      .post-img { max-width:100%; height:auto; border-radius:8px; margin-top:8px; }
+      @media (max-width:800px) {
+        .post-header .post-avatar .avatar-img { width:44px; height:44px; }
+        .post-header-meta .post-username a { font-size:0.95rem; }
+        .post-time { font-size:0.80rem; }
+      }
+    </style>
+</head>
+<body>
+  <div id="headerSlot"></div>
+  <main>
+    <div class="container">
+      <div class="card" id="postCard">
+        <div id="postBox"></div>
+        <hr style="margin:16px 0;">
+        <div id="commentBox"></div>
+        <form id="commentForm" class="mt-16 hidden">
+          <label class="small">แสดงความคิดเห็น</label>
+          <textarea name="content" placeholder="แสดงความคิดเห็น" required></textarea>
+          <div class="text-right mt-16">
+            <button type="submit" class="btn btn-primary">แสดงความคิดเห็น</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+  <div id="footerSlot"></div>
+<script src="/js/main.js"></script>
+<script>
+const postId = location.pathname.split('/').pop();
+let myUsername;
+
+async function loadPost() {
+    const res = await fetch('/api/post/' + postId);
+    const data = await res.json();
+    if (!data.success) return document.getElementById('postBox').innerText = 'ไม่พบโพสต์';
+    const { post, comments, owner, myUsername: apiUsername } = data;
+    myUsername = apiUsername;
+
+    // แสดง header แบบเดียวกับฟีด: avatar + username + time (ไม่มีหัวข้อแยก)
+    let html = `<article class="post">
+      <div class="post-header" role="group" aria-label="ผู้โพสต์">
+        <a class="post-avatar" href="/user/${post.username}" aria-hidden="false">
+          <img src="/img/default_profile.png" class="avatar-img" alt="${post.username}" id="avatar-${post.username}-${post.id}">
+        </a>
+        <div class="post-header-meta">
+          <div class="post-username"><a href="/user/${post.username}">${post.username}</a></div>
+          <div class="post-time small">${new Date(post.createdAt).toLocaleString()}</div>
+        </div>
+      </div>
+
+      <div class="post-body">
+        ${post.image ? `<img src="${post.image}" class="post-img" alt="post image" loading="lazy">` : ''}
+        <div class="post-content mt-8">${post.content}</div>
+        <div class="post-actions mt-16">
+          ${myUsername === post.username ? `<a class="btn btn-ghost" href="/post/${post.id}/edit">แก้ไข</a> <button class="btn btn-ghost" id="delBtn">ลบ</button>` : ''}
+        </div>
+      </div>
+    </article>`;
+    document.getElementById('postBox').innerHTML = html;
+
+    // โหลด avatar สำหรับ header (เหมือน feed)
+    (async () => {
+      try {
+        const up = await fetch(`/api/user/${encodeURIComponent(post.username)}`);
+        const ud = await up.json();
+        if (ud && ud.success && ud.profile && ud.profile.profilePic) {
+          const imgElem = document.getElementById("avatar-"+post.username+"-"+post.id);
+          if (imgElem) imgElem.src = ud.profile.profilePic;
+        }
+      } catch(e){}
+    })();
+
+    if (myUsername === post.username) {
+        const del = document.getElementById('delBtn');
+        if (del) del.onclick = async () => {
+            if (confirm('ลบโพสต์?')) {
+                await fetch('/api/post/' + postId, { method: 'DELETE' });
+                location.replace('/');
+            }
+        };
+    }
+
+    // render comments
+    let cHtml = '<h3>คอมเมนต์</h3>';
+    if (!comments || comments.length === 0) cHtml += '<i class="small">ยังไม่มีคอมเมนต์</i>';
+    for (let c of comments) {
+        cHtml += `<div class="comment">
+            <div class="meta"><strong><a href="/user/${c.username}">${c.username}</a></strong> • ${new Date(c.createdAt).toLocaleString()}</div>
+            <div>${c.content}</div>
+            ${myUsername === c.username ? `<div class="mt-16"><button class="btn btn-ghost" onclick="deleteComment('${c.id}')">ลบ</button></div>` : ''}
+        </div>`;
+    }
+    document.getElementById('commentBox').innerHTML = cHtml;
+    if (myUsername) document.getElementById('commentForm').classList.remove("hidden");
+}
+loadPost();
+
+document.getElementById('commentForm').onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const res = await fetch('/api/post/' + postId + '/comment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.fromEntries(fd.entries()))
+    });
+    const data = await res.json();
+    if (data.success) {
+        e.target.reset();
+        loadPost();
+    }
+};
+window.deleteComment = async (cid) => {
+    if (confirm('ยืนยันลบคอมเมนต์?')) {
+        await fetch(`/api/post/${postId}/comment/${cid}`, {method:'DELETE'});
+        loadPost();
+    }
+};
+</script>
+</body>
+</html>
