@@ -13,11 +13,14 @@
       .post-header-meta { display:flex; flex-direction:column; gap:4px; min-width:0; }
       .post .post-body { margin-top: 6px; display:flex; flex-direction:column; gap:8px; }
       .post-content { white-space: pre-wrap; word-break: break-word; color:#38414b; }
-      .post-img { max-width:100%; height:auto; border-radius:8px; margin-top:8px; }
+      .post-img { max-width:100%; height:auto; border-radius:8px; margin-top:8px; display:block; }
+      .post-gallery { display: grid; gap: 8px; margin-top: 8px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+      .post-gallery .post-img { height: 220px; object-fit: cover; }
       @media (max-width:800px) {
         .post-header .post-avatar .avatar-img { width:44px; height:44px; }
         .post-header-meta .post-username a { font-size:0.95rem; }
         .post-time { font-size:0.80rem; }
+        .post-gallery .post-img { height:140px; }
       }
     </style>
 </head>
@@ -45,6 +48,8 @@
 const postId = location.pathname.split('/').pop();
 let myUsername;
 
+function escapeHtml(s){ if (s===null||s===undefined) return ''; return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
 async function loadPost() {
     const res = await fetch('/api/post/' + postId);
     const data = await res.json();
@@ -52,29 +57,75 @@ async function loadPost() {
     const { post, comments, owner, myUsername: apiUsername } = data;
     myUsername = apiUsername;
 
-    // แสดง header แบบเดียวกับฟีด: avatar + username + time (ไม่มีหัวข้อแยก)
-    let html = `<article class="post">
-      <div class="post-header" role="group" aria-label="ผู้โพสต์">
-        <a class="post-avatar" href="/user/${post.username}" aria-hidden="false">
-          <img src="/img/default_profile.png" class="avatar-img" alt="${post.username}" id="avatar-${post.username}-${post.id}">
-        </a>
-        <div class="post-header-meta">
-          <div class="post-username"><a href="/user/${post.username}">${post.username}</a></div>
-          <div class="post-time small">${new Date(post.createdAt).toLocaleString()}</div>
-        </div>
-      </div>
+    // Build DOM using same structure as feed
+    const container = document.getElementById('postBox');
+    container.innerHTML = '';
+    const art = document.createElement('article');
+    art.className = 'post';
 
-      <div class="post-body">
-        ${post.image ? `<img src="${post.image}" class="post-img" alt="post image" loading="lazy">` : ''}
-        <div class="post-content mt-8">${post.content}</div>
-        <div class="post-actions mt-16">
-          ${myUsername === post.username ? `<a class="btn btn-ghost" href="/post/${post.id}/edit">แก้ไข</a> <button class="btn btn-ghost" id="delBtn">ลบ</button>` : ''}
-        </div>
-      </div>
-    </article>`;
-    document.getElementById('postBox').innerHTML = html;
+    // header
+    const header = document.createElement('div'); header.className = 'post-header';
+    const avatarA = document.createElement('a'); avatarA.className = 'post-avatar'; avatarA.href = '/user/' + encodeURIComponent(post.username || '');
+    const avatarImg = document.createElement('img'); avatarImg.className = 'avatar-img'; avatarImg.alt = post.username || '';
+    avatarImg.id = `avatar-${post.username}-${post.id}`;
+    avatarImg.src = '/img/default_profile.png';
+    avatarA.appendChild(avatarImg);
+    header.appendChild(avatarA);
 
-    // โหลด avatar สำหรับ header (เหมือน feed)
+    const meta = document.createElement('div'); meta.className = 'post-header-meta';
+    const nameDiv = document.createElement('div'); nameDiv.className = 'post-username';
+    const nameLink = document.createElement('a'); nameLink.href = '/user/' + encodeURIComponent(post.username || ''); nameLink.textContent = post.username || '(ไม่ระบุ)';
+    nameDiv.appendChild(nameLink);
+    const timeDiv = document.createElement('div'); timeDiv.className = 'post-time small'; timeDiv.textContent = new Date(post.createdAt).toLocaleString();
+    meta.appendChild(nameDiv); meta.appendChild(timeDiv);
+    header.appendChild(meta);
+
+    art.appendChild(header);
+
+    // body
+    const body = document.createElement('div'); body.className = 'post-body';
+
+    // images: support post.images (array) or legacy post.image
+    const imgs = Array.isArray(post.images) ? post.images.slice() : (post.image ? [post.image] : []);
+    if (imgs.length === 1) {
+      const im = document.createElement('img');
+      im.className = 'post-img';
+      im.src = imgs[0];
+      im.alt = 'post image';
+      im.loading = 'lazy';
+      body.appendChild(im);
+    } else if (imgs.length > 1) {
+      const gallery = document.createElement('div');
+      gallery.className = 'post-gallery';
+      for (const src of imgs) {
+        const im = document.createElement('img');
+        im.className = 'post-img';
+        im.src = src;
+        im.alt = 'post image';
+        im.loading = 'lazy';
+        gallery.appendChild(im);
+      }
+      body.appendChild(gallery);
+    }
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'post-content mt-8';
+    contentDiv.innerHTML = escapeHtml(post.content || '');
+    body.appendChild(contentDiv);
+
+    const actionsDiv = document.createElement('div'); actionsDiv.className = 'post-actions mt-16';
+    if (myUsername === post.username) {
+      const editA = document.createElement('a'); editA.className = 'btn btn-ghost'; editA.href = '/post/' + post.id + '/edit'; editA.textContent = 'แก้ไข';
+      actionsDiv.appendChild(editA);
+      const delBtn = document.createElement('button'); delBtn.className = 'btn btn-ghost'; delBtn.id = 'delBtn'; delBtn.type='button'; delBtn.textContent = 'ลบ';
+      actionsDiv.appendChild(delBtn);
+    }
+    body.appendChild(actionsDiv);
+
+    art.appendChild(body);
+    container.appendChild(art);
+
+    // tải avatar (เหมือน feed)
     (async () => {
       try {
         const up = await fetch(`/api/user/${encodeURIComponent(post.username)}`);
@@ -102,7 +153,7 @@ async function loadPost() {
     for (let c of comments) {
         cHtml += `<div class="comment">
             <div class="meta"><strong><a href="/user/${c.username}">${c.username}</a></strong> • ${new Date(c.createdAt).toLocaleString()}</div>
-            <div>${c.content}</div>
+            <div>${escapeHtml(c.content)}</div>
             ${myUsername === c.username ? `<div class="mt-16"><button class="btn btn-ghost" onclick="deleteComment('${c.id}')">ลบ</button></div>` : ''}
         </div>`;
     }
