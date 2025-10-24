@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>แก้ไขโพสต์</title>
     <link rel="stylesheet" href="/css/style.css">
+    <style>
+      /* keep styles consistent with create page */
+      .image-gallery { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+      .image-thumb { position:relative; width:120px; height:90px; border-radius:8px; overflow:hidden; background:#f6f7fb; display:flex;align-items:center;justify-content:center; }
+      .image-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+      .image-thumb button.remove { position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.6); color:#fff; border:none; width:26px; height:26px; border-radius:6px; cursor:pointer; }
+      textarea[name="content"] { min-height:140px; width:100%; padding:10px; border-radius:8px; border:1px solid rgba(15,23,42,0.06); font-size:1rem; }
+      .small-note { color:var(--muted); font-size:0.92rem; margin-top:8px; }
+    </style>
 </head>
 <body>
   <div id="headerSlot"></div>
@@ -13,14 +22,21 @@
       <div class="card">
         <div class="section-title"><span>แก้ไขโพสต์</span></div>
         <form id="editPostForm" enctype="multipart/form-data">
-            <!-- เอาช่องหัวข้อออก: ใช้ textarea เดียวสำหรับเนื้อหา -->
             <label class="small">เนื้อหา</label>
-            <textarea name="content" placeholder="เนื้อหา"></textarea>
+            <textarea name="content" id="contentInput" placeholder="เนื้อหา"></textarea>
+
             <div class="input-file mt-16">
               <label class="btn btn-ghost">
-                เปลี่ยนรูป <input type="file" name="postImage">
+                เพิ่มรูปภาพเพิ่มเติม <input id="fileInput" type="file" name="postImage" multiple style="display:none">
               </label>
+              <span class="small-note">คุณสามารถลบรูปเดิมหรือเพิ่มรูปใหม่ได้</span>
             </div>
+
+            <div id="selectedImages" class="image-gallery" aria-live="polite" aria-label="รูปที่เลือก"></div>
+
+            <!-- container for hidden inputs to signal deletion of existing images -->
+            <div id="deleteMarkers"></div>
+
             <div class="text-right mt-16">
               <button type="submit" class="btn btn-primary">อัปเดต</button>
             </div>
@@ -30,28 +46,222 @@
     </div>
   </main>
   <div id="footerSlot"></div>
+
 <script src="/js/main.js"></script>
 <script>
-const postId = location.pathname.split('/').slice(-2)[0];
-(async ()=>{
-    const res = await fetch('/api/post/' + postId);
-    const data = await res.json();
-    if (data.success) {
-        // ไม่ใช้ title อีกต่อไป — ใส่แค่ content ลงใน textarea
-        document.querySelector('textarea[name=content]').value = data.post.content || '';
-    }
-})();
-document.getElementById('editPostForm').onsubmit = async e => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const res = await fetch('/api/post/' + postId + '/edit', {
-        method: 'POST',
-        body: fd
+(function(){
+  const postId = (location.pathname.split('/').slice(-2)[0] || '').replace(/[^a-zA-Z0-9\-_]/g,'');
+  function escapeHtml(s){ if (s===null||s===undefined) return ''; return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+  function formatNow(){ return new Date().toLocaleString(); }
+
+  const contentInput = document.getElementById('contentInput');
+  const fileInput = document.getElementById('fileInput');
+  const selectedImages = document.getElementById('selectedImages');
+  const deleteMarkers = document.getElementById('deleteMarkers');
+  const previewPostContainer = document.createElement('div');
+  const msg = document.getElementById('msg');
+  const editForm = document.getElementById('editPostForm');
+
+  // state
+  let newFiles = []; // newly added File objects
+  let existingImages = []; // { id?, url } from server
+  let profileCache = null;
+
+  async function getMyProfile() {
+    try {
+      const r = await fetch('/api/profile');
+      if (!r.ok) return null;
+      const j = await r.json();
+      if (j && j.success) return j.profile;
+    } catch (e) {}
+    return null;
+  }
+
+  function createThumbBox(srcOrFile, isExisting, index) {
+    const box = document.createElement('div'); box.className = 'image-thumb';
+    const img = document.createElement('img');
+    if (isExisting) img.src = srcOrFile.url || srcOrFile;
+    else img.src = URL.createObjectURL(srcOrFile);
+    img.alt = isExisting ? (srcOrFile.id || 'existing') : srcOrFile.name;
+    box.appendChild(img);
+
+    const btn = document.createElement('button'); btn.className = 'remove'; btn.innerText = '✕'; btn.title='ลบรูป';
+    btn.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      if (isExisting) {
+        // mark for deletion
+        const marker = document.createElement('input');
+        marker.type = 'hidden';
+        marker.name = 'deleteImages[]';
+        marker.value = srcOrFile.id || srcOrFile.url || index;
+        deleteMarkers.appendChild(marker);
+        // remove from existingImages
+        existingImages = existingImages.filter((e, i) => !(i === index || e.id === srcOrFile.id));
+      } else {
+        // remove new file
+        newFiles.splice(index,1);
+      }
+      renderThumbnails();
+      updatePreview();
     });
-    const data = await res.json();
-    document.getElementById('msg').innerText = data.success ? 'บันทึกสำเร็จ' : data.msg;
-    if (data.success) setTimeout(() => location.replace('/post/' + postId), 1000);
-};
+    box.appendChild(btn);
+    return box;
+  }
+
+  function renderThumbnails() {
+    selectedImages.innerHTML = '';
+    // render existing first
+    existingImages.forEach((e, idx) => {
+      const box = createThumbBox(e, true, idx);
+      selectedImages.appendChild(box);
+    });
+    // render new files
+    newFiles.forEach((f, idx) => {
+      const box = createThumbBox(f, false, idx);
+      selectedImages.appendChild(box);
+    });
+  }
+
+  function previewImageSrcs() {
+    const srcs = [];
+    for (const e of existingImages) srcs.push(e.url || e);
+    for (const f of newFiles) srcs.push(URL.createObjectURL(f));
+    return srcs;
+  }
+
+  function makePreviewArticle(username, avatarUrl, contentHtml, images, createdAt) {
+    const art = document.createElement('article');
+    art.className = 'post';
+    art.setAttribute('data-preview','1');
+
+    const header = document.createElement('div'); header.className='post-header';
+    const avatarLink = document.createElement('a'); avatarLink.className='post-avatar'; avatarLink.href='#';
+    const img = document.createElement('img'); img.className='avatar-img'; img.alt = username || '';
+    img.src = avatarUrl || '/img/default_profile.png';
+    avatarLink.appendChild(img);
+    header.appendChild(avatarLink);
+
+    const meta = document.createElement('div'); meta.className='post-header-meta';
+    const nameDiv = document.createElement('div'); nameDiv.className='post-username';
+    const nameLink = document.createElement('a'); nameLink.href = '#'; nameLink.textContent = username || '(ฉัน)';
+    nameDiv.appendChild(nameLink);
+    const timeDiv = document.createElement('div'); timeDiv.className='post-time small'; timeDiv.textContent = createdAt || '';
+    meta.appendChild(nameDiv); meta.appendChild(timeDiv);
+    header.appendChild(meta);
+
+    art.appendChild(header);
+
+    const body = document.createElement('div'); body.className='post-body';
+    const contentDiv = document.createElement('div'); contentDiv.className='post-content';
+    contentDiv.innerHTML = contentHtml || '';
+    body.appendChild(contentDiv);
+
+    if (images && images.length) {
+      for (const src of images) {
+        const im = document.createElement('img');
+        im.className = 'post-img';
+        im.src = src;
+        im.alt = 'post image';
+        im.loading = 'lazy';
+        body.appendChild(im);
+      }
+    }
+
+    art.appendChild(body);
+    return art;
+  }
+
+  async function updatePreview() {
+    const contentHtml = escapeHtml(contentInput.value).replace(/\n/g,'<br>');
+    if (!profileCache) profileCache = await getMyProfile();
+    const username = profileCache ? (profileCache.username || '(ฉัน)') : '(ฉัน)';
+    const avatar = profileCache ? (profileCache.profilePic || '/img/default_profile.png') : '/img/default_profile.png';
+    const images = previewImageSrcs();
+    const art = makePreviewArticle(username, avatar, contentHtml, images, formatNow());
+    // replace or append preview
+    const existing = document.querySelector('#previewPostPreview');
+    // we'll place preview right above the form
+    let container = document.getElementById('previewContainer');
+    if (!container) {
+      container = document.createElement('div'); container.id = 'previewContainer'; container.className='card mt-16';
+      const wrap = document.createElement('div');
+      wrap.className = 'preview-wrap';
+      const title = document.createElement('div'); title.className='section-title'; title.innerHTML = '<span>ตัวอย่างโพสต์ (Preview)</span>';
+      container.appendChild(title);
+      const body = document.createElement('div'); body.id = 'previewPostArea';
+      container.appendChild(body);
+      editForm.parentElement.insertBefore(container, editForm.nextSibling);
+    }
+    const area = document.getElementById('previewPostArea');
+    area.innerHTML = '';
+    area.appendChild(art);
+  }
+
+  // load post data
+  async function loadPost() {
+    try {
+      const r = await fetch('/api/post/' + encodeURIComponent(postId));
+      if (!r.ok) { msg.innerText = 'ไม่สามารถโหลดโพสต์ได้'; return; }
+      const j = await r.json();
+      if (!j.success) { msg.innerText = 'ไม่พบโพสต์'; return; }
+      const post = j.post || {};
+      contentInput.value = post.content || '';
+      // support single image key 'image' or 'images' array
+      if (Array.isArray(post.images) && post.images.length) {
+        existingImages = post.images.map((u, idx) => ({ id: post.imageIds && post.imageIds[idx] ? post.imageIds[idx] : undefined, url: u }));
+      } else if (post.image) {
+        existingImages = [{ id: undefined, url: post.image }];
+      } else existingImages = [];
+      renderThumbnails();
+      profileCache = j.myProfile || null;
+      updatePreview();
+    } catch (e) {
+      console.error(e);
+      msg.innerText = 'เกิดข้อผิดพลาดขณะโหลดโพสต์';
+    }
+  }
+
+  // file input
+  fileInput.addEventListener('change', (ev) => {
+    const list = Array.from(ev.target.files || []);
+    for (const f of list) newFiles.push(f);
+    renderThumbnails();
+    updatePreview();
+    fileInput.value = '';
+  });
+
+  // render initial
+  loadPost();
+
+  // submit
+  editForm.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    msg.style.color = '#000'; msg.innerText = 'กำลังอัปเดต...';
+    const fd = new FormData();
+    fd.append('content', contentInput.value || '');
+    // include delete markers already added as hidden inputs? They won't be in FormData automatically because we're not submitting the form directly.
+    // So collect delete markers from deleteMarkers container
+    const deletes = Array.from(deleteMarkers.querySelectorAll('input[name="deleteImages[]"]')).map(i => i.value);
+    deletes.forEach(d => fd.append('deleteImages[]', d));
+    // append new files
+    newFiles.forEach(f => { fd.append('postImage', f); fd.append('postImages[]', f); });
+    try {
+      const res = await fetch('/api/post/' + encodeURIComponent(postId) + '/edit', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data && data.success) {
+        msg.style.color = '#080'; msg.innerText = 'อัปเดตสำเร็จ';
+        setTimeout(() => location.replace('/post/' + postId), 800);
+      } else {
+        msg.style.color = '#d00'; msg.innerText = data && data.msg ? data.msg : 'ไม่สำเร็จ';
+      }
+    } catch (e) {
+      msg.style.color = '#d00'; msg.innerText = 'เกิดข้อผิดพลาดเครือข่าย';
+    }
+  });
+
+  // helper to ensure preview updates when typing
+  contentInput.addEventListener('input', () => updatePreview());
+})();
 </script>
 </body>
 </html>
