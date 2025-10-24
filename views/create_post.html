@@ -59,6 +59,7 @@
   // utility
   function escapeHtml(s){ if (s===null||s===undefined) return ''; return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
   function formatNow(){ return new Date().toLocaleString(); }
+  function genId(prefix='id'){ return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8); }
 
   const contentInput = document.getElementById('contentInput');
   const fileInput = document.getElementById('fileInput');
@@ -67,8 +68,9 @@
   const msg = document.getElementById('msg');
   const postForm = document.getElementById('postForm');
 
-  // state
-  let files = []; // File objects selected (new)
+  // state: store new files as objects with id and object URL
+  let newFiles = []; // { id, file, url }
+
   // helpers
   function makePreviewArticle(username, avatarUrl, contentHtml, images, createdAt) {
     const art = document.createElement('article');
@@ -100,13 +102,25 @@
     body.appendChild(contentDiv);
 
     if (images && images.length) {
-      for (const src of images) {
+      if (images.length === 1) {
         const im = document.createElement('img');
         im.className = 'post-img';
-        im.src = src;
+        im.src = images[0];
         im.alt = 'post image';
         im.loading = 'lazy';
         body.appendChild(im);
+      } else {
+        const gallery = document.createElement('div');
+        gallery.className = 'post-gallery';
+        for (const src of images) {
+          const im = document.createElement('img');
+          im.className = 'post-img';
+          im.src = src;
+          im.alt = 'post image';
+          im.loading = 'lazy';
+          gallery.appendChild(im);
+        }
+        body.appendChild(gallery);
       }
     }
 
@@ -127,26 +141,34 @@
   // render selected thumbnails
   function renderSelectedThumbnails() {
     selectedImages.innerHTML = '';
-    files.forEach((f, idx) => {
+    newFiles.forEach((entry) => {
       const box = document.createElement('div');
       box.className = 'image-thumb';
+      box.dataset.id = entry.id;
+
       const img = document.createElement('img');
-      const url = URL.createObjectURL(f);
-      img.src = url;
-      img.alt = f.name;
+      img.src = entry.url;
+      img.alt = entry.file.name;
       box.appendChild(img);
 
       const btn = document.createElement('button');
       btn.className = 'remove';
       btn.title = 'ลบรูปนี้';
+      btn.setAttribute('aria-label', 'ลบรูป');
       btn.innerText = '✕';
+      btn.dataset.id = entry.id;
       btn.addEventListener('click', (ev) => {
         ev.preventDefault();
-        // revoke object URL
-        try { URL.revokeObjectURL(url); } catch(e){}
-        files.splice(idx,1);
-        renderSelectedThumbnails();
-        updatePreview();
+        const id = btn.dataset.id;
+        // find and remove specific file by id
+        const idx = newFiles.findIndex(f => f.id === id);
+        if (idx !== -1) {
+          const removed = newFiles.splice(idx, 1)[0];
+          // revoke object URL
+          try { URL.revokeObjectURL(removed.url); } catch(e){}
+          renderSelectedThumbnails();
+          updatePreview();
+        }
       });
       box.appendChild(btn);
       selectedImages.appendChild(box);
@@ -155,7 +177,7 @@
 
   // gather image srcs for preview (object URLs)
   function previewImageSrcs() {
-    return files.map(f => URL.createObjectURL(f));
+    return newFiles.map(f => f.url);
   }
 
   // update live preview
@@ -169,28 +191,27 @@
     const art = makePreviewArticle(username, avatar, content, images, formatNow());
     previewPost.innerHTML = '';
     previewPost.appendChild(art);
-
-    // revoke the temporary object URLs created earlier (for thumb rendering we created URLs twice),
-    // but keep them until next update — to avoid revoking still-in-use URLs, we will not aggressively revoke here.
   }
 
   // file input change
   fileInput.addEventListener('change', (ev) => {
     const list = Array.from(ev.target.files || []);
-    // append new files
-    for (const f of list) files.push(f);
+    for (const f of list) {
+      const id = genId('new');
+      const url = URL.createObjectURL(f);
+      newFiles.push({ id, file: f, url });
+    }
     renderSelectedThumbnails();
     updatePreview();
-    // reset input so same file can be re-selected if removed
     fileInput.value = '';
   });
 
   // live update when typing
   contentInput.addEventListener('input', () => updatePreview());
 
-  // enable clicking the ghost label to open file dialog
-  document.querySelectorAll('.input-file input[type="file"]').forEach(inp => {
-    inp.addEventListener('click', (e) => { e.stopPropagation(); });
+  // cleanup object URLs on unload
+  window.addEventListener('beforeunload', () => {
+    newFiles.forEach(f => { try { if (f.url && f.url.startsWith('blob:')) URL.revokeObjectURL(f.url); } catch(e){} });
   });
 
   // initialize preview
@@ -206,10 +227,10 @@
     msg.innerText = 'กำลังอัปโหลด...';
     const fd = new FormData();
     fd.append('content', contentInput.value || '');
-    // append each file under two kinds of fields to maximize backend compatibility
-    files.forEach(f => {
-      fd.append('postImage', f);         // common single-field multiple entries
-      fd.append('postImages[]', f);      // array style
+    // append each new file under both recognized field names
+    newFiles.forEach(entry => {
+      fd.append('postImage', entry.file);
+      fd.append('postImages[]', entry.file);
     });
     try {
       const res = await fetch('/api/post/create', { method: 'POST', body: fd });
