@@ -4,11 +4,8 @@
    style.css — Tuned feed header spacing & sizing
    - Avatar stays visible and fixed on the left (no absolute positioning)
    - Username + timestamp are inline and can sit close to the content
-   - Reserved profile column area: the profile-hero (left column) keeps a
-     full-height/sticky area so nothing from the main column can intrude.
-   - Post images: constrained max-height (mobile-first). Width is allowed
-     to scale (auto/max-width) but height will never exceed defined max.
-   - Desktop breakpoints increase allowed image max-height but still cap it.
+   - Removed the large left gutter approach so content can be placed closer
+   - Responsive adjustments keep touch targets comfortable
    ======================================================================== */
 
 :root{
@@ -335,10 +332,26 @@ main {
   margin-bottom: var(--space-md);
 }
 
+/* Default left avatar area (legacy structure still supported) */
+.post .post-left {
+  width: 64px;
+  flex-shrink: 0;
+}
+.post .post-body {
+  flex: 1;
+}
+
 /* Post title / meta / excerpt */
 .post .post-title { font-size: 1.05rem; margin:0; color: var(--text); font-weight:700; }
 .post .post-meta { color: var(--muted); font-size: 0.9rem; margin-top:6px; display:flex; gap:8px; align-items:center; }
 .post .post-excerpt { margin-top: 12px; color: #38414b; }
+.post .post-img {
+  max-width: 280px;
+  border-radius: 10px;
+  object-fit: cover;
+  margin-top: 12px;
+  box-shadow: 0 8px 30px rgba(16,24,40,0.04);
+}
 
 /* Post actions */
 .post-actions {
@@ -355,12 +368,12 @@ main {
      be placed closer under it.
    ------------------------------------------------------------------ */
 
-/* Make the header a normal inline row (avatar + main column) */
+/* Make the header a normal inline row (avatar + meta + kebab) */
 .feed .post {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-left: calc(var(--space-md) - 2px); /* keep card padding */
+  padding-left: calc(var(--space-md) - 2px); /* default card padding */
 }
 
 /* header row: avatar + meta inline */
@@ -472,48 +485,6 @@ main {
   vertical-align: top;
 }
 
-/* ------------------------------------------------------------------ */
-/* Post image sizing rules
-   - Mobile-first: cap the height so very tall images don't dominate the screen.
-   - Width is allowed to be auto (keeps natural proportions), but never wider than container.
-   - Desktop: allow a larger max-height and an upper limit to width so images don't go full-bleed.
-   ------------------------------------------------------------------ */
-
-.post .post-img {
-  display: block;
-  width: auto;         /* prefer intrinsic width; will shrink to fit container */
-  max-width: 100%;     /* never overflow container horizontally */
-  height: auto;
-  max-height: 360px;   /* MOBILE: images will not exceed this height */
-  object-fit: cover;   /* crop if needed to keep visual balance when resizing */
-  border-radius: 10px;
-  margin-top: 12px;
-  box-shadow: 0 8px 30px rgba(16,24,40,0.04);
-}
-
-/* Slightly more generous on mid-size screens */
-@media (min-width: 801px) {
-  .post .post-img {
-    max-height: 480px;
-    /* cap width as well on larger viewports to avoid full-bleed wide images */
-    max-width: 720px;
-  }
-}
-
-/* Desktop wide screens: allow taller images but still capped */
-@media (min-width: 1200px) {
-  .post .post-img {
-    max-height: 560px;
-    max-width: 880px;
-  }
-}
-
-/* If you want the image block to be centered when narrower than the column */
-.post .post-img {
-  margin-left: 0;
-  margin-right: 0;
-}
-
 /* responsive adjustments */
 @media (max-width: 800px) {
   /* On small screens keep avatar slightly larger for touch targets */
@@ -523,30 +494,48 @@ main {
   .feed .post-header .post-avatar .avatar-img { width:44px; height:44px; border-radius:10px; }
   .feed .post-header-meta .post-username a { font-size: 0.92rem; max-width: 40ch; }
   .feed .post-header-meta .post-time { font-size: 0.80rem; }
-  .post .post-img {
-    max-height: 320px; /* tighten height for small screens */
-  }
 }
 
 /* ------------------------------------------------------------------ */
-/* Profile hero, grid & reserved-column behavior
-   - Keep a dedicated left column for profile (profile-hero).
-   - Reserve a sticky full-height area so nothing from the main column intrudes.
-   - The profile column width remains the same as the grid template (320px),
-     and the profile card will be sticky within the viewport.
-   ------------------------------------------------------------------ */
-.grid-2 {
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: var(--space-md);
-  align-items: start;
+/* Comments                                                             */
+/* ------------------------------------------------------------------ */
+.comment {
+  background: #fbfdff;
+  border: 1px solid rgba(15,23,42,0.03);
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
 }
+.comment .meta { font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
 
-/* Ensure the left column (profile-hero) occupies a reserved vertical area.
-   We make it sticky so the profile area appears anchored from near the top of the
-   viewport down, and we set a min-height so visually it behaves like a column
-   from head-to-foot of the available viewport space.
-*/
+/* ------------------------------------------------------------------ */
+/* Forms & inputs                                                        */
+/* ------------------------------------------------------------------ */
+input, textarea, select, button { font-family: inherit; }
+input[type="text"], input[type="email"], input[type="password"], textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(15,23,42,0.06);
+  padding: 12px 14px;
+  background: #fff;
+  transition: box-shadow var(--transition), border-color var(--transition);
+  font-size: 0.96rem;
+  line-height: 1.3;
+}
+input:focus, textarea:focus {
+  outline: none;
+  border-color: rgba(47,128,237,0.6);
+  box-shadow: 0 8px 30px rgba(47,128,237,0.06);
+}
+textarea { min-height: 120px; resize: vertical; }
+
+/* file input */
+.input-file { display:inline-flex; gap:8px; align-items:center; }
+.input-file input[type="file"] { display:none; }
+
+/* ------------------------------------------------------------------ */
+/* Profile hero, grid & responsive helpers                              */
+/* ------------------------------------------------------------------ */
 .profile-hero {
   background: linear-gradient(180deg,#fff,#fbfdff);
   padding: var(--space-md);
@@ -557,17 +546,7 @@ main {
   align-items:center;
   text-align:center;
   border: 1px solid rgba(15,23,42,0.03);
-  position: sticky;
-  top: calc(68px + 16px); /* header (68px) + breathing room */
-  /* occupy most of the viewport height beneath the header */
-  min-height: calc(100vh - (68px + 32px));
-  max-height: calc(100vh - (68px + 32px));
-  overflow: hidden; /* prevent inner content from protruding; scroll inside if needed (we prefer not) */
-  box-sizing: border-box;
-  z-index: 2;
 }
-
-/* Keep avatar sizing consistent in the reserved area */
 .profile-hero .avatar {
   width: 140px;
   height: 140px;
@@ -577,27 +556,12 @@ main {
   box-shadow: var(--shadow-2);
 }
 
-/* Make sure nothing in the main column uses negative margins that could intrude
-   into the left column on wide screens. Cards in main column remain within their grid cell. */
-.profile-main .card,
-.profile-main > .card {
-  margin-left: 0;
-  margin-right: 0;
+.grid-2 {
+  display:grid;
+  grid-template-columns: 320px 1fr;
+  gap: var(--space-md);
 }
-
-/* For very narrow viewports we collapse to single-column (existing behavior) */
-@media (max-width: 1100px) {
-  .grid-2 {
-    grid-template-columns: 1fr;
-  }
-  .profile-hero {
-    position: relative;
-    top: auto;
-    min-height: auto;
-    max-height: none;
-    overflow: visible;
-  }
-}
+@media (max-width: 1100px) { .grid-2 { grid-template-columns: 1fr; } }
 
 /* ------------------------------------------------------------------ */
 /* Dropdowns / notifications / badges                                   */
