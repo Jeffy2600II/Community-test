@@ -4,8 +4,8 @@
    style.css — Tuned feed header spacing & sizing
    - Avatar stays visible and fixed on the left (no absolute positioning)
    - Username + timestamp are inline and can sit close to the content
-   - Removed the large left gutter approach so content can be placed closer
-   - Responsive adjustments keep touch targets comfortable
+   - Post images: responsive, never cropped; constrained by max-height (viewport-based)
+   - Mobile: stricter max-height so tall images fit comfortably on-screen
    ======================================================================== */
 
 :root{
@@ -345,13 +345,6 @@ main {
 .post .post-title { font-size: 1.05rem; margin:0; color: var(--text); font-weight:700; }
 .post .post-meta { color: var(--muted); font-size: 0.9rem; margin-top:6px; display:flex; gap:8px; align-items:center; }
 .post .post-excerpt { margin-top: 12px; color: #38414b; }
-.post .post-img {
-  max-width: 280px;
-  border-radius: 10px;
-  object-fit: cover;
-  margin-top: 12px;
-  box-shadow: 0 8px 30px rgba(16,24,40,0.04);
-}
 
 /* Post actions */
 .post-actions {
@@ -485,15 +478,38 @@ main {
   vertical-align: top;
 }
 
-/* responsive adjustments */
+/* ------------------------------------------------------------------ */
+/* Post image behavior: responsive, no cropping
+   - Images keep aspect ratio (width/height scale together)
+   - Constrained by max-height (viewport-relative) to avoid overly tall images on mobile
+   - max-width:100% ensures very wide images fit container
+   - width:auto lets image shrink when height constraint applies (prevents distortion)
+   ------------------------------------------------------------------ */
+.post-img {
+  display: block;
+  max-width: 100%; /* never overflow the container width */
+  width: auto;     /* allow width to adjust when height constraint is active */
+  height: auto;    /* preserve aspect ratio */
+  border-radius: 8px;
+  margin-top: 10px;
+  object-fit: contain; /* defensive: don't crop */
+  /* Desktop/tablet default: allow tall images but limit to viewport height */
+  max-height: 75vh;
+}
+
+/* Mobile: tighter max-height so tall images remain visible without scrolling off-screen */
 @media (max-width: 800px) {
-  /* On small screens keep avatar slightly larger for touch targets */
-  .feed .post {
-    padding-left: 12px;
+  .post-img {
+    max-height: 60vh; /* suitable for most phones — adjustable if you prefer */
+    margin-top: 8px;
   }
-  .feed .post-header .post-avatar .avatar-img { width:44px; height:44px; border-radius:10px; }
-  .feed .post-header-meta .post-username a { font-size: 0.92rem; max-width: 40ch; }
-  .feed .post-header-meta .post-time { font-size: 0.80rem; }
+}
+
+/* If you want a stricter ceiling on very large desktop screens */
+@media (min-width: 1400px) {
+  .post-img {
+    max-height: 80vh;
+  }
 }
 
 /* ------------------------------------------------------------------ */
