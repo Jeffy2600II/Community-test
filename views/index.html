@@ -26,7 +26,7 @@
     .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
     .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
     /* popup should align to the right of the post when kebab is on the right */
-    .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); min-width:160px; z-index:2200; overflow:hidden; }
+    .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
     .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
     .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
 
@@ -266,14 +266,37 @@
         (async () => {
           try {
             const up = await fetch('/api/user/' + encodeURIComponent(username));
-            if (!up.ok) return;
+            if (!up.ok) {
+              console.warn('Failed to fetch /api/user/' + username + ': status', up.status);
+              return;
+            }
             const ud = await up.json();
-            if (ud && ud.success && ud.profile && ud.profile.profilePic) {
+            // debug logs to help trace why avatar not applied
+            if (!ud || !ud.success) {
+              console.warn('/api/user/ response for', username, ud);
+              return;
+            }
+            if (!ud.profile) {
+              console.warn('No profile returned for', username);
+              return;
+            }
+            if (ud.profile.profilePic) {
+              // apply to all matching imgs
               document.querySelectorAll('img[id^="avatar-' + username + '"]').forEach(i => {
+                // attach error handler to catch failed image load (404 etc)
+                i.addEventListener('error', function () {
+                  console.warn('Avatar image failed to load for', username, 'url=', ud.profile.profilePic, 'element id=', i.id);
+                  // leave default or set to a visible fallback
+                  i.src = '/img/default_profile.png';
+                }, { once: true });
                 i.src = ud.profile.profilePic;
               });
+            } else {
+              console.info('profilePic empty for', username, 'profile:', ud.profile);
             }
-          } catch (e) {}
+          } catch (e) {
+            console.error('error fetching profile for', username, e && e.message);
+          }
         })();
       }
 
