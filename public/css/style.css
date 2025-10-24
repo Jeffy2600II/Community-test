@@ -1,14 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
 
 /* ========================================================================
-   style.css — Final improved design
-   - Preserves original structure, class names and mobile sidebar positioning.
-   - Visual improvements: refined tokens, buttons, inputs, cards.
-   - Feed changes: new .post-header structure support and styles so avatar,
-     username and timestamp appear on one horizontal row while title and
-     content follow beneath (HTML updated in views/index.html earlier).
-   - Adjusted spacing & sizing so header (avatar/username/time) is visually
-     smaller and closer together to put focus on the post content.
+   style.css — Updated: tighter header focus for posts
+   - Goal: make avatar/username/timestamp visually small and baseline-aligned
+   - Avatar becomes circular and smaller; username + time reduced and aligned
+   - Content remains the primary visual focus
    ======================================================================== */
 
 :root{
@@ -374,18 +370,16 @@ main {
 .feed .post {
   display: flex;
   flex-direction: column;
-  /* reduced gap so header and body are visually closer — puts focus on content */
   gap: 8px;
 }
 
 /* header row: avatar + meta inline */
 .feed .post-header {
   display: flex;
-  align-items: center;
-  gap: 10px; /* slightly reduced */
+  align-items: center; /* keep avatar centered vertically with meta */
+  gap: 10px;
   width: 100%;
-  /* tighter bottom spacing to keep header compact */
-  margin-bottom: 4px; /* reduced from 6px to bring username/time closer to content */
+  margin-bottom: 4px;
 }
 
 /* avatar link (keeps .avatar-img class for compatibility) */
@@ -395,47 +389,57 @@ main {
   justify-content: center;
   text-decoration: none;
 }
-/* AVATAR SIZE: significantly reduced so header is much less dominant than content */
+/* AVATAR: now circular and much smaller to de-emphasize header */
 .feed .post-header .post-avatar .avatar-img {
-  width: 32px;   /* reduced further from 40px to 32px */
-  height: 32px;  /* reduced further from 40px to 32px */
-  border-radius: 8px;
+  width: 28px;   /* made smaller */
+  height: 28px;
+  border-radius: 9999px; /* full circle */
   object-fit: cover;
   border: 1px solid rgba(15,23,42,0.06);
   flex-shrink: 0;
 }
 
 /* meta area right of avatar: username + time inline */
-/* Reduced gap so username and timestamp sit very close together */
+/* align-items baseline so username and date sit on the same visual baseline */
 .feed .post-header-meta {
   display: flex;
   flex-direction: row;
-  align-items: center;
-  gap: 4px; /* reduced again from 6px to 4px */
-  flex-wrap: wrap;
+  align-items: baseline; /* baseline alignment requested */
+  gap: 6px;
+  flex-wrap: nowrap;
   min-width: 0; /* allow truncation on small screens */
 }
 
-/* username emphasized (smaller to keep attention on content) */
+/* username emphasized but much smaller so content stands out */
 .feed .post-header-meta .post-username a {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
-  font-size: 0.80rem; /* reduced to emphasize content */
+  font-size: 0.70rem; /* significantly smaller */
+  line-height: 1; /* tight line height to match baseline */
   text-decoration: none;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   display: inline-block;
+  transform: translateY(0); /* no vertical offset; baseline alignment will position it */
 }
 
-/* timestamp small and muted, inline to the right (reduced size) */
+/* timestamp subtle and small, aligned on same baseline */
 .feed .post-header-meta .post-time {
   color: var(--muted);
-  font-size: 0.64rem; /* reduced further for subtle appearance */
+  font-size: 0.62rem; /* very small but legible */
+  line-height: 1;
   white-space: nowrap;
+  opacity: 0.9;
+  transform: translateY(0);
 }
 
-/* accessible spacing: if you have additional meta (badges) they will fold nicely */
+/* If there is a displayName, keep it visually similar — still small */
+.feed .post-header-meta .post-displayname {
+  font-size: 0.70rem;
+  color: var(--muted);
+  margin-right: 4px;
+}
 
 /* body below header */
 .feed .post .post-body {
@@ -451,10 +455,10 @@ main {
 
 /* responsive adjustments */
 @media (max-width: 800px) {
-  /* On narrow screens give slightly larger header touch targets */
-  .feed .post-header .post-avatar .avatar-img { width: 40px; height: 40px; } /* touch target kept comfortable */
-  .feed .post-header-meta .post-username a { font-size: 0.95rem; }
-  .feed .post-header-meta .post-time { font-size: 0.72rem; }
+  /* on small screens expand avatar slightly for touch */
+  .feed .post-header .post-avatar .avatar-img { width: 40px; height: 40px; border-radius: 9999px; }
+  .feed .post-header-meta .post-username a { font-size: 0.90rem; }
+  .feed .post-header-meta .post-time { font-size: 0.70rem; }
 }
 
 /* ------------------------------------------------------------------ */
@@ -773,64 +777,23 @@ img { max-width: 100%; height: auto; display: block; }
 
 /* ---------------------------------------------------------------------------
    New mobile/card-specific adjustments
-   Goal: maximize horizontal space used by card-like UI on small screens.
-   Only affects "card-like" elements (.card, .post and direct card usage),
-   leaving other UI components untouched as requested.
    --------------------------------------------------------------------------- */
 
-/* Apply on small devices where extra container padding wastes width.
-   We make cards visually edge-to-edge within the viewport while keeping the
-   page container and header alignment intact. Adjust values are conservative
-   to avoid overlapping sticky header paddings. */
+/* Apply on small devices where extra container padding wastes width. */
 @media (max-width: 800px) {
-  /* Reduce container side padding so content has more room */
-  .container {
-    padding-left: 10px;
-    padding-right: 10px;
-  }
-
-  /* Make .card and .post stretch to the edges of the container viewport area.
-     Use calc with --space-sm so it adapts to the small-device spacing changes
-     defined earlier. The negative margins counteract the container padding, so
-     the visual card appears fuller width. */
-  .card,
-  .post {
+  .container { padding-left: 10px; padding-right: 10px; }
+  .card, .post {
     width: calc(100% + (2 * var(--space-sm)));
     margin-left: calc(var(--space-sm) * -1);
     margin-right: calc(var(--space-sm) * -1);
-    border-radius: 10px; /* slightly reduced for touch devices */
+    border-radius: 10px;
     box-shadow: var(--shadow-1);
-    /* keep internal padding comfortable */
     padding: calc(var(--space-md));
   }
-
-  /* For feed items that are nested inside other wrappers, ensure they
-     don't create horizontal scroll; make images / content wrap correctly. */
-  .post .post-img,
-  .card img {
-    max-width: 100%;
-    height: auto;
-    display: block;
-  }
-
-  /* Slightly tighter gaps inside a card on narrow screens to show more content */
+  .post .post-img, .card img { max-width: 100%; height: auto; display: block; }
   .card { gap: 12px; }
   .post { gap: 12px; }
-
-  /* If a card is already placed inside a container that is full-bleed (e.g. header),
-     avoid double-negative margins by resetting when the card directly follows header. */
-  .site-header + main .card,
-  main > .container > .card {
-    /* keep the full-width card look but ensure it aligns with page flow */
-  }
-
-  /* Specific tweak: profile-hero often sits in a sidebar; keep it visually full
-     width but preserve the avatar sizing so layout stays balanced. */
-  .profile-hero {
-    padding-left: calc(var(--space-md));
-    padding-right: calc(var(--space-md));
-    border-radius: 10px;
-  }
+  .profile-hero { padding-left: calc(var(--space-md)); padding-right: calc(var(--space-md)); border-radius: 10px; }
 }
 
 /* Desktop / tablet adjustments */
