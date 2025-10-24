@@ -6,6 +6,11 @@
    - Username + timestamp are inline and can sit close to the content
    - Post images: responsive, never cropped; constrained by max-height (viewport-based)
    - Mobile: stricter max-height so tall images fit comfortably on-screen
+   ------------------------------------------------------------------------
+   Added:
+   - --header-height variable for consistent sticky profile area top offset
+   - profile-hero made "tall" (full viewport column) and sticky on wide screens
+   - grid-2 aligns items to start so the left profile column reserves vertical space
    ======================================================================== */
 
 :root{
@@ -38,6 +43,9 @@
   --transition: 180ms cubic-bezier(.2,.9,.2,1);
   --readable-line: 1.5rem;
   --touch-target: 44px;
+
+  /* header height used for sticky offsets (keeps profile sticky offset consistent) */
+  --header-height: 68px;
 }
 
 /* Respect user reduced motion */
@@ -359,7 +367,7 @@ main {
    - We intentionally remove the large left gutter approach so that the header
      (username + time) can sit directly beside the avatar and the content can
      be placed closer under it.
-   ------------------------------------------------------------------ */
+   ----------------------------------------------------------------------- */
 
 /* Make the header a normal inline row (avatar + meta + kebab) */
 .feed .post {
@@ -552,6 +560,16 @@ textarea { min-height: 120px; resize: vertical; }
 /* ------------------------------------------------------------------ */
 /* Profile hero, grid & responsive helpers                              */
 /* ------------------------------------------------------------------ */
+/* Make the grid's left column (profile) reserve a vertical column and align items to start */
+.grid-2 {
+  display:grid;
+  grid-template-columns: 320px 1fr;
+  gap: var(--space-md);
+  align-items: start; /* ensure left column stretches/aligns to top so it can reserve vertical whitespace */
+}
+
+/* Profile hero - now sticky and tall on wide screens to reserve a full vertical band.
+   On narrow screens it falls back to normal stacked behavior. */
 .profile-hero {
   background: linear-gradient(180deg,#fff,#fbfdff);
   padding: var(--space-md);
@@ -562,7 +580,18 @@ textarea { min-height: 120px; resize: vertical; }
   align-items:center;
   text-align:center;
   border: 1px solid rgba(15,23,42,0.03);
+
+  /* Make it behave as a vertical reserved column: sticky and full-height (viewport) */
+  position: -webkit-sticky;
+  position: sticky;
+  top: calc(var(--header-height) + var(--space-md));
+  align-self: start;
+  /* height computed to take the remaining viewport height below the header */
+  height: calc(100vh - (var(--header-height) + (var(--space-md) * 2)));
+  min-height: 420px; /* ensures it's visually prominent; adjust as you prefer */
 }
+
+/* profile avatar sizing inside the tall column */
 .profile-hero .avatar {
   width: 140px;
   height: 140px;
@@ -572,12 +601,19 @@ textarea { min-height: 120px; resize: vertical; }
   box-shadow: var(--shadow-2);
 }
 
-.grid-2 {
-  display:grid;
-  grid-template-columns: 320px 1fr;
-  gap: var(--space-md);
-}
+/* When the left column is tall, ensure the main column has comfortable padding on small widths */
 @media (max-width: 1100px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* On small screens, disable sticky/reserved-height to avoid layout issues and allow natural flow */
+@media (max-width: 800px) {
+  .profile-hero {
+    position: static;
+    top: 0;
+    height: auto;
+    min-height: 0;
+    border-radius: 10px;
+  }
+}
 
 /* ------------------------------------------------------------------ */
 /* Dropdowns / notifications / badges                                   */
@@ -701,6 +737,7 @@ a { color: var(--accent); text-decoration: none; }
     --space-md: 12px;
     --space-lg: 18px;
     --touch-target: 48px;
+    --header-height: 60px; /* smaller header on very small screens */
   }
   body { font-size: 15px; }
   .site-header .container { height: 60px; padding-left: 12px; padding-right: 12px; }
