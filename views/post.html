@@ -51,10 +51,10 @@
       }
 
       /* Kebab & popup: same layout as index */
-      .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: aut; }
+      .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: aut;}
       .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
 
-      .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); z-index:2000; overflow:hidden; }
+      .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
       .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
       .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
 
@@ -69,6 +69,33 @@
 
       /* Minor spacing so bottom fixed bar does not overlay content on very small screens: overridden by comments.css JS spacer */
       #postCard { padding-bottom: 32px; }
+
+      /* ========================
+         Comment-specific: place kebab (three-dot) at the right edge
+         and ensure popup aligns to the right of the comment card.
+         ======================== */
+      .post.comment .post-header {
+        position: relative; /* make header a positioning context for absolute kebab */
+      }
+      .post.comment .post-kebab {
+        position: absolute;
+        right: 8px;
+        top: 12px;
+        margin-left: 0;
+      }
+      /* Ensure popup for comment is positioned under the kebab, not shifting layout */
+      .post.comment .post-popup {
+        position: absolute;
+        right: 8px;
+        top: 44px;
+        left: auto;
+        z-index: 2000;
+      }
+      /* When comment header is narrow on small screens, nudge kebab a bit */
+      @media (max-width: 600px) {
+        .post.comment .post-kebab { top: 8px; right: 8px; }
+        .post.comment .post-popup { right: 8px; top: 40px; }
+      }
     </style>
 </head>
 <body>
@@ -99,11 +126,13 @@
 <script src="/js/main.js"></script>
 <script>
 /*
-  ปรับปรุง:
-  - ใช้ดีไซน์ (class .post-kebab / .post-popup) ที่มีอยู่แล้วสำหรับ 3 จุดของคอมเมนต์
-  - ไม่ออกแบบ dropdown ใหม่ แต่ reuse พฤติกรรมแบบเดียวกับโพสต์ (single popup, ปิดเมื่อคลิกภายนอก / ESC)
-  - ใช้ delegated event handler บน commentBox แทนการผูก listener ต่อคอมเมนต์แต่ละรายการ
-  - ให้เจ้าของคอมเมนต์สามารถลบคอมเมนต์ได้ (เรียก DELETE /api/post/:postId/comment/:commentId)
+  Updated:
+  - Render comments as post-like DOM nodes (avatar, name, timestamp, content)
+  - Added a kebab (three-dot) button to each comment which opens a small dropdown/popup
+    with actions (delete for comment owner, or profile/report for others).
+  - Kebab for comments is positioned at the right edge of the comment (same place as post kebab)
+  - Fixed comment input bar at bottom; JS will ensure page content has spacer to avoid overlap
+  - On submit: post to /api/post/:id/comment (same as before) and reload comments area
 */
 
 const postId = location.pathname.split('/').pop();
@@ -117,13 +146,10 @@ const commentSpacer = document.getElementById('commentSpacer');
 function escapeHtml(s){ if (s===null||s===undefined) return ''; return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
 // Create DOM node for a single comment (post-like structure but without images)
-// Note: we add data attributes on the article so delegated handler can read them.
 function createCommentNode(c) {
   const art = document.createElement('article');
   art.className = 'post comment';
   art.dataset.commentId = c.id || '';
-  art.dataset.username = c.username || '';
-  art.dataset.displayName = (c.displayName || '') || '';
 
   // header
   const header = document.createElement('div');
@@ -168,9 +194,87 @@ function createCommentNode(c) {
   kebab.title = 'ตัวเลือกคอมเมนต์';
   kebab.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`;
+  // prevent the outer article click listener from firing when interacting with kebab
+  kebab.addEventListener('click', function (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const existing = art.querySelector('.post-popup');
+    if (existing) {
+      existing.remove();
+      kebab.setAttribute('aria-expanded', 'false');
+      return;
+    }
 
-  // We do NOT attach a per-kebab elaborate handler here.
-  // Delegated handler will manage opening/closing/popups centrally.
+    const popup = document.createElement('div');
+    popup.className = 'post-popup';
+    popup.dataset.commentId = c.id || '';
+
+    const isOwner = (myUsername && c.username && myUsername === c.username);
+
+    if (isOwner) {
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.textContent = 'ลบคอมเมนต์';
+      delBtn.addEventListener('click', async function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!confirm('ลบคอมเมนต์นี้?')) return;
+        try {
+          // Attempt to delete comment via RESTful endpoint.
+          // Server should support DELETE /api/post/:postId/comment/:commentId
+          const resp = await fetch('/api/post/' + encodeURIComponent(postId) + '/comment/' + encodeURIComponent(c.id), {
+            method: 'DELETE'
+          });
+          // Try parse JSON if provided
+          let json = null;
+          try { json = await resp.json(); } catch (err) {}
+          if (resp.ok && (!json || json.success !== false)) {
+            // remove node from DOM
+            art.remove();
+          } else {
+            alert((json && json.msg) ? json.msg : 'ไม่สามารถลบคอมเมนต์ได้');
+          }
+        } catch (err) {
+          console.error('delete comment error', err);
+          alert('เกิดข้อผิดพลาดขณะลบคอมเมนต์');
+        } finally {
+          popup.remove();
+          kebab.setAttribute('aria-expanded', 'false');
+        }
+      });
+      popup.appendChild(delBtn);
+    } else {
+      const profileA = document.createElement('a');
+      profileA.href = '/user/' + encodeURIComponent(c.username || '');
+      profileA.textContent = 'ไปยังโปรไฟล์';
+      popup.appendChild(profileA);
+
+      const reportBtn = document.createElement('button');
+      reportBtn.type = 'button';
+      reportBtn.textContent = 'รายงานคอมเมนต์';
+      reportBtn.addEventListener('click', function () {
+        alert('ฟีเจอร์รายงานยังไม่เปิดใช้งาน');
+        popup.remove();
+        kebab.setAttribute('aria-expanded', 'false');
+      });
+      popup.appendChild(reportBtn);
+    }
+
+    // attach popup to the comment node and handle outside click to dismiss
+    art.appendChild(popup);
+    kebab.setAttribute('aria-expanded', 'true');
+    setTimeout(() => {
+      const onDoc = (ev) => {
+        if (!popup.contains(ev.target) && ev.target !== kebab) {
+          popup.remove();
+          kebab.setAttribute('aria-expanded', 'false');
+          document.removeEventListener('click', onDoc, true);
+        }
+      };
+      document.addEventListener('click', onDoc, true);
+    }, 0);
+  }, { passive: false });
+
   header.appendChild(kebab);
 
   art.appendChild(header);
@@ -219,6 +323,7 @@ async function loadAvatarsForNodes(container) {
     seen.add(u);
     usernames.push(u);
   }
+  // fetch profiles in parallel but not to exceed reasonable concurrency
   await Promise.all(usernames.map(async (username) => {
     try {
       const url = '/api/user/' + encodeURIComponent(username);
@@ -229,6 +334,7 @@ async function loadAvatarsForNodes(container) {
       const pic = data.profile.profilePic;
       if (!pic) return;
       container.querySelectorAll('img[data-username="' + CSS.escape(username) + '"]').forEach(i => {
+        // set error handler once
         i.addEventListener('error', function onErr() {
           i.removeEventListener('error', onErr);
           i.src = '/img/default_profile.png';
@@ -236,133 +342,13 @@ async function loadAvatarsForNodes(container) {
         i.src = pic;
       });
     } catch (e) {
+      // ignore per-avatar fetch errors
       console.warn('avatar fetch failed for', username);
     }
   }));
 }
 
-/* -------------------------
-   Comment popup (shared, reuse existing styles)
-   - single popup instance for comments; matches post popup UI.
-   ------------------------- */
-let openCommentPopup = null;
-let commentPopupHost = null; // the article element the popup is attached to
-
-function closeCommentPopup() {
-  if (openCommentPopup && openCommentPopup.parentElement) openCommentPopup.remove();
-  openCommentPopup = null;
-  commentPopupHost = null;
-  // reset all kebab aria-expanded
-  document.querySelectorAll('.post-kebab[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded','false'));
-  document.removeEventListener('keydown', commentPopupEscapeHandler, true);
-}
-
-function commentPopupEscapeHandler(ev) {
-  if (ev.key === 'Escape') {
-    ev.preventDefault();
-    closeCommentPopup();
-  }
-}
-
-function openCommentPopupFor(hostEl) {
-  // hostEl: article.post.comment
-  if (!hostEl) return;
-  // close any existing
-  closeCommentPopup();
-
-  const commentId = hostEl.dataset.commentId;
-  const username = hostEl.dataset.username;
-  const displayName = hostEl.dataset.displayName || username;
-  const isOwner = (myUsername && username && myUsername === username);
-
-  const popup = document.createElement('div');
-  popup.className = 'post-popup';
-  popup.dataset.commentId = commentId;
-
-  if (isOwner) {
-    const delBtn = document.createElement('button');
-    delBtn.type = 'button';
-    delBtn.textContent = 'ลบคอมเมนต์';
-    delBtn.addEventListener('click', async (e) => {
-      e.preventDefault(); e.stopPropagation();
-      if (!confirm('ลบคอมเมนต์นี้?')) return;
-      try {
-        const resp = await fetch('/api/post/' + encodeURIComponent(postId) + '/comment/' + encodeURIComponent(commentId), { method: 'DELETE' });
-        let json = null;
-        try { json = await resp.json(); } catch (err) {}
-        if (resp.ok && (!json || json.success !== false)) {
-          hostEl.remove();
-        } else {
-          alert((json && json.msg) ? json.msg : 'ไม่สามารถลบคอมเมนต์ได้');
-        }
-      } catch (err) {
-        console.error('delete comment error', err);
-        alert('เกิดข้อผิดพลาดขณะลบคอมเมนต์');
-      } finally {
-        closeCommentPopup();
-      }
-    });
-    popup.appendChild(delBtn);
-  } else {
-    const profileA = document.createElement('a');
-    profileA.href = '/user/' + encodeURIComponent(username || '');
-    profileA.textContent = 'ไปยังโปรไฟล์';
-    popup.appendChild(profileA);
-
-    const reportBtn = document.createElement('button');
-    reportBtn.type = 'button';
-    reportBtn.textContent = 'รายงานคอมเมนต์';
-    reportBtn.addEventListener('click', function () {
-      alert('ฟีเจอร์รายงานยังไม่เปิดใช้งาน');
-      closeCommentPopup();
-    });
-    popup.appendChild(reportBtn);
-  }
-
-  // Attach popup to host element
-  hostEl.appendChild(popup);
-  openCommentPopup = popup;
-  commentPopupHost = hostEl;
-
-  // mark kebab aria-expanded on the button inside header
-  const kebabBtn = hostEl.querySelector('.post-kebab');
-  if (kebabBtn) kebabBtn.setAttribute('aria-expanded', 'true');
-
-  // close on outside click
-  setTimeout(() => {
-    const onDocClick = (ev) => {
-      if (!popup.contains(ev.target) && !hostEl.querySelector('.post-kebab')?.contains(ev.target)) {
-        closeCommentPopup();
-        document.removeEventListener('click', onDocClick, true);
-      }
-    };
-    document.addEventListener('click', onDocClick, true);
-  }, 0);
-
-  // close on ESC
-  document.addEventListener('keydown', commentPopupEscapeHandler, true);
-}
-
-/* Delegated click handler for kebab buttons inside commentBox */
-commentBox.addEventListener('click', function (ev) {
-  const kebab = ev.target.closest('.post-kebab');
-  if (!kebab) return;
-  ev.preventDefault();
-  ev.stopPropagation();
-  const host = kebab.closest('article.post.comment');
-  if (!host) return;
-
-  // toggle
-  if (openCommentPopup && commentPopupHost === host) {
-    closeCommentPopup();
-  } else {
-    openCommentPopupFor(host);
-  }
-}, true);
-
-/* -------------------------
-   Load post + comments
-   ------------------------- */
+// Load the post + comments from API and render
 async function loadPost() {
   try {
     const res = await fetch('/api/post/' + encodeURIComponent(postId));
@@ -376,7 +362,6 @@ async function loadPost() {
     container.innerHTML = '';
     const art = document.createElement('article');
     art.className = 'post';
-    art.dataset.postId = post.id;
 
     // header
     const header = document.createElement('div'); header.className = 'post-header';
@@ -446,6 +431,59 @@ async function loadPost() {
     // render comments area using structured nodes
     renderComments(comments || []);
 
+    // wire kebab popup (simple)
+    kebab.addEventListener('click', function(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const existing = art.querySelector('.post-popup');
+      if (existing) { existing.remove(); kebab.setAttribute('aria-expanded','false'); return; }
+      const popup = document.createElement('div'); popup.className = 'post-popup'; popup.dataset.postId = post.id;
+      const isOwner = (myUsername && post.username && myUsername === post.username);
+      if (isOwner) {
+        const editA = document.createElement('a');
+        editA.href = '/post/' + encodeURIComponent(post.id) + '/edit';
+        editA.textContent = 'แก้ไขโพสต์';
+        popup.appendChild(editA);
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.textContent = 'ลบโพสต์';
+        delBtn.addEventListener('click', async function (e) {
+          e.preventDefault();
+          if (!confirm('ลบโพสต์นี้?')) return;
+          try {
+            await fetch('/api/post/' + encodeURIComponent(post.id), { method: 'DELETE' });
+            const el = document.querySelector('.post[data-post-id="' + post.id + '"]');
+            if (el) el.remove();
+            location.replace('/');
+          } catch (err) {
+            alert('เกิดข้อผิดพลาดขณะลบโพสต์');
+          } finally {
+            popup.remove();
+            kebab.setAttribute('aria-expanded','false');
+          }
+        });
+        popup.appendChild(delBtn);
+      } else {
+        const profileA = document.createElement('a');
+        profileA.href = '/user/' + encodeURIComponent(post.username || '');
+        profileA.textContent = 'ไปยังโปรไฟล์';
+        popup.appendChild(profileA);
+
+        const reportBtn = document.createElement('button');
+        reportBtn.type = 'button';
+        reportBtn.textContent = 'รายงานโพสต์';
+        reportBtn.addEventListener('click', function () { alert('ฟีเจอร์รายงานยังไม่เปิดใช้งาน'); });
+        popup.appendChild(reportBtn);
+      }
+      art.appendChild(popup);
+      kebab.setAttribute('aria-expanded','true');
+      setTimeout(() => {
+        const onDoc = (ev) => { if (!popup.contains(ev.target) && ev.target !== kebab) { popup.remove(); kebab.setAttribute('aria-expanded','false'); document.removeEventListener('click', onDoc, true); } };
+        document.addEventListener('click', onDoc, true);
+      }, 0);
+    });
+
   } catch (e) {
     console.error('loadPost error', e);
   } finally {
@@ -468,7 +506,7 @@ function syncSpacerToBar() {
 window.addEventListener('load', () => { loadPost(); syncSpacerToBar(); });
 window.addEventListener('resize', syncSpacerToBar);
 
-/* Submit comment handler (AJAX) */
+// submit comment handler (AJAX)
 commentForm.addEventListener('submit', async function (ev) {
   ev.preventDefault();
   const txt = (commentContent.value || '').trim();
