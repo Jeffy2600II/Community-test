@@ -7,8 +7,6 @@
 // Note: This is the full server.js used by the project with one change:
 // - saveUploadedPostFiles now deduplicates incoming multer file objects by an MD5
 //   fingerprint (buffer) + size + originalname before processing/writing them.
-// - Added endpoint POST /api/post/:postId/comment/:commentId/edit to allow editing comments
-//   (requires authentication and owner check).
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -1019,50 +1017,12 @@ app.post('/api/post/:id/comment', authMiddleware, (req, res) => {
     if (post && post.username && post.username !== username) {
       const ownerObj = findUserByUsername(post.username);
       if (ownerObj) {
-        addNotificationToUser(ownerObj._userId, 'comment', `${username} แสดงความคิดเห็นในโพสต์ของคุณ`, { postId, commentId: comment.id, actorUsername: username, actorId: userObj ? userObj.id : undefined });
+        addNotificationToUser(ownerObj._userId, 'comment', `${username} แสดงความคิดเห็นในโพสต์ของคุณ`, { postId, commentId: comment.id, actorUsername: username });
       }
     }
   } catch (e) { /* ignore */ }
 
   res.json({ success: true });
-});
-
-/*
-  NEW: Edit comment endpoint
-  - Verifies auth, verifies the comment exists, verifies ownership, updates content and writes back.
-  - Returns the updated comment on success.
-*/
-app.post('/api/post/:postId/comment/:commentId/edit', authMiddleware, (req, res) => {
-  try {
-    const { postId, commentId } = req.params;
-    const userId = req.user.id;
-    const username = req.user.username;
-    const commentsPath = getPostCommentsPath(postId);
-    if (!fs.existsSync(commentsPath)) return res.json({ success: false, msg: 'ไม่พบโพสต์/คอมเมนต์' });
-
-    let comments = JSON.parse(fs.readFileSync(commentsPath, 'utf8'));
-    const idx = comments.findIndex(c => c.id === commentId);
-    if (idx === -1) return res.json({ success: false, msg: 'คอมเมนต์ไม่พบ' });
-
-    const comment = comments[idx];
-    if (comment.username !== username) return res.json({ success: false, msg: 'ไม่ได้รับอนุญาต' });
-
-    const { content } = req.body;
-    if (typeof content === 'undefined' || String(content).trim() === '') {
-      return res.json({ success: false, msg: 'เนื้อหาห้ามว่าง' });
-    }
-
-    // update
-    comment.content = String(content);
-    comment.updatedAt = new Date().toISOString();
-    comments[idx] = comment;
-    fs.writeFileSync(commentsPath, JSON.stringify(comments, null, 2), 'utf8');
-
-    res.json({ success: true, comment });
-  } catch (e) {
-    console.error('edit comment error', e && e.message);
-    res.status(500).json({ success: false, msg: 'แก้ไขคอมเมนต์ล้มเหลว' });
-  }
 });
 
 app.delete('/api/post/:postId/comment/:commentId', authMiddleware, (req, res) => {
