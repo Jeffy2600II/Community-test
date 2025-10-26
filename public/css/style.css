@@ -2,7 +2,8 @@
    style.css — Tuned feed header spacing & sizing (consolidated)
    - Duplicate/overlapping rules merged for maintainability
    - Behaviour for media queries preserved (mobile/desktop overrides kept)
-   - Added explicit styling for post/comment kebab popups/dropdowns
+   - Improved kebab popups/dropdowns: constrained small width, not fullviewport,
+     with smooth, soft animation and accessible focus states.
    ======================================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
@@ -35,13 +36,14 @@
   --max-width: 1100px;
   --max-width-narrow: 920px;
   --transition: 180ms cubic-bezier(.2,.9,.2,1);
+  --popup-ease: cubic-bezier(.2,.9,.25,1);
   --readable-line: 1.5rem;
   --touch-target: 44px;
 }
 
 /* Respect user reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  :root { --transition: 0ms; }
+  :root { --transition: 0ms; --popup-ease: linear; }
 }
 
 /* ------------------------------------------------------------------ */
@@ -833,13 +835,14 @@ img { max-width: 100%; height: auto; display: block; }
   #mobileMenuToggle { display: none; }
 }
 
-/* End of file */
+/* End of main file */
 
 /* -------------------------------------------------------------------------
-   Additions: ensure the 3-dot kebab sits at the right edge of the header for
-   both posts and comments, and style the popup/dropdown so it looks like a
-   proper floating menu with accessible focus states and a small "arrow".
-   Placed at the end so it overrides earlier/legacy declarations.
+   Popups / Kebab menus (improved)
+   - Popups are small, constrained width (not full-viewport)
+   - Smooth, subtle animation (scale + translate + fade)
+   - Accessible focus/hover states
+   - Keep popup inside viewport using max-width and simple positioning fallback
    ------------------------------------------------------------------------- */
 
 /* Make header a positioning context so absolute kebab aligns to header's right */
@@ -855,8 +858,7 @@ img { max-width: 100%; height: auto; display: block; }
   position: absolute;
   right: 8px;
   top: 12px;
-  margin-left: 0;
-  z-index: 10;
+  z-index: 30;
   background: transparent;
   border: none;
   cursor: pointer;
@@ -866,60 +868,63 @@ img { max-width: 100%; height: auto; display: block; }
   align-items: center;
   justify-content: center;
   border-radius: 8px;
+  transition: background 140ms var(--popup-ease), transform 120ms var(--popup-ease);
 }
-.post .post-kebab:focus,
-.post.comment .post-kebab:focus {
+.post .post-kebab:hover { background: rgba(15,23,42,0.03); transform: translateY(-1px); }
+.post .post-kebab:active { transform: translateY(0); }
+.post .post-kebab:focus {
   outline: 3px solid rgba(47,128,237,0.12);
   outline-offset: 2px;
 }
 
-/* Popup/panel should anchor under the kebab on the right */
-/* Styling gives background, padding, shadow, and item styles */
+/* Core popup styling — constrained small popup */
 .post .post-popup,
 .post.comment .post-popup {
   position: absolute;
   right: 8px;
   top: 44px;
-  left: auto;
   z-index: 2000;
   min-width: 160px;
-  max-width: calc(100vw - 32px);
+  max-width: 260px;                      /* keep it compact */
+  width: max-content;                    /* shrink to fit content */
   background: var(--surface);
   border: 1px solid rgba(15,23,42,0.06);
   border-radius: 10px;
-  box-shadow: 0 12px 30px rgba(16,24,40,0.12);
+  box-shadow: 0 18px 40px rgba(16,24,40,0.12);
   padding: 6px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   transform-origin: top right;
-  transition: transform 140ms var(--transition), opacity 120ms var(--transition);
-  opacity: 1;
-}
-
-/* Slight entrance transform when appended (helpful when JS adds it) */
-.post .post-popup[data-animate="in"] {
-  transform: translateY(-6px) scale(.99);
   opacity: 0;
-  animation: popup-in 140ms ease forwards;
-}
-@keyframes popup-in {
-  to { transform: translateY(0) scale(1); opacity: 1; }
+  transform: translateY(-6px) scale(.98);
+  transition: opacity 180ms var(--popup-ease), transform 180ms var(--popup-ease);
+  pointer-events: none;
 }
 
-/* small decorative arrow (square rotated 45deg) */
+/* When JS adds a visible attribute/class, show with smooth animation.
+   We use [data-open="true"] as an accessible, non-invasive toggle selector. */
+.post .post-popup[data-open="true"],
+.post.comment .post-popup[data-open="true"] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+/* Small decorative arrow (rotated square) — subtle and small */
 .post .post-popup::before {
   content: '';
   position: absolute;
   top: -6px;
-  right: 18px; /* aligns roughly under kebab; adjust if necessary */
-  width: 12px;
-  height: 12px;
+  right: 20px; /* aligns under kebab; if popup is narrower, this still looks OK */
+  width: 10px;
+  height: 10px;
   background: var(--surface);
   transform: rotate(45deg);
   border-left: 1px solid rgba(15,23,42,0.06);
   border-top: 1px solid rgba(15,23,42,0.06);
-  box-shadow: -3px -3px 6px rgba(0,0,0,0.02);
+  box-shadow: -2px -2px 4px rgba(0,0,0,0.02);
+  display: block;
 }
 
 /* popup link / button items */
@@ -936,6 +941,7 @@ img { max-width: 100%; height: auto; display: block; }
   cursor: pointer;
   border-radius: 8px;
   text-decoration: none;
+  transition: background 120ms var(--popup-ease);
 }
 .post .post-popup a:hover,
 .post .post-popup button:hover {
@@ -955,22 +961,87 @@ img { max-width: 100%; height: auto; display: block; }
   border-radius: 2px;
 }
 
-/* For very narrow screens, nudge positioning so popup doesn't overflow */
+/* Notification / per-item kebab dropdowns used in accounts/notifications */
+.notif-dropdown {
+  position: absolute;
+  right: 10px;
+  top: 44px;
+  z-index: 2000;
+  min-width: 160px;
+  max-width: 260px;
+  width: max-content;
+  background: var(--surface);
+  border: 1px solid rgba(15,23,42,0.06);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(16,24,40,0.10);
+  padding: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  opacity: 0;
+  transform: translateY(-6px) scale(.98);
+  transform-origin: top right;
+  transition: opacity 160ms var(--popup-ease), transform 160ms var(--popup-ease);
+  pointer-events: none;
+}
+.notif-dropdown[data-open="true"] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+.notif-dropdown button {
+  width: 100%;
+  display: block;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-weight: 600;
+  border-radius: 8px;
+}
+.notif-dropdown button:hover { background: #fbfdff; }
+
+/* For very narrow screens, ensure popup stays compact and doesn't become full width */
 @media (max-width: 720px) {
   .post .post-popup,
-  .post.comment .post-popup {
+  .post.comment .post-popup,
+  .notif-dropdown {
     right: 8px;
-    left: 8px;
-    top: calc(100% + 8px); /* anchor under header area */
-    min-width: auto;
-    width: auto;
-    box-shadow: 0 8px 24px rgba(16,24,40,0.12);
-    border-radius: 10px;
+    left: auto;
+    top: 40px;
+    max-width: min(260px, calc(100% - 32px)); /* still small but never overflow */
+    width: min(260px, calc(100% - 32px));
+    box-shadow: 0 14px 36px rgba(16,24,40,0.14);
+    transform-origin: top right;
   }
-  .post .post-popup::before { display: none; }
+  .post .post-popup::before { right: 18px; }
 }
 
-/* small-screen nudge for kebab */
+/* Extra: if popup would go off-screen on the right, allow JS to flip it to the left
+   by toggling data-align="left" — this gives a simple hook for the JS positioner. */
+.post .post-popup[data-align="left"],
+.post.comment .post-popup[data-align="left"] {
+  right: auto;
+  left: 8px;
+  transform-origin: top left;
+}
+.post .post-popup[data-align="left"]::before {
+  right: auto;
+  left: 18px;
+  transform-origin: top left;
+}
+
+/* Ensure dropdowns are keyboard focusable and have visible focus ring */
+.post .post-popup a:focus-visible,
+.post .post-popup button:focus-visible,
+.notif-dropdown button:focus-visible {
+  outline: 3px solid rgba(47,128,237,0.16);
+  outline-offset: 2px;
+}
+
+/* Small-screen nudge for kebab */
 @media (max-width: 600px) {
   .post .post-kebab,
   .post.comment .post-kebab {
@@ -984,46 +1055,4 @@ img { max-width: 100%; height: auto; display: block; }
   }
 }
 
-/* -------------------------------------------------------------------------
-   Notification / per-item kebab dropdowns used in accounts/notifications
-   Keep these consistent with post-popup visuals but scoped to .notif-dropdown
-   ------------------------------------------------------------------------- */
-.notif-dropdown {
-  position: absolute;
-  right: 10px;
-  top: 44px;
-  background: var(--surface);
-  border: 1px solid rgba(15,23,42,0.06);
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(16,24,40,0.08);
-  min-width: 160px;
-  z-index: 2000;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.notif-dropdown button {
-  width: 100%;
-  display: block;
-  padding: 10px 12px;
-  background: transparent;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-  font-weight: 600;
-}
-.notif-dropdown button:hover { background: #fbfdff; }
-@media (max-width: 600px) {
-  .notif-dropdown { right: 8px; top: 44px; }
-}
-
-/* Ensure dropdowns are accessible: trap focus by giving them tabindex where JS requires,
-   and style focus-visible on items */
-.post .post-popup a:focus-visible,
-.post .post-popup button:focus-visible,
-.notif-dropdown button:focus-visible {
-  outline: 3px solid rgba(47,128,237,0.16);
-  outline-offset: 2px;
-}
-
-/* End of additional popup/dropdown styling */
+/* End of popup/dropdown styling */
