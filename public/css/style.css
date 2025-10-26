@@ -6,6 +6,8 @@
    - Username + timestamp are inline and sit close to content
    - Post images: never cropped; original aspect ratio preserved
    - Images top-aligned so different heights line up visually at the top
+   - Images must NOT be upscaled — we never enlarge a source image; we only
+     allow it to be downscaled to fit the container/viewport
    - Mobile: multi-image posts become a horizontal scroller (swipe left/right)
    - Desktop: allow taller images while still preserving original shape
    ======================================================================== */
@@ -481,74 +483,72 @@ main {
 }
 
 /* ------------------------------------------------------------------ */
-/* Post image behavior: responsive, never cropped, top-aligned; mobile horizontal scroller
-   Goals:
-   - Never crop images: preserve original aspect ratio and shape.
-   - Align images to the top edge so images with different heights line up at the top.
-   - On narrow screens (mobile), multi-image posts become a horizontal scroller (swipe left/right).
-   - On wider screens, still preserve natural aspect ratio and allow horizontal scrolling for many images;
-     increase allowed max-height so images appear larger on desktop.
-   - Single-image posts can be shown larger but still never cropped.
+/* Post image behavior: responsive, never cropped, top-aligned; do NOT upscale images
+   Important: to prevent images from being enlarged we:
+     - do not set width:100% on images
+     - ensure width:auto so the browser uses the intrinsic (natural) width
+     - use max-width:100% as a protective ceiling so very large images will downscale
+     - ensure flex items don't force width/height via flex-grow/stretch
+     - for galleries use flex:0 0 auto so images keep their natural size and are not stretched
+   Outcome: images larger than container will downscale to fit; images smaller than container
+   will be shown at their natural size (not upscaled).
    ------------------------------------------------------------------ */
 
-/* Ensure images don't overflow container width by default but keep natural shape */
+/* Basic image reset: preserve natural dimensions but allow downscaling to fit container */
 .post-img {
   display: block;
-  width: auto;         /* allow natural width; constrained by max-width when needed */
+  width: auto;         /* use intrinsic width; do not force full width */
   height: auto;        /* preserve aspect ratio */
-  max-width: 100%;     /* don't overflow the container width */
+  max-width: 100%;     /* ceiling - prevents overflow and allows downscale when necessary */
   border-radius: 8px;
   margin-top: 10px;
-  object-fit: none;    /* do not crop or fill — preserve original */
-  object-position: top;/* top-align image content for consistency across various heights */
-  align-self: flex-start; /* in flex layouts, align images to the top */
+  object-fit: none;    /* do not crop or fill — preserve original shape */
+  object-position: top;/* top-align image content for consistent visual baseline */
+  align-self: flex-start; /* align images to the top inside flex containers */
+  flex: 0 0 auto;      /* prevent flex children from stretching images */
   max-height: 75vh;    /* prevent images taller than viewport on desktop (adjustable) */
 }
 
-/* Gallery: horizontal scroller and top-aligned images by default (mobile-first) */
+/* Gallery: horizontal scroller and top-aligned images (mobile-first) */
 .post-gallery {
   display: flex;
   gap: 8px;
   margin-top: 10px;
-  align-items: flex-start;        /* align images to top edge */
-  overflow-x: auto;               /* allow horizontal scroll */
+  align-items: flex-start;        /* align images to top edge so differing heights line up at top */
+  overflow-x: auto;               /* horizontal scroll for many images */
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 6px;            /* breathing room for scrollbar on some UIs */
+  padding-bottom: 6px;
 }
 
-/* Each gallery image keeps its natural aspect ratio. Prevent shrinking so shapes remain unchanged. */
+/* Gallery images: keep intrinsic sizes, allow downscale but never upscale */
 .post-gallery .post-img {
-  flex: 0 0 auto;
+  flex: 0 0 auto; /* do not allow images to grow or shrink to fill row */
   width: auto;
   height: auto;
-  max-width: none;
-  max-height: 45vh; /* mobile ceiling so tall images don't dominate screen */
-  object-fit: none;
+  max-width: 100%;  /* ensure very wide images will downscale to container width */
+  max-height: 45vh; /* mobile ceiling to keep images in viewport */
+  object-fit: none;  /* preserve aspect ratio / shape */
 }
 
-/* If a gallery contains only one image, allow it to be larger (single featured image) */
+/* Single-image posts: show image at its natural size (no upscaling). If image is larger than container it'll downscale. */
 .post .post-gallery.only-one .post-img,
 .post-img.single {
-  max-width: 100%;
+  width: auto;
+  height: auto;
+  max-width: 100%;  /* downscale large image if needed; no forced expansion */
   max-height: 80vh;
+  object-fit: none;
+  flex: 0 0 auto;
 }
 
-/* Desktop / large screens: give images more vertical room and slightly larger spacing.
-   Keep horizontal scrolling for ordered image viewing; this preserves original shapes. */
+/* Desktop / large screens: slightly larger vertical allowances but still prevent upscaling */
 @media (min-width: 900px) {
-  .post-gallery {
-    gap: 12px;
-  }
-  .post-gallery .post-img {
-    max-height: 60vh;
-  }
-  .post-img {
-    max-height: 80vh;
-  }
+  .post-gallery { gap: 12px; }
+  .post-gallery .post-img { max-height: 60vh; }
+  .post-img { max-height: 80vh; }
 }
 
-/* Optional grid-like layout (kept inert unless the 'grid' class is applied)
-   This lets you opt in to a column-based presentation without cropping: */
+/* Optional grid-like layout (kept inert unless the 'grid' class is applied) */
 .post-gallery.grid {
   display: grid;
   grid-auto-flow: column;
@@ -558,9 +558,12 @@ main {
   overflow-x: auto;
 }
 
-/* scrollbar styling */
-.post-gallery::-webkit-scrollbar { height: 8px; }
-.post-gallery::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.06); border-radius: 999px; }
+/* Make sure general img rule doesn't force upscaling either */
+img {
+  max-width: 100%; /* allows downscale of very wide images; doesn't force upscaling */
+  height: auto;
+  display: block;
+}
 
 /* ------------------------------------------------------------------ */
 /* Comments                                                             */
@@ -766,9 +769,6 @@ a { color: var(--accent); text-decoration: none; }
   .grid-2 { grid-template-columns: 1fr; }
   .avatar-circle { width: 110px; height: 110px; }
 }
-
-/* Ensure images don't overflow */
-img { max-width: 100%; height: auto; display: block; }
 
 /* ------------------------------------------------------------------ */
 /* Mobile-first stacked header behavior (UNCHANGED layout positions)    */
