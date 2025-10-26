@@ -1,12 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
-
 /* ========================================================================
-   style.css — Tuned feed header spacing & sizing
-   - Avatar stays visible and fixed on the left (no absolute positioning)
-   - Username + timestamp are inline and can sit close to the content
-   - Post images: responsive, never cropped; constrained by max-height (viewport-based)
-   - Mobile: stricter max-height so tall images fit comfortably on-screen
+   style.css — Tuned feed header spacing & sizing (consolidated)
+   - Duplicate/overlapping rules merged for maintainability
+   - Behaviour for media queries preserved (mobile/desktop overrides kept)
+   - Comment-specific styles remain in public/css/comments.css and are not touched here
    ======================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
 
 :root{
   --bg: #f6f7fb;
@@ -253,12 +252,37 @@ main {
 @media (hover: hover) {
   .avatar-btn:hover { background: var(--glass); }
 }
+
+/* ------------------------------------------------------------------ */
+/* Avatar: consolidated rules (base + context sizes)                  */
+/* ------------------------------------------------------------------ */
+/* Base avatar styling shared across contexts */
 .avatar-img {
-  width:40px;
-  height:40px;
-  border-radius: 10px;
   object-fit: cover;
   border: 1px solid rgba(15,23,42,0.06);
+  border-radius: 10px;
+  display: inline-block;
+  width: 48px;   /* sensible default used in post headers */
+  height: 48px;
+}
+
+/* Smaller avatar used in compact places (avatar buttons, dropdowns, lists) */
+.avatar-btn .avatar-img,
+.avatar-circle img.small,
+.profile-pic-small,
+.image-thumb img {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+}
+
+/* Explicit rule for post header avatar to ensure consistency */
+.post .post-header .post-avatar .avatar-img,
+.feed .post-header .post-avatar .avatar-img,
+.post-avatar .avatar-img {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
 }
 
 /* ------------------------------------------------------------------ */
@@ -314,7 +338,7 @@ main {
 }
 
 /* ------------------------------------------------------------------ */
-/* Feed & posts                                                          */
+/* Feed & posts (consolidated)                                          */
 /* ------------------------------------------------------------------ */
 .feed {
   display:flex;
@@ -322,93 +346,46 @@ main {
   gap: var(--space-md);
 }
 
-/* Keep the default .post visual card, but feed-specific stacking applied below */
+/* Centralized post card visuals (feed & single-post)
+   This block intentionally covers the common visual appearance and
+   is placed early so more specific overrides (media or page-scoped)
+   can change behavior below. */
 .post {
+  position: relative;
   background: linear-gradient(180deg,#fff,#fcfdff);
   border-radius: var(--radius);
   box-shadow: var(--shadow-1);
   border: 1px solid rgba(15,23,42,0.03);
-  padding: calc(var(--space-md) - 2px);
-  margin-bottom: var(--space-md);
+  padding: 12px;
+  margin-bottom: 12px;
+  cursor: pointer;
 }
 
-/* Default left avatar area (legacy structure still supported) */
-.post .post-left {
-  width: 64px;
-  flex-shrink: 0;
-}
-.post .post-body {
-  flex: 1;
-}
-
-/* Post title / meta / excerpt */
-.post .post-title { font-size: 1.05rem; margin:0; color: var(--text); font-weight:700; }
-.post .post-meta { color: var(--muted); font-size: 0.9rem; margin-top:6px; display:flex; gap:8px; align-items:center; }
-.post .post-excerpt { margin-top: 12px; color: #38414b; }
-
-/* Post actions */
-.post-actions {
-  margin-top: 12px;
-  display:flex;
-  gap:8px;
-  align-items:center;
-}
-
-/* ------------------------------------------------------------------ */
-/* New feed header layout: avatar + meta inline (no absolute positioning)
-   - We intentionally remove the large left gutter approach so that the header
-     (username + time) can sit directly beside the avatar and the content can
-     be placed closer under it.
-   ------------------------------------------------------------------ */
-
-/* Make the header a normal inline row (avatar + meta + kebab) */
-.feed .post {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-left: calc(var(--space-md) - 2px); /* default card padding */
-}
-
-/* header row: avatar + meta inline */
+/* header row: avatar + meta inline (shared for feed and single post) */
+.post .post-header,
 .feed .post-header {
   display: flex;
   align-items: flex-start;
   gap: 12px;
   width: 100%;
-  margin-bottom: 6px;
+  margin-bottom: 6px; /* default — can be overridden where necessary */
 }
 
-/* avatar — keep it in flow (no absolute) so content can be positioned relative to it */
-.feed .post-header .post-avatar {
-  position: static;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
-  z-index: 2;
-  flex-shrink: 0;
-}
-
-/* AVATAR: comfortable size, circular */
-.feed .post-header .post-avatar .avatar-img {
-  width: 48px;
-  height: 48px;
-  border-radius: 10px;
-  object-fit: cover;
-  border: 1px solid rgba(15,23,42,0.06);
-}
-
-/* meta area right of avatar: username + time stacked (column) */
-.feed .post-header-meta {
+/* meta area (username + time stacked column) */
+.post .post-header-meta,
+.feed .post-header-meta,
+.post-header-meta {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 0; /* allow truncation on small screens */
+  min-width: 0;
   margin-top: 0;
 }
 
-/* username */
-.feed .post-header-meta .post-username a {
+/* username / time shared rules */
+.post .post-header-meta .post-username a,
+.feed .post-header-meta .post-username a,
+.post-username a {
   font-weight: 700;
   color: var(--text);
   font-size: 0.96rem;
@@ -422,8 +399,9 @@ main {
   max-width: 60ch;
 }
 
-/* timestamp */
-.feed .post-header-meta .post-time {
+.post .post-header-meta .post-time,
+.feed .post-header-meta .post-time,
+.post-time {
   color: var(--muted);
   font-size: 0.88rem;
   line-height: 1;
@@ -433,88 +411,80 @@ main {
   vertical-align: top;
 }
 
-/* DisplayName (optional) */
-.feed .post-header-meta .post-displayname {
-  font-size: 0.92rem;
-  color: var(--muted);
-  margin-right: 4px;
-  align-self: flex-start;
-}
-
 /* Body (content) sits directly under header with small gap */
-.feed .post .post-body {
+.post .post-body {
   display:flex;
   flex-direction: column;
   gap: 8px;
   padding: 0;
   margin-top: 0;
+  line-height: 1.55;
 }
+.post .post-title { font-size: 1.05rem; margin:0; color: var(--text); font-weight:700; }
+.post .post-meta { color: var(--muted); font-size: 0.9rem; margin-top:6px; display:flex; gap:8px; align-items:center; }
+.post .post-excerpt { margin-top: 12px; color: #38414b; }
 
-/* Ensure single-post view uses same layout (remove absolute avatar) */
-.post .post-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-.post .post-header .post-avatar {
-  position: static;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.post .post-header .post-avatar .avatar-img {
-  width: 48px;
-  height: 48px;
-  border-radius: 10px;
-}
-.post .post-header-meta {
-  align-items: flex-start;
-  margin-top: 0;
-}
-.post .post-header-meta .post-username a,
-.post .post-header-meta .post-time {
-  font-size: 0.96rem;
-  vertical-align: top;
+/* Post actions */
+.post-actions {
+  margin-top: 12px;
+  display:flex;
+  gap:8px;
+  align-items:center;
 }
 
 /* ------------------------------------------------------------------ */
-/* Post image behavior: responsive, no cropping
-   - Images keep aspect ratio (width/height scale together)
-   - Constrained by max-height (viewport-relative) to avoid overly tall images on mobile
-   - max-width:100% ensures very wide images fit container
-   - width:auto lets image shrink when height constraint applies (prevents distortion)
+/* Post images behavior (consolidated)
+   - Preserve aspect ratio
+   - Responsive max-height to avoid overly tall images
+   - Keep object-fit: contain to avoid cropping
    ------------------------------------------------------------------ */
 .post-img {
   display: block;
-  max-width: 100%; /* never overflow the container width */
-  width: auto;     /* allow width to adjust when height constraint is active */
-  height: auto;    /* preserve aspect ratio */
-  border-radius: 8px;
+  max-width: 100%;
+  width: auto;
+  height: auto;
   margin-top: 10px;
-  object-fit: contain; /* defensive: don't crop */
-  /* Desktop/tablet default: allow tall images but limit to viewport height */
+  object-fit: contain;
+  border-radius: 15px;
+  /* sensible default ceiling for tall images */
   max-height: 75vh;
+}
+
+/* Gallery: horizontal scrolling, each image top-aligned, preserve aspect ratio */
+.post-gallery {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  align-items: flex-start;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 6px;
+  scroll-behavior: smooth;
+}
+.post-gallery .post-img {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  max-height: 520px; /* allow larger gallery images */
+  max-width: calc(100vw - 96px);
+  height: auto;
+  width: auto;
+  display: block;
 }
 
 /* Mobile: tighter max-height so tall images remain visible without scrolling off-screen */
 @media (max-width: 800px) {
-  .post-img {
-    max-height: 60vh; /* suitable for most phones — adjustable if you prefer */
-    margin-top: 8px;
-  }
+  .post-img { max-height: 60vh; margin-top: 8px; }
 }
 
 /* If you want a stricter ceiling on very large desktop screens */
 @media (min-width: 1400px) {
-  .post-img {
-    max-height: 80vh;
-  }
+  .post-img { max-height: 80vh; }
 }
 
 /* ------------------------------------------------------------------ */
-/* Comments                                                             */
-/* ------------------------------------------------------------------ */
+/* Comments (lightweight fallback; comments-specific styling kept in comments.css)
+   Keep a small default so pages without comments.css still look reasonable */
 .comment {
   background: #fbfdff;
   border: 1px solid rgba(15,23,42,0.03);
@@ -695,6 +665,10 @@ a { color: var(--accent); text-decoration: none; }
 .row { display:flex; gap:12px; align-items:center; }
 .col { display:flex; flex-direction:column; gap:8px; }
 
+/* ------------------------------------------------------------------ */
+/* Responsive adjustments (preserve original breakpoints & overrides)  */
+/* ------------------------------------------------------------------ */
+
 /* very small screens */
 @media (max-width: 560px) {
   :root {
@@ -827,7 +801,7 @@ img { max-width: 100%; height: auto; display: block; }
 }
 
 /* ---------------------------------------------------------------------------
-   New mobile/card-specific adjustments
+   New mobile/card-specific adjustments (kept from original)
    --------------------------------------------------------------------------- */
 
 /* Apply on small devices where extra container padding wastes width. */
@@ -916,132 +890,3 @@ img { max-width: 100%; height: auto; display: block; }
     right: 8px;
   }
 }
-
-/* -------------------------------------------------------------------------
-   Post & Feed (moved from views/index.html and views/post.html)
-   Centralized rules for feed and single-post pages so HTMLs don't need page-scoped styles.
-   This block intentionally placed at end so it overrides earlier/legacy rules when necessary.
-   ------------------------------------------------------------------------- */
-
-/* Basic post card visuals (feed & single post) */
-.post {
-  position: relative;
-  padding: 12px;
-  border-radius: 10px;
-  background: linear-gradient(180deg,#fff,#fcfdff);
-  margin-bottom: 12px;
-  border: 1px solid rgba(15,23,42,0.03);
-  cursor: pointer;
-}
-
-/* Header row (avatar + meta + kebab) */
-.post-header {
-  display:flex;
-  align-items:flex-start;
-  gap:12px;
-  width:100%;
-  margin-bottom:6px;
-}
-
-/* Avatar inside post header */
-.post-avatar .avatar-img {
-  width:48px;
-  height:48px;
-  border-radius:10px;
-  object-fit: cover;
-  flex-shrink:0;
-}
-
-/* username/timestamp stack */
-.post-header-meta { display:flex; flex-direction:column; gap:2px; min-width:0; }
-.post-username a { font-weight:700; color:var(--text); text-decoration:none; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px; }
-.post-time { color:var(--muted); font-size:0.88rem; }
-
-/* Slightly tighter spacing between header and body so content sits closer */
-.post-body { margin-top: 4px; line-height:1.55; display:flex; flex-direction:column; gap:8px; }
-.post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
-
-/* Single image default presentation */
-.post-img {
-  margin-top:10px;
-  max-width:100%;
-  height:auto;
-  border-radius:20px;
-  display:block;
-  object-fit:contain;
-  /* For single-image cases, allow taller rendering (but still bounded to viewport) */
-  max-height: 85vh;
-  border-radius: 15px;
-}
-
-/* Gallery: horizontal scrolling, each image top-aligned, preserve aspect ratio */
-.post-gallery {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  align-items: flex-start;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 6px;
-  scroll-behavior: smooth;
-}
-.post-gallery .post-img {
-  flex: 0 0 auto;
-  align-self: flex-start;
-  /* Allow taller gallery images on desktop; increased ceiling to show taller images */
-  max-height: 520px; /* increased from earlier 320/420 to allow taller images */
-  max-width: calc(100vw - 96px);
-  height: auto;
-  width: auto;
-  object-fit: contain;
-  border-radius: 15px;
-  display: block;
-}
-/* If gallery only has one image, allow it to use viewport-height limit like single-image */
-.post-gallery.only-one .post-img {
-  max-height: 85vh;
-  max-width: 100%;
-}
-
-/* If needed: hide inline .post-actions in feed (we use popup for actions) */
-.post-actions { display:none; }
-
-/* Post excerpt: optional clamp behaviour */
-.post-excerpt a.post-link {
-  color: inherit;
-  text-decoration: none;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  -webkit-line-clamp: 5;
-}
-
-/* Kebab button focus style */
-.post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
-.post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
-
-/* Popup/menu for post kebab */
-.post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
-.post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
-.post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
-
-/* Small screen adjustments for gallery heights */
-@media (max-width:560px) {
-  .post-username a { max-width:140px; }
-  .post-avatar .avatar-img { width:44px; height:44px; }
-  .post-username a { font-size:0.95rem; }
-  .post-time { font-size:0.80rem; }
-  .post-gallery .post-img { max-height: 360px; max-width: calc(100vw - 56px); } /* increased from previous 220 */
-}
-
-/* Slightly different breakpoint used on post.html earlier — keep consistent here */
-@media (max-width:800px) {
-  .post-gallery .post-img { max-height: 360px; max-width: calc(100vw - 56px); } /* mobile-friendly */
-}
-
-/* Ensure interactive children keep default cursor while whole card is clickable */
-.post a, .post button, .post input, .post textarea { cursor: auto; }
-
-/* End of centralized post/feed styles */
