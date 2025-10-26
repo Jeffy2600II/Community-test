@@ -26,30 +26,6 @@
 /* Comment content */
 .post.comment .post-content { color: #333; font-size: 0.95rem; }
 
-/* Ensure the kebab (three-dot) sits at the right edge of the comment header */
-.post.comment .post-header {
-  position: relative;
-  padding-right: 48px; /* leave room for kebab */
-}
-
-/* Position the kebab button absolutely within comment header */
-.post.comment .post-kebab {
-  position: absolute;
-  right: 10px;
-  top: 10px;
-  z-index: 2000;
-  width:36px;
-  height:36px;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  border-radius:8px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
-.post.comment .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
-
 /* Fixed input bar */
 .comment-input-bar {
   position: fixed;
