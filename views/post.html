@@ -6,22 +6,21 @@
     <title>ดูโพสต์</title>
     <link rel="stylesheet" href="/css/style.css">
     <style>
-      /* Single post: preserve no-crop, top-aligned, horizontal-scroll behavior from global stylesheet.
-         We remove fixed heights/object-fit:cover so original aspect ratios are kept. */
+      /* Single post: use same inline header layout as feed */
       .post-header { display:flex; align-items:flex-start; gap:12px; margin-bottom:8px; }
       .post-header .post-avatar { position: static; display:inline-flex; align-items:center; justify-content:center; }
       .post-header .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit:cover; }
       .post-header-meta { display:flex; flex-direction:column; gap:4px; min-width:0; }
       .post .post-body { margin-top: 6px; display:flex; flex-direction:column; gap:8px; }
       .post-content { white-space: pre-wrap; word-break: break-word; color:#38414b; }
-      .post-img { max-width:100%; height:auto; border-radius:8px; margin-top:8px; display:block; object-fit:none; align-self:flex-start; }
-      .post-gallery { display:flex; gap:8px; margin-top:8px; align-items:flex-start; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:6px; }
-      .post-gallery .post-img { flex:0 0 auto; width:auto; height:auto; max-height:60vh; object-fit:none; }
+      .post-img { max-width:100%; height:auto; border-radius:8px; margin-top:8px; display:block; }
+      .post-gallery { display: grid; gap: 8px; margin-top: 8px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+      .post-gallery .post-img { height: 220px; object-fit: cover; }
       @media (max-width:800px) {
         .post-header .post-avatar .avatar-img { width:44px; height:44px; }
         .post-header-meta .post-username a { font-size:0.95rem; }
         .post-time { font-size:0.80rem; }
-        .post-gallery .post-img { max-height:45vh; }
+        .post-gallery .post-img { height:140px; }
       }
     </style>
 </head>
@@ -97,7 +96,7 @@ async function loadPost() {
       body.appendChild(im);
     } else if (imgs.length > 1) {
       const gallery = document.createElement('div');
-      gallery.className = 'post-gallery' + (imgs.length === 1 ? ' only-one' : '');
+      gallery.className = 'post-gallery';
       for (const src of imgs) {
         const im = document.createElement('img');
         im.className = 'post-img';
