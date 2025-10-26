@@ -9,7 +9,6 @@
   box-shadow: none;
   border-radius: 10px;
   font-size: 0.96rem;
-  position: relative;
 }
 
 /* Slightly smaller avatar in comments */
@@ -26,37 +25,6 @@
 
 /* Comment content */
 .post.comment .post-content { color: #333; font-size: 0.95rem; }
-
-/* Kebab button for comment (three dots) */
-.comment-kebab {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  width:36px;
-  height:36px;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  border-radius:8px;
-  color: var(--muted);
-}
-.comment-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
-
-/* Dropdown (hidden by default). .hidden used in JS */
-.comment-dropdown { display: block; }
-.comment-dropdown.hidden { display: none; }
-
-/* Dropdown buttons */
-.comment-dd-btn {
-  width: 100%;
-  padding: 10px 12px;
-  text-align: left;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-weight: 700;
-}
-.comment-dd-btn:hover { background: #fbfdff; }
 
 /* Fixed input bar */
 .comment-input-bar {
@@ -95,7 +63,7 @@
   box-shadow: 0 6px 14px rgba(15,23,42,0.03);
 }
 
-/* Primary button sizing */
+/* Ensure the primary button stays a comfortable size on mobile */
 .comment-input-row .btn-primary {
   min-width: 72px;
   padding: 10px 14px;
@@ -104,8 +72,23 @@
   font-weight: 700;
 }
 
-/* Accessibility focus */
+/* Make sure that when the viewport is small, textarea and button stack nicely */
+@media (max-width: 560px) {
+  .comment-input-row {
+    flex-direction: row;
+    gap: 8px;
+  }
+  .comment-input-row textarea {
+    min-height: 46px;
+    max-height: 120px;
+  }
+}
+
+/* Accessibility: focus styles */
 .comment-input-row textarea:focus {
   outline: 3px solid rgba(47,128,237,0.12);
   outline-offset: 2px;
 }
+
+/* Ensure the comments area doesn't have horizontal overflow because of fixed bar */
+#commentBox { overflow: visible; }
