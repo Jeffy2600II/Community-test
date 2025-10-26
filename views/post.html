@@ -1,4 +1,3 @@
- url=https://github.com/Jeffy2600II/Community-test/blob/main/views/post.html
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -51,10 +50,10 @@
       }
 
       /* Kebab & popup: same layout as index */
-      .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: aut[...]
+      .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
       .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
 
-      .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08);[...]
+      .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
       .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
       .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
 
@@ -66,39 +65,6 @@
         .post-time { font-size:0.80rem; }
         .post-gallery .post-img { max-height: 260px; max-width: calc(100vw - 56px); }
       }
-
-      /* Minimal comment styles kept small (fallback if comment-fixes.css not loaded) */
-      .comment {
-        background: linear-gradient(180deg,#fff,#fcfdff);
-        border-radius: 10px;
-        border: 1px solid rgba(15,23,42,0.03);
-        padding: 10px;
-        display: flex;
-        gap: 12px;
-        align-items: flex-start;
-        margin-bottom: 8px;
-      }
-      .comment .comment-avatar .avatar-img { width:44px; height:44px; border-radius:10px; object-fit:cover; border:1px solid rgba(15,23,42,0.06); }
-      .comment .comment-body { display:flex; flex-direction:column; gap:6px; min-width:0; }
-      .comment .comment-username a { font-weight:700; color:var(--text); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:36ch; }
-      .comment .comment-time { color:var(--muted); font-size:0.88rem; }
-      .comment .comment-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
-
-      /* Fixed comment bar fallback */
-      .fixed-comment-bar {
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 1600;
-        background: linear-gradient(180deg, rgba(255,255,255,0.98), #fff);
-        border-top: 1px solid rgba(15,23,42,0.04);
-        padding: 10px 0;
-      }
-      .fixed-comment-bar > .container { display:flex; gap:8px; align-items:center; }
-      .fixed-comment-bar textarea { flex:1; min-height:44px; max-height:140px; padding:10px; border-radius:10px; border:1px solid rgba(15,23,42,0.06); resize:vertical; }
-      .has-fixed-comment main, .has-fixed-comment .container { padding-bottom:120px; }
-
     </style>
 </head>
 <body>
@@ -109,19 +75,17 @@
         <div id="postBox"></div>
         <hr style="margin:16px 0;">
         <div id="commentBox"></div>
+        <form id="commentForm" class="mt-16 hidden">
+          <label class="small">แสดงความคิดเห็น</label>
+          <textarea name="content" placeholder="แสดงความคิดเห็น" required></textarea>
+          <div class="text-right mt-16">
+            <button type="submit" class="btn btn-primary">แสดงความคิดเห็น</button>
+          </div>
+        </form>
       </div>
     </div>
   </main>
   <div id="footerSlot"></div>
-
-  <!-- fixed comment form: อยู่ด้านล่างของหน้าจอ -->
-  <form id="commentForm" class="fixed-comment-bar hidden" aria-label="กล่องแสดงความคิดเห็น">
-    <div class="container" style="max-width:900px; align-items:flex-end;">
-      <img id="commentFormAvatar" class="avatar-img" src="/img/default_profile.png" alt="avatar" style="width:40px;height:40px;border-radius:8px;object-fit:cover;">
-      <textarea name="content" placeholder="แสดงความคิดเห็น" required></textarea>
-      <button type="submit" class="btn btn-primary">ส่ง</button>
-    </div>
-  </form>
 
 <script src="/js/main.js"></script>
 <script>
@@ -299,112 +263,18 @@ async function loadPost() {
       }, 0);
     });
 
-    // render comments using DOM nodes (structure similar to posts but without images)
-    function renderComments(commentsArr) {
-      const cb = document.getElementById('commentBox');
-      cb.innerHTML = '';
-      const title = document.createElement('h3'); title.textContent = 'คอมเมนต์'; cb.appendChild(title);
-
-      if (!commentsArr || commentsArr.length === 0) {
-        const none = document.createElement('i'); none.className = 'small'; none.textContent = 'ยังไม่มีคอมเมนต์';
-        cb.appendChild(none);
-        return;
-      }
-
-      for (const c of commentsArr) {
-        const node = document.createElement('div');
-        node.className = 'comment';
-        node.dataset.commentId = c.id || '';
-
-        // avatar
-        const avWrap = document.createElement('a');
-        avWrap.className = 'comment-avatar';
-        avWrap.href = '/user/' + encodeURIComponent(c.username || '');
-        const avImg = document.createElement('img');
-        avImg.className = 'avatar-img';
-        avImg.alt = c.username || '';
-        avImg.dataset.username = c.username || '';
-        avImg.src = '/img/default_profile.png';
-        avWrap.appendChild(avImg);
-        node.appendChild(avWrap);
-
-        // body
-        const body = document.createElement('div'); body.className = 'comment-body';
-        const headerRow = document.createElement('div'); headerRow.className = 'comment-header';
-        const meta = document.createElement('div'); meta.className = 'comment-meta';
-        const unameDiv = document.createElement('div'); unameDiv.className = 'comment-username';
-        const unameA = document.createElement('a'); unameA.href = '/user/' + encodeURIComponent(c.username || ''); unameA.textContent = c.username || '(ไม่ระบุ)';
-        unameDiv.appendChild(unameA);
-        const timeDiv = document.createElement('div'); timeDiv.className = 'comment-time small'; timeDiv.textContent = new Date(c.createdAt).toLocaleString();
-        meta.appendChild(unameDiv);
-        meta.appendChild(timeDiv);
-        headerRow.appendChild(meta);
-
-        // optional kebab for comment owner actions (kept minimal)
-        const rightArea = document.createElement('div');
-        if (myUsername === c.username) {
-          const delBtn = document.createElement('button');
-          delBtn.className = 'btn btn-ghost';
-          delBtn.type = 'button';
-          delBtn.textContent = 'ลบ';
-          delBtn.addEventListener('click', async (ev) => {
-            ev.preventDefault();
-            if (!confirm('ลบคอมเมนต์นี้?')) return;
-            await fetch(`/api/post/${encodeURIComponent(postId)}/comment/${encodeURIComponent(c.id)}`, { method: 'DELETE' });
-            await loadPost();
-          });
-          rightArea.appendChild(delBtn);
-        }
-        headerRow.appendChild(rightArea);
-
-        body.appendChild(headerRow);
-
-        const content = document.createElement('div');
-        content.className = 'comment-content';
-        content.innerHTML = escapeHtml(c.content || '');
-        body.appendChild(content);
-
-        node.appendChild(body);
-        cb.appendChild(node);
-
-        // fetch avatar for commenter (best-effort)
-        (async function(username, imgEl){
-          try {
-            if (!username) return;
-            const pr = await fetch('/api/user/' + encodeURIComponent(username));
-            if (!pr.ok) return;
-            const dd = await pr.json();
-            if (dd && dd.success && dd.profile && dd.profile.profilePic) {
-              imgEl.src = dd.profile.profilePic;
-            }
-          } catch (e) {}
-        })(c.username, avImg);
-      }
+    // render comments
+    let cHtml = '<h3>คอมเมนต์</h3>';
+    if (!comments || comments.length === 0) cHtml += '<i class="small">ยังไม่มีคอมเมนต์</i>';
+    for (let c of (comments || [])) {
+        cHtml += `<div class="comment">
+            <div class="meta"><strong><a href="/user/${c.username}">${c.username}</a></strong> • ${new Date(c.createdAt).toLocaleString()}</div>
+            <div>${escapeHtml(c.content)}</div>
+            ${myUsername === c.username ? `<div class="mt-16"><button class="btn btn-ghost" onclick="deleteComment('${c.id}')">ลบ</button></div>` : ''}
+        </div>`;
     }
-
-    renderComments(comments);
-
-    // show/hide fixed comment form based on login state and set avatar
-    const commentFormEl = document.getElementById('commentForm');
-    if (myUsername) {
-      commentFormEl.classList.remove('hidden');
-      document.body.classList.add('has-fixed-comment');
-      // set my avatar in form (best-effort)
-      (async () => {
-        try {
-          const up = await fetch('/api/user/' + encodeURIComponent(myUsername));
-          if (!up.ok) return;
-          const ud = await up.json();
-          if (ud && ud.success && ud.profile && ud.profile.profilePic) {
-            const av = document.getElementById('commentFormAvatar');
-            if (av) av.src = ud.profile.profilePic;
-          }
-        } catch (e) {}
-      })();
-    } else {
-      commentFormEl.classList.add('hidden');
-      document.body.classList.remove('has-fixed-comment');
-    }
+    document.getElementById('commentBox').innerHTML = cHtml;
+    if (myUsername) document.getElementById('commentForm').classList.remove("hidden");
 
     // delete handler if present
     const delBtn = document.getElementById('delBtn');
@@ -420,30 +290,20 @@ async function loadPost() {
 
 loadPost();
 
-document.getElementById('commentForm').onsubmit = async function(e) {
+document.getElementById('commentForm').onsubmit = async e => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const body = Object.fromEntries(fd.entries());
-    // simple validation
-    if (!body.content || !body.content.trim()) {
-      alert('โปรดพิมพ์ข้อความคอมเมนต์');
-      return;
-    }
-    try {
-      const res = await fetch('/api/post/' + encodeURIComponent(postId) + '/comment', {
+    const res = await fetch('/api/post/' + encodeURIComponent(postId) + '/comment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      const data = await res.json();
-      if (data && data.success) {
+        body: JSON.stringify(Object.fromEntries(fd.entries()))
+    });
+    const data = await res.json();
+    if (data && data.success) {
         e.target.reset();
-        await loadPost();
-      } else {
-        alert((data && data.msg) ? data.msg : 'ไม่สามารถส่งคอมเมนต์ได้');
-      }
-    } catch (err) {
-      alert('ไม่สามารถเชื่อมต่อไปยังเซิร์ฟเวอร์');
+        loadPost();
+    } else {
+        alert('ไม่สามารถส่งคอมเมนต์ได้');
     }
 };
 
