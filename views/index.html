@@ -6,88 +6,14 @@
   <title>Community Home</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
-    /* Feed & content visuals - updated to match new header layout (avatar inline, no left gutter) */
-    .post { position: relative; padding: 12px; border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); cursor: pointer; }
-    .post-header { display:flex; align-items:flex-start; gap:12px; width:100%; margin-bottom:6px; }
-    .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit: cover; flex-shrink:0; }
-    .post-header-meta { display:flex; flex-direction:column; gap:2px; min-width:0; }
-    .post-username a { font-weight:700; color:var(--text); text-decoration:none; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px; }
-    .post-time { color:var(--muted); font-size:0.88rem; }
-
-    /* Reduce gap between header and body so content sits closer to username/time */
-    .post-body { margin-top: 4px; line-height:1.55; }
-    .post-header { margin-bottom: 6px; }
-
-    .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
-    .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:20px; display:block; }
-
-    /* ===== NEW: horizontal scrolling gallery (not grid) =====
-       - Gallery flows horizontally and can be scrolled left/right.
-       - Images keep aspect ratio (height:auto) and are constrained by max-height and max-width.
-       - Images are top-aligned so shorter images leave empty space below (no stretching).
-       - Wide images are scaled down so the full image is visible when scrolled into view.
-    */
-    .post-gallery {
-      display: flex;
-      gap: 8px;
-      margin-top: 10px;
-      overflow-x: auto;
-      overflow-y: hidden;
-      align-items: flex-start;         /* anchor all images to the top */
-      -webkit-overflow-scrolling: touch;
-      padding-bottom: 6px;             /* breathing room for horizontal scroll */
-      scroll-behavior: smooth;
-    }
-    .post-gallery .post-img {
-      flex: 0 0 auto;                  /* do not shrink/grow, keep intrinsic sizing within limits */
-      align-self: flex-start;          /* ensure each image is aligned to top of the gallery row */
-      max-height: 320px;               /* max height for images in the gallery (adjust as needed) */
-      max-width: calc(100vw - 96px);   /* ensure very wide images scale down to fit viewport when viewed */
-      height: auto;
-      width: auto;
-      object-fit: contain;             /* avoid cropping; preserve full image within the max box */
-      border-radius: 15px;
-      display: block;
-    }
-    /* If only a single image inside gallery, allow it to be taller but still bounded */
-    .post-gallery.only-one .post-img {
-      max-height: 75vh;
-      max-width: 100%;
-    }
-
-    /* make whole post show pointer, but interactive children keep their own cursor */
-    .post a, .post button, .post input, .post textarea { cursor: auto; }
-
-    /* Kebab placed on the right side of the header */
-    .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto;[...]
-    .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
-
-    /* popup should align to the right of the post when kebab is on the right */
-    .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
-    .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
-    .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
-
-    /* Hide inline actions in feed (we use popup) */
-    .post-actions { display:none; }
-
-    /* Excerpt clamp for long posts (if you want CSS clamp instead of JS truncation) */
-    .post-excerpt a.post-link {
-      color: inherit;
-      text-decoration: none;
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      -webkit-line-clamp: 5;
-    }
-
-    @media (max-width:560px) {
-      .post-username a { max-width:140px; }
-      .post-avatar .avatar-img { width:44px; height:44px; }
-      .post-username a { font-size:0.95rem; }
-      .post-time { font-size:0.80rem; }
-      .post-gallery .post-img { max-height: 220px; max-width: calc(100vw - 56px); }
-    }
+    /* Page-scoped / layout helpers (kept minimal).
+       All post/feed visual styles were moved to public/css/style.css
+       to centralize design for feed & post pages. */
+    /* small local: ensure feed card spacing */
+    .post { cursor: pointer; }
+    /* keep gallery horizontal scrollbar aesthetics small */
+    .post-gallery::-webkit-scrollbar { height: 8px; }
+    .post-gallery::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08); border-radius: 8px; }
   </style>
 </head>
 <body>
