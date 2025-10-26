@@ -9,6 +9,7 @@
   box-shadow: none;
   border-radius: 10px;
   font-size: 0.96rem;
+  position: relative; /* allow absolute-positioned kebab/popup inside comment */
 }
 
 /* Slightly smaller avatar in comments */
@@ -25,6 +26,54 @@
 
 /* Comment content */
 .post.comment .post-content { color: #333; font-size: 0.95rem; }
+
+/* Kebab (three-dot) for comments */
+.post.comment .post-kebab {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  margin-left: auto;
+  padding: 6px;
+  color: var(--muted);
+}
+.post.comment .post-kebab:focus {
+  outline: 2px solid rgba(47,128,237,0.12);
+}
+
+/* tiny popup placed relative to the comment container */
+.post.comment .post-popup {
+  position: absolute;
+  right: 8px;
+  top: 44px;
+  left: auto;
+  background: var(--surface);
+  border: 1px solid rgba(15,23,42,0.06);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(16,24,40,0.08);
+  z-index: 1600;
+  overflow: hidden;
+  min-width: 160px;
+}
+.post.comment .post-popup a,
+.post.comment .post-popup button {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+}
+.post.comment .post-popup a:hover,
+.post.comment .post-popup button:hover { background: #fbfdff; }
 
 /* Fixed input bar */
 .comment-input-bar {
