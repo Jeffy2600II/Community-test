@@ -21,13 +21,11 @@
     .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
     .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; display:block; }
 
-    /*
-      NEW: horizontal-scrolling gallery (replaces previous grid layout)
-      - gallery flows horizontally and can be scrolled left/right
-      - images preserve their aspect ratio and are constrained by max-height and max-width
-      - items are aligned to the top (align-items: flex-start) so shorter images leave empty space below
-      - each image is a flex item that does NOT grow/stretches (flex: 0 0 auto)
-      - enable smooth native scrolling on touch devices
+    /* ===== NEW: horizontal scrolling gallery (not grid) =====
+       - Gallery flows horizontally and can be scrolled left/right.
+       - Images keep aspect ratio (height:auto) and are constrained by max-height and max-width.
+       - Images are top-aligned so shorter images leave empty space below (no stretching).
+       - Wide images are scaled down so the full image is visible when scrolled into view.
     */
     .post-gallery {
       display: flex;
@@ -44,17 +42,16 @@
       flex: 0 0 auto;                  /* do not shrink/grow, keep intrinsic sizing within limits */
       align-self: flex-start;          /* ensure each image is aligned to top of the gallery row */
       max-height: 320px;               /* max height for images in the gallery (adjust as needed) */
-      max-width: 720px;                /* max width for images in the gallery */
+      max-width: calc(100vw - 96px);   /* ensure very wide images scale down to fit viewport when viewed */
       height: auto;
       width: auto;
       object-fit: contain;             /* avoid cropping; preserve full image within the max box */
       border-radius: 8px;
       display: block;
     }
-
-    /* If you need a special layout for a single image placed inside a gallery container */
+    /* If only a single image inside gallery, allow it to be taller but still bounded */
     .post-gallery.only-one .post-img {
-      max-height: 75vh;                /* allow a single image to be taller, but still limited by viewport */
+      max-height: 75vh;
       max-width: 100%;
     }
 
@@ -89,7 +86,7 @@
       .post-avatar .avatar-img { width:44px; height:44px; }
       .post-username a { font-size:0.95rem; }
       .post-time { font-size:0.80rem; }
-      .post-gallery .post-img { max-height: 220px; }
+      .post-gallery .post-img { max-height: 220px; max-width: calc(100vw - 56px); }
     }
   </style>
 </head>
@@ -386,7 +383,7 @@
 
         const postEl = kebab.closest('.post');
         if (!postEl) return;
-        const postId = kebab.closest('.post').dataset.postId;
+        const postId = postEl.dataset.postId;
         const owner = postEl.dataset.postOwner;
 
         if (openPopup && openPopup.dataset.postId === postId) {
