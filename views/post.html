@@ -14,13 +14,34 @@
       .post .post-body { margin-top: 6px; display:flex; flex-direction:column; gap:8px; }
       .post-content { white-space: pre-wrap; word-break: break-word; color:#38414b; }
       .post-img { max-width:100%; height:auto; border-radius:8px; margin-top:8px; display:block; }
-      .post-gallery { display: grid; gap: 8px; margin-top: 8px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
-      .post-gallery .post-img { height: 220px; object-fit: cover; }
+
+      /* ===== Use horizontal gallery here too (same rules as feed) ===== */
+      .post-gallery {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        align-items: flex-start;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 6px;
+      }
+      .post-gallery .post-img {
+        flex: 0 0 auto;
+        align-self: flex-start;
+        max-height: 420px;
+        max-width: calc(100vw - 96px);
+        height: auto;
+        width: auto;
+        object-fit: contain;
+        border-radius: 8px;
+      }
+
       @media (max-width:800px) {
         .post-header .post-avatar .avatar-img { width:44px; height:44px; }
         .post-header-meta .post-username a { font-size:0.95rem; }
         .post-time { font-size:0.80rem; }
-        .post-gallery .post-img { height:140px; }
+        .post-gallery .post-img { max-height: 260px; max-width: calc(100vw - 56px); }
       }
     </style>
 </head>
