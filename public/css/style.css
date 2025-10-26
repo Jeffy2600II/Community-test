@@ -490,7 +490,7 @@ main {
   max-width: 100%; /* never overflow the container width */
   width: auto;     /* allow width to adjust when height constraint is active */
   height: auto;    /* preserve aspect ratio */
-  border-radius: 8px;
+  border-radius: 20px;
   margin-top: 10px;
   object-fit: contain; /* defensive: don't crop */
   /* Desktop/tablet default: allow tall images but limit to viewport height */
