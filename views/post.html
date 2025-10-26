@@ -51,10 +51,10 @@
       }
 
       /* Kebab & popup: same layout as index */
-      .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
+      .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: aut[...]
       .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
 
-      .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
+      .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08);[...]
       .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
       .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
 
@@ -69,6 +69,46 @@
 
       /* Minor spacing so bottom fixed bar does not overlay content on very small screens: overridden by comments.css JS spacer */
       #postCard { padding-bottom: 32px; }
+
+      /* Comment kebab dropdown (scoped small styles) */
+      .comment-kebab {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        margin-left: auto;
+      }
+      .comment-dropdown {
+        position: absolute;
+        right: 12px;
+        top: 44px;
+        background: var(--surface);
+        border: 1px solid rgba(15,23,42,0.06);
+        border-radius: 8px;
+        box-shadow: 0 8px 20px rgba(16,24,40,0.06);
+        min-width: 160px;
+        z-index: 2200;
+        overflow: hidden;
+      }
+      .comment-dropdown button {
+        width: 100%;
+        display: block;
+        padding: 10px 12px;
+        background: transparent;
+        border: none;
+        text-align: left;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .comment-dropdown button:hover { background: #fbfdff; }
+      .comment-edit-area { display:flex; gap:8px; align-items:flex-start; margin-top:8px; }
+      .comment-edit-area textarea { flex:1; min-height:64px; padding:8px; border-radius:8px; border:1px solid rgba(15,23,42,0.06); }
+      .comment-edit-area .btn { padding:8px 10px; height:auto; }
     </style>
 </head>
 <body>
@@ -101,8 +141,10 @@
 /*
   Updated:
   - Render comments as post-like DOM nodes (avatar, name, timestamp, content)
+  - Added a three-dot kebab on each comment that opens a small dropdown with "แก้ไข" and "ลบคอมเมนต์"
+  - Delete uses DELETE /api/post/:postId/comment/:commentId
+  - Edit performs in-place editing and attempts POST /api/post/:postId/comment/:commentId/edit (falls back to PUT if desired)
   - Fixed comment input bar at bottom; JS will ensure page content has spacer to avoid overlap
-  - On submit: post to /api/post/:id/comment (same as before) and reload comments area
 */
 
 const postId = location.pathname.split('/').pop();
@@ -124,6 +166,7 @@ function createCommentNode(c) {
   // header
   const header = document.createElement('div');
   header.className = 'post-header';
+  header.style.position = 'relative'; // allow absolute dropdown positioning
 
   const avatarA = document.createElement('a');
   avatarA.className = 'post-avatar';
@@ -155,6 +198,16 @@ function createCommentNode(c) {
   meta.appendChild(timeDiv);
   header.appendChild(meta);
 
+  // kebab for comment actions
+  const kebab = document.createElement('button');
+  kebab.className = 'comment-kebab';
+  kebab.type = 'button';
+  kebab.setAttribute('aria-haspopup', 'true');
+  kebab.setAttribute('aria-expanded', 'false');
+  kebab.title = 'ตัวเลือกคอมเมนต์';
+  kebab.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`;
+  header.appendChild(kebab);
+
   art.appendChild(header);
 
   // body
@@ -167,6 +220,85 @@ function createCommentNode(c) {
   body.appendChild(contentDiv);
 
   art.appendChild(body);
+
+  // kebab behavior
+  kebab.addEventListener('click', function(ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    // close other comment dropdowns
+    closeAllCommentDropdowns();
+
+    const open = art.querySelector('.comment-dropdown');
+    if (open) {
+      open.remove();
+      kebab.setAttribute('aria-expanded','false');
+      return;
+    }
+
+    const dd = document.createElement('div');
+    dd.className = 'comment-dropdown';
+
+    // Edit button
+    const btnEdit = document.createElement('button');
+    btnEdit.type = 'button';
+    btnEdit.textContent = 'แก้ไข';
+    btnEdit.addEventListener('click', function(ev2) {
+      ev2.preventDefault();
+      ev2.stopPropagation();
+      dd.remove();
+      kebab.setAttribute('aria-expanded','false');
+      openCommentEditor(art, c);
+    });
+    dd.appendChild(btnEdit);
+
+    // Delete button (only allow if we are owner OR server may enforce permission)
+    const btnDel = document.createElement('button');
+    btnDel.type = 'button';
+    btnDel.textContent = 'ลบคอมเมนต์';
+    btnDel.addEventListener('click', async function(ev2) {
+      ev2.preventDefault();
+      ev2.stopPropagation();
+      dd.remove();
+      kebab.setAttribute('aria-expanded','false');
+      if (!c.id) { alert('ไม่สามารถลบคอมเมนต์นี้ได้ (ไม่มี id)'); return; }
+      if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบคอมเมนต์นี้?')) return;
+      try {
+        const resp = await fetch('/api/post/' + encodeURIComponent(postId) + '/comment/' + encodeURIComponent(c.id), { method: 'DELETE' });
+        if (resp.ok) {
+          // remove node
+          art.remove();
+        } else {
+          const js = await resp.json().catch(()=>null);
+          alert((js && js.msg) ? js.msg : 'ไม่สามารถลบคอมเมนต์ได้');
+        }
+      } catch (e) {
+        console.error('delete comment error', e);
+        alert('เกิดข้อผิดพลาดขณะลบคอมเมนต์');
+      }
+    });
+    dd.appendChild(btnDel);
+
+    // position & append
+    header.appendChild(dd);
+    kebab.setAttribute('aria-expanded','true');
+
+    // close on outside click
+    setTimeout(() => {
+      const onDoc = (ev3) => {
+        if (!header.contains(ev3.target)) {
+          dd.remove();
+          kebab.setAttribute('aria-expanded','false');
+          document.removeEventListener('click', onDoc, true);
+        }
+      };
+      document.addEventListener('click', onDoc, true);
+    }, 0);
+  });
+
+  // keyboard: Enter/Space on article opens or acts like clicking content
+  art.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); art.querySelector('.post-content').click(); }
+  });
 
   return art;
 }
@@ -226,6 +358,103 @@ async function loadAvatarsForNodes(container) {
   }));
 }
 
+// helper to close any open comment dropdowns
+function closeAllCommentDropdowns() {
+  document.querySelectorAll('.comment-dropdown').forEach(d => d.remove());
+  document.querySelectorAll('.comment-kebab[aria-expanded="true"]').forEach(k => k.setAttribute('aria-expanded','false'));
+}
+
+// open in-place editor for a comment node
+function openCommentEditor(commentArticle, commentData) {
+  const contentDiv = commentArticle.querySelector('.post-content');
+  if (!contentDiv) return;
+  // prevent multiple editors
+  if (commentArticle.querySelector('.comment-edit-area')) return;
+
+  const originalHtml = contentDiv.innerHTML;
+  const originalText = (commentData && commentData.content) ? commentData.content : contentDiv.textContent || '';
+
+  // build edit area
+  const editArea = document.createElement('div');
+  editArea.className = 'comment-edit-area';
+  const ta = document.createElement('textarea');
+  ta.value = originalText;
+  editArea.appendChild(ta);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'btn btn-primary';
+  saveBtn.type = 'button';
+  saveBtn.textContent = 'บันทึก';
+  editArea.appendChild(saveBtn);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn btn-ghost';
+  cancelBtn.type = 'button';
+  cancelBtn.textContent = 'ยกเลิก';
+  editArea.appendChild(cancelBtn);
+
+  // replace content with edit area
+  contentDiv.innerHTML = '';
+  contentDiv.appendChild(editArea);
+  ta.focus();
+
+  cancelBtn.addEventListener('click', function() {
+    contentDiv.innerHTML = originalHtml;
+  });
+
+  saveBtn.addEventListener('click', async function() {
+    const newText = ta.value.trim();
+    if (!newText) { alert('เนื้อหาคอมเมนต์ต้องไม่ว่าง'); return; }
+    if (!commentData || !commentData.id) {
+      alert('ไม่สามารถแก้ไขคอมเมนต์นี้ได้ (ไม่มี id)');
+      return;
+    }
+    saveBtn.disabled = true;
+    cancelBtn.disabled = true;
+    try {
+      // try endpoint: POST /api/post/:postId/comment/:commentId/edit (common pattern in this app)
+      let ok = false;
+      let res = null;
+      try {
+        res = await fetch('/api/post/' + encodeURIComponent(postId) + '/comment/' + encodeURIComponent(commentData.id) + '/edit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: newText })
+        });
+        ok = res && res.ok;
+      } catch(e){ ok = false; }
+
+      // fallback: PUT /api/post/:postId/comment/:commentId
+      if (!ok) {
+        try {
+          res = await fetch('/api/post/' + encodeURIComponent(postId) + '/comment/' + encodeURIComponent(commentData.id), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: newText })
+          });
+          ok = res && res.ok;
+        } catch(e){ ok = false; }
+      }
+
+      if (ok) {
+        // update DOM in place
+        contentDiv.innerHTML = escapeHtml(newText).replace(/\r\n|\r|\n/g, '<br>');
+      } else {
+        const js = await (res ? res.json().catch(()=>null) : Promise.resolve(null));
+        alert((js && js.msg) ? js.msg : 'ไม่สามารถบันทึกการแก้ไขได้ (เซิร์ฟเวอร์อาจยังไม่รองรับ)');
+        contentDiv.innerHTML = originalHtml;
+      }
+    } catch (e) {
+      console.error('edit comment error', e);
+      alert('เกิดข้อผิดพลาดขณะบันทึกคอมเมนต์');
+      contentDiv.innerHTML = originalHtml;
+    } finally {
+      saveBtn.disabled = false;
+      cancelBtn.disabled = false;
+    }
+  });
+}
+
 // Load the post + comments from API and render
 async function loadPost() {
   try {
@@ -266,7 +495,7 @@ async function loadPost() {
     kebab.setAttribute('aria-haspopup','true');
     kebab.setAttribute('aria-expanded','false');
     kebab.title = 'ตัวเลือกโพสต์';
-    kebab.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
+    kebab.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" c[...]
     header.appendChild(kebab);
 
     art.appendChild(header);
@@ -323,11 +552,11 @@ async function loadPost() {
         delBtn.addEventListener('click', async function (e) {
           e.preventDefault();
           if (!confirm('ลบโพสต์นี้?')) return;
-          try { await fetch('/api/post/' + encodeURIComponent(post.id), { method: 'DELETE' }); location.replace('/'); } catch (err) { alert('เกิดข้อผิดพลาดขณะลบโพสต์'); }
+          try { await fetch('/api/post/' + encodeURIComponent(post.id), { method: 'DELETE' }); location.replace('/'); } catch (err) { alert('เกิดข้อผิดพลาดขณะลบ��[...]
         });
         popup.appendChild(delBtn);
       } else {
-        const profileA = document.createElement('a'); profileA.href = '/user/' + encodeURIComponent(post.username || ''); profileA.textContent = 'ไปยังโปรไฟล์'; popup.appendChild(profileA);
+        const profileA = document.createElement('a'); profileA.href = '/user/' + encodeURIComponent(post.username || ''); profileA.textContent = 'ไปยังโปรไฟล์'; popup.appendChi[...]
         const reportBtn = document.createElement('button'); reportBtn.type = 'button'; reportBtn.textContent = 'รายงานโพสต์';
         reportBtn.addEventListener('click', function () { alert('ฟีเจอร์รายงานยังไม่เปิดใช้งาน'); });
         popup.appendChild(reportBtn);
@@ -335,7 +564,7 @@ async function loadPost() {
       art.appendChild(popup);
       kebab.setAttribute('aria-expanded','true');
       setTimeout(() => {
-        const onDoc = (ev) => { if (!popup.contains(ev.target) && ev.target !== kebab) { popup.remove(); kebab.setAttribute('aria-expanded','false'); document.removeEventListener('click', onDoc, true); } };
+        const onDoc = (ev) => { if (!popup.contains(ev.target) && ev.target !== kebab) { popup.remove(); kebab.setAttribute('aria-expanded','false'); document.removeEventListener('click', onDoc, true)[...]
         document.addEventListener('click', onDoc, true);
       }, 0);
     });
