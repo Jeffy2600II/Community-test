@@ -376,6 +376,9 @@ main {
   gap: 12px;
   width: 100%;
   margin-bottom: 6px;
+  /* ensure there's room for the kebab on the right */
+  position: relative;
+  padding-right: 56px;
 }
 
 /* avatar — keep it in flow (no absolute) so content can be positioned relative to it */
@@ -456,6 +459,8 @@ main {
   align-items: flex-start;
   gap: 12px;
   margin-bottom: 8px;
+  position: relative;
+  padding-right: 56px; /* room for kebab */
 }
 .post .post-header .post-avatar {
   position: static;
@@ -477,6 +482,34 @@ main {
   font-size: 0.96rem;
   vertical-align: top;
 }
+
+/* ------------------------------------------------------------------ */
+/* Ensure kebab (three-dot) button sits on the right edge of the header
+   for both feed posts and single-post view. This keeps markup simple
+   (append button inside header) while visually pinning it to the right.
+   ------------------------------------------------------------------ */
+.post .post-kebab {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  margin-left: 0;
+  z-index: 5;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+.post .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
+
+/* popup should align to the right of the post when kebab is on the right */
+.post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
+.post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
+.post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
 
 /* ------------------------------------------------------------------ */
 /* Post image behavior: responsive, no cropping
