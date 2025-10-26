@@ -302,7 +302,7 @@ async function loadPost() {
     kebab.setAttribute('aria-haspopup','true');
     kebab.setAttribute('aria-expanded','false');
     kebab.title = 'ตัวเลือกโพสต์';
-    kebab.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" c[...]
+    kebab.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
     header.appendChild(kebab);
 
     art.appendChild(header);
@@ -393,7 +393,7 @@ async function loadPost() {
       art.appendChild(popup);
       kebab.setAttribute('aria-expanded','true');
       setTimeout(() => {
-        const onDoc = (ev) => { if (!popup.contains(ev.target) && ev.target !== kebab) { popup.remove(); kebab.setAttribute('aria-expanded','false'); document.removeEventListener('click', onDoc, true)[...]
+        const onDoc = (ev) => { if (!popup.contains(ev.target) && ev.target !== kebab) { popup.remove(); kebab.setAttribute('aria-expanded','false'); document.removeEventListener('click', onDoc, true); } };
         document.addEventListener('click', onDoc, true);
       }, 0);
     });
