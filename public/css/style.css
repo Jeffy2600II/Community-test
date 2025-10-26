@@ -1,11 +1,13 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
 
 /* ========================================================================
-   style.css — Tuned feed header spacing & sizing
+   style.css — Feed & UI styling (updated)
    - Avatar stays visible and fixed on the left (no absolute positioning)
-   - Username + timestamp are inline and can sit close to the content
-   - Post images: responsive, never cropped; constrained by max-height (viewport-based)
-   - Mobile: stricter max-height so tall images fit comfortably on-screen
+   - Username + timestamp are inline and sit close to content
+   - Post images: never cropped; original aspect ratio preserved
+   - Images top-aligned so different heights line up visually at the top
+   - Mobile: multi-image posts become a horizontal scroller (swipe left/right)
+   - Desktop: allow taller images while still preserving original shape
    ======================================================================== */
 
 :root{
@@ -479,38 +481,86 @@ main {
 }
 
 /* ------------------------------------------------------------------ */
-/* Post image behavior: responsive, no cropping
-   - Images keep aspect ratio (width/height scale together)
-   - Constrained by max-height (viewport-relative) to avoid overly tall images on mobile
-   - max-width:100% ensures very wide images fit container
-   - width:auto lets image shrink when height constraint applies (prevents distortion)
+/* Post image behavior: responsive, never cropped, top-aligned; mobile horizontal scroller
+   Goals:
+   - Never crop images: preserve original aspect ratio and shape.
+   - Align images to the top edge so images with different heights line up at the top.
+   - On narrow screens (mobile), multi-image posts become a horizontal scroller (swipe left/right).
+   - On wider screens, still preserve natural aspect ratio and allow horizontal scrolling for many images;
+     increase allowed max-height so images appear larger on desktop.
+   - Single-image posts can be shown larger but still never cropped.
    ------------------------------------------------------------------ */
+
+/* Ensure images don't overflow container width by default but keep natural shape */
 .post-img {
   display: block;
-  max-width: 100%; /* never overflow the container width */
-  width: auto;     /* allow width to adjust when height constraint is active */
-  height: auto;    /* preserve aspect ratio */
+  width: auto;         /* allow natural width; constrained by max-width when needed */
+  height: auto;        /* preserve aspect ratio */
+  max-width: 100%;     /* don't overflow the container width */
   border-radius: 8px;
   margin-top: 10px;
-  object-fit: contain; /* defensive: don't crop */
-  /* Desktop/tablet default: allow tall images but limit to viewport height */
-  max-height: 75vh;
+  object-fit: none;    /* do not crop or fill — preserve original */
+  object-position: top;/* top-align image content for consistency across various heights */
+  align-self: flex-start; /* in flex layouts, align images to the top */
+  max-height: 75vh;    /* prevent images taller than viewport on desktop (adjustable) */
 }
 
-/* Mobile: tighter max-height so tall images remain visible without scrolling off-screen */
-@media (max-width: 800px) {
-  .post-img {
-    max-height: 60vh; /* suitable for most phones — adjustable if you prefer */
-    margin-top: 8px;
+/* Gallery: horizontal scroller and top-aligned images by default (mobile-first) */
+.post-gallery {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  align-items: flex-start;        /* align images to top edge */
+  overflow-x: auto;               /* allow horizontal scroll */
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 6px;            /* breathing room for scrollbar on some UIs */
+}
+
+/* Each gallery image keeps its natural aspect ratio. Prevent shrinking so shapes remain unchanged. */
+.post-gallery .post-img {
+  flex: 0 0 auto;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: 45vh; /* mobile ceiling so tall images don't dominate screen */
+  object-fit: none;
+}
+
+/* If a gallery contains only one image, allow it to be larger (single featured image) */
+.post .post-gallery.only-one .post-img,
+.post-img.single {
+  max-width: 100%;
+  max-height: 80vh;
+}
+
+/* Desktop / large screens: give images more vertical room and slightly larger spacing.
+   Keep horizontal scrolling for ordered image viewing; this preserves original shapes. */
+@media (min-width: 900px) {
+  .post-gallery {
+    gap: 12px;
   }
-}
-
-/* If you want a stricter ceiling on very large desktop screens */
-@media (min-width: 1400px) {
+  .post-gallery .post-img {
+    max-height: 60vh;
+  }
   .post-img {
     max-height: 80vh;
   }
 }
+
+/* Optional grid-like layout (kept inert unless the 'grid' class is applied)
+   This lets you opt in to a column-based presentation without cropping: */
+.post-gallery.grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(160px, 1fr);
+  gap: 12px;
+  align-items: start;
+  overflow-x: auto;
+}
+
+/* scrollbar styling */
+.post-gallery::-webkit-scrollbar { height: 8px; }
+.post-gallery::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.06); border-radius: 999px; }
 
 /* ------------------------------------------------------------------ */
 /* Comments                                                             */
