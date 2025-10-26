@@ -6,36 +6,58 @@
     <title>ดูโพสต์</title>
     <link rel="stylesheet" href="/css/style.css">
     <style>
-      /* Single post: use same inline header layout as feed */
-      .post-header { display:flex; align-items:flex-start; gap:12px; margin-bottom:8px; }
-      .post-header .post-avatar { position: static; display:inline-flex; align-items:center; justify-content:center; }
-      .post-header .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit:cover; }
-      .post-header-meta { display:flex; flex-direction:column; gap:4px; min-width:0; }
-      .post .post-body { margin-top: 6px; display:flex; flex-direction:column; gap:8px; }
-      .post-content { white-space: pre-wrap; word-break: break-word; color:#38414b; }
-      .post-img { max-width:100%; height:auto; border-radius:8px; margin-top:8px; display:block; }
+      /* Make single-post layout match feed/index.html 100% for post structure and gallery behavior.
+         All post-related classes (.post, .post-header, .post-body, .post-gallery, .post-img, etc.)
+         mirror the feed page so visuals/interaction are identical. */
 
-      /* ===== Use horizontal gallery here too (same rules as feed) ===== */
+      .post { position: relative; padding: 12px; border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); }
+      .post-header { display:flex; align-items:flex-start; gap:12px; width:100%; margin-bottom:6px; }
+      .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit: cover; flex-shrink:0; }
+      .post-header-meta { display:flex; flex-direction:column; gap:2px; min-width:0; }
+      .post-username a { font-weight:700; color:var(--text); text-decoration:none; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px; }
+      .post-time { color:var(--muted); font-size:0.88rem; }
+
+      .post-body { margin-top: 4px; line-height:1.55; display:flex; flex-direction:column; gap:8px; }
+      .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
+      .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; display:block; }
+
+      /* Horizontal scrolling gallery — identical rules to index.html */
       .post-gallery {
         display: flex;
         gap: 8px;
-        margin-top: 8px;
+        margin-top: 10px;
         overflow-x: auto;
         overflow-y: hidden;
-        align-items: flex-start;
+        align-items: flex-start;         /* anchor all images to the top */
         -webkit-overflow-scrolling: touch;
-        padding-bottom: 6px;
+        padding-bottom: 6px;             /* breathing room for horizontal scroll */
+        scroll-behavior: smooth;
       }
       .post-gallery .post-img {
-        flex: 0 0 auto;
-        align-self: flex-start;
-        max-height: 420px;
-        max-width: calc(100vw - 96px);
+        flex: 0 0 auto;                  /* do not shrink/grow, keep intrinsic sizing within limits */
+        align-self: flex-start;          /* ensure each image is aligned to top of the gallery row */
+        max-height: 420px;               /* max height for images in the gallery */
+        max-width: calc(100vw - 96px);   /* ensure very wide images scale down to fit viewport when viewed */
         height: auto;
         width: auto;
-        object-fit: contain;
+        object-fit: contain;             /* avoid cropping; preserve full image within the max box */
         border-radius: 8px;
+        display: block;
       }
+      .post-gallery.only-one .post-img {
+        max-height: 75vh;
+        max-width: 100%;
+      }
+
+      /* Kebab & popup: same layout as index */
+      .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
+      .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
+
+      .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
+      .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
+      .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
+
+      .post-actions { display:none; }
 
       @media (max-width:800px) {
         .post-header .post-avatar .avatar-img { width:44px; height:44px; }
@@ -64,15 +86,21 @@
     </div>
   </main>
   <div id="footerSlot"></div>
+
 <script src="/js/main.js"></script>
 <script>
+/*
+  This script renders the single post using the exact same DOM structure
+  and image/gallery behavior as the feed (index.html). Avatars, kebab popup
+  and comments are wired the same way so layout/interaction are 100% identical.
+*/
 const postId = location.pathname.split('/').pop();
 let myUsername;
 
 function escapeHtml(s){ if (s===null||s===undefined) return ''; return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
 async function loadPost() {
-    const res = await fetch('/api/post/' + postId);
+    const res = await fetch('/api/post/' + encodeURIComponent(postId));
     const data = await res.json();
     if (!data.success) return document.getElementById('postBox').innerText = 'ไม่พบโพสต์';
     const { post, comments, owner, myUsername: apiUsername } = data;
@@ -89,6 +117,7 @@ async function loadPost() {
     const avatarA = document.createElement('a'); avatarA.className = 'post-avatar'; avatarA.href = '/user/' + encodeURIComponent(post.username || '');
     const avatarImg = document.createElement('img'); avatarImg.className = 'avatar-img'; avatarImg.alt = post.username || '';
     avatarImg.id = `avatar-${post.username}-${post.id}`;
+    avatarImg.dataset.username = post.username || '';
     avatarImg.src = '/img/default_profile.png';
     avatarA.appendChild(avatarImg);
     header.appendChild(avatarA);
@@ -101,12 +130,22 @@ async function loadPost() {
     meta.appendChild(nameDiv); meta.appendChild(timeDiv);
     header.appendChild(meta);
 
+    // kebab (same as feed)
+    const kebab = document.createElement('button');
+    kebab.className = 'post-kebab';
+    kebab.type = 'button';
+    kebab.setAttribute('aria-haspopup','true');
+    kebab.setAttribute('aria-expanded','false');
+    kebab.title = 'ตัวเลือกโพสต์';
+    kebab.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`;
+    header.appendChild(kebab);
+
     art.appendChild(header);
 
     // body
     const body = document.createElement('div'); body.className = 'post-body';
 
-    // images: support post.images (array) or legacy post.image
+    // images (keep array compatibility)
     const imgs = Array.isArray(post.images) ? post.images.slice() : (post.image ? [post.image] : []);
     if (imgs.length === 1) {
       const im = document.createElement('img');
@@ -118,6 +157,7 @@ async function loadPost() {
     } else if (imgs.length > 1) {
       const gallery = document.createElement('div');
       gallery.className = 'post-gallery';
+      if (imgs.length === 1) gallery.classList.add('only-one');
       for (const src of imgs) {
         const im = document.createElement('img');
         im.className = 'post-img';
@@ -130,11 +170,11 @@ async function loadPost() {
     }
 
     const contentDiv = document.createElement('div');
-    contentDiv.className = 'post-content mt-8';
+    contentDiv.className = 'post-content';
     contentDiv.innerHTML = escapeHtml(post.content || '');
     body.appendChild(contentDiv);
 
-    const actionsDiv = document.createElement('div'); actionsDiv.className = 'post-actions mt-16';
+    const actionsDiv = document.createElement('div'); actionsDiv.className = 'post-actions';
     if (myUsername === post.username) {
       const editA = document.createElement('a'); editA.className = 'btn btn-ghost'; editA.href = '/post/' + post.id + '/edit'; editA.textContent = 'แก้ไข';
       actionsDiv.appendChild(editA);
@@ -146,7 +186,7 @@ async function loadPost() {
     art.appendChild(body);
     container.appendChild(art);
 
-    // tải avatar (เหมือน feed)
+    // load avatar similarly to feed implementation (apply profilePic to all matching imgs)
     (async () => {
       try {
         const up = await fetch(`/api/user/${encodeURIComponent(post.username)}`);
@@ -158,20 +198,74 @@ async function loadPost() {
       } catch(e){}
     })();
 
-    if (myUsername === post.username) {
-        const del = document.getElementById('delBtn');
-        if (del) del.onclick = async () => {
-            if (confirm('ลบโพสต์?')) {
-                await fetch('/api/post/' + postId, { method: 'DELETE' });
-                location.replace('/');
-            }
+    // kebab popup logic (same behavior as feed)
+    kebab.addEventListener('click', function(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      // remove existing popup
+      const existing = art.querySelector('.post-popup');
+      if (existing) { existing.remove(); kebab.setAttribute('aria-expanded','false'); return; }
+
+      const popup = document.createElement('div');
+      popup.className = 'post-popup';
+      popup.dataset.postId = post.id;
+
+      const isOwner = (myUsername && post.username && myUsername === post.username);
+
+      if (isOwner) {
+        const editA = document.createElement('a');
+        editA.href = '/post/' + encodeURIComponent(post.id) + '/edit';
+        editA.textContent = 'แก้ไขโพสต์';
+        popup.appendChild(editA);
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.textContent = 'ลบโพสต์';
+        delBtn.addEventListener('click', async function (e) {
+          e.preventDefault();
+          if (!confirm('ลบโพสต์นี้?')) return;
+          try {
+            await fetch('/api/post/' + encodeURIComponent(post.id), { method: 'DELETE' });
+            location.replace('/');
+          } catch (err) {
+            alert('เกิดข้อผิดพลาดขณะลบโพสต์');
+          }
+        });
+        popup.appendChild(delBtn);
+      } else {
+        const profileA = document.createElement('a');
+        profileA.href = '/user/' + encodeURIComponent(post.username || '');
+        profileA.textContent = 'ไปยังโปรไฟล์';
+        popup.appendChild(profileA);
+
+        const reportBtn = document.createElement('button');
+        reportBtn.type = 'button';
+        reportBtn.textContent = 'รายงานโพสต์';
+        reportBtn.addEventListener('click', function () {
+          alert('ฟีเจอร์รายงานยังไม่เปิดใช้งาน');
+        });
+        popup.appendChild(reportBtn);
+      }
+
+      art.appendChild(popup);
+      kebab.setAttribute('aria-expanded','true');
+      // close popup when clicking outside
+      setTimeout(() => {
+        const onDoc = (ev) => {
+          if (!popup.contains(ev.target) && ev.target !== kebab) {
+            popup.remove();
+            kebab.setAttribute('aria-expanded','false');
+            document.removeEventListener('click', onDoc, true);
+          }
         };
-    }
+        document.addEventListener('click', onDoc, true);
+      }, 0);
+    });
 
     // render comments
     let cHtml = '<h3>คอมเมนต์</h3>';
     if (!comments || comments.length === 0) cHtml += '<i class="small">ยังไม่มีคอมเมนต์</i>';
-    for (let c of comments) {
+    for (let c of (comments || [])) {
         cHtml += `<div class="comment">
             <div class="meta"><strong><a href="/user/${c.username}">${c.username}</a></strong> • ${new Date(c.createdAt).toLocaleString()}</div>
             <div>${escapeHtml(c.content)}</div>
@@ -180,26 +274,41 @@ async function loadPost() {
     }
     document.getElementById('commentBox').innerHTML = cHtml;
     if (myUsername) document.getElementById('commentForm').classList.remove("hidden");
+
+    // delete handler if present
+    const delBtn = document.getElementById('delBtn');
+    if (delBtn) {
+      delBtn.onclick = async () => {
+        if (confirm('ลบโพสต์?')) {
+          await fetch('/api/post/' + encodeURIComponent(postId), { method: 'DELETE' });
+          location.replace('/');
+        }
+      };
+    }
 }
+
 loadPost();
 
 document.getElementById('commentForm').onsubmit = async e => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const res = await fetch('/api/post/' + postId + '/comment', {
+    const res = await fetch('/api/post/' + encodeURIComponent(postId) + '/comment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(Object.fromEntries(fd.entries()))
     });
     const data = await res.json();
-    if (data.success) {
+    if (data && data.success) {
         e.target.reset();
         loadPost();
+    } else {
+        alert('ไม่สามารถส่งคอมเมนต์ได้');
     }
 };
+
 window.deleteComment = async (cid) => {
     if (confirm('ยืนยันลบคอมเมนต์?')) {
-        await fetch(`/api/post/${postId}/comment/${cid}`, {method:'DELETE'});
+        await fetch(`/api/post/${encodeURIComponent(postId)}/comment/${encodeURIComponent(cid)}`, {method:'DELETE'});
         loadPost();
     }
 };
