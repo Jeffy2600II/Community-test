@@ -6,8 +6,11 @@
   <title>Community Home</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
-    /* Feed & content visuals - updated to match new header layout (avatar inline, no left gutter) */
-    .post { position: relative; padding: 12px; border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); cursor: pointer; }
+    /* Feed & content visuals - updated to match new header layout (avatar inline, no left gutter)
+       and to adopt the "no-crop, top-aligned, horizontal-scroll" gallery approach defined in the
+       global stylesheet. This block now avoids re-defining gallery behavior that conflicts with
+       the global rules. */
+    .post { position: relative; padding: 12px; border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); cursor: pointer; display:flex; flex-direction:column; gap:8px; }
     .post-header { display:flex; align-items:flex-start; gap:12px; width:100%; margin-bottom:6px; }
     .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit: cover; flex-shrink:0; }
     .post-header-meta { display:flex; flex-direction:column; gap:2px; min-width:0; }
@@ -15,36 +18,37 @@
     .post-time { color:var(--muted); font-size:0.88rem; }
 
     /* Reduce gap between header and body so content sits closer to username/time */
-    .post-body { margin-top: 4px; line-height:1.55; }
+    .post-body { margin-top: 4px; line-height:1.55; display:flex; flex-direction:column; gap:8px; }
     .post-header { margin-bottom: 6px; }
 
     .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
-    .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; display:block; }
+    .post-img { margin-top:10px; border-radius:8px; display:block; }
 
-    /* gallery for multiple images: responsive grid */
+    /* gallery for multiple images: horizontal scroller by default, top-aligned images */
     .post-gallery {
-      display: grid;
+      display: flex;
       gap: 8px;
       margin-top: 10px;
-      /* responsive columns: try to show up to 3 columns on wide screens */
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      align-items: stretch;
+      align-items: flex-start;      /* align images to the top so different heights sit flush at top */
+      overflow-x: auto;             /* horizontal scrolling */
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 6px;
     }
     .post-gallery .post-img {
-      width: 100%;
-      height: 140px;
-      object-fit: cover;
-      border-radius: 8px;
-      margin: 0;
-    }
-    /* if only one image, make it taller / natural ratio */
-    .post .post-gallery.only-one .post-img {
+      flex: 0 0 auto;
+      width: auto;
       height: auto;
-      object-fit: contain;
+      max-width: none;
+      max-height: 45vh; /* mobile-friendly cap */
+      object-fit: none;
     }
 
-    /* make whole post show pointer, but interactive children keep their own cursor */
-    .post a, .post button, .post input, .post textarea { cursor: auto; }
+    /* if only one image, show it larger (no cropping) */
+    .post .post-gallery.only-one .post-img {
+      max-width: 100%;
+      max-height: 75vh;
+      object-fit: none;
+    }
 
     /* Kebab placed on the right side of the header */
     .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
@@ -74,7 +78,14 @@
       .post-avatar .avatar-img { width:44px; height:44px; }
       .post-username a { font-size:0.95rem; }
       .post-time { font-size:0.80rem; }
-      .post-gallery .post-img { height:120px; }
+      .post-gallery .post-img { max-height: 40vh; }
+    }
+
+    @media (min-width:900px) {
+      /* larger screens: allow taller images but keep top-aligned horizontal scrolling behavior */
+      .post-gallery .post-img { max-height: 60vh; }
+      .post .post-gallery.only-one .post-img { max-height: 80vh; }
+      .post-gallery { gap: 12px; }
     }
   </style>
 </head>
@@ -243,15 +254,14 @@
         const imgs = Array.isArray(post.images) ? post.images.slice() : (post.image ? [post.image] : []);
         if (imgs.length === 1) {
           const im = document.createElement('img');
-          im.className = 'post-img';
+          im.className = 'post-img single';
           im.src = imgs[0];
           im.alt = 'post image';
           im.loading = 'lazy';
           body.appendChild(im);
         } else if (imgs.length > 1) {
           const gallery = document.createElement('div');
-          gallery.className = 'post-gallery';
-          if (imgs.length === 1) gallery.classList.add('only-one');
+          gallery.className = 'post-gallery' + (imgs.length === 1 ? ' only-one' : '');
           for (const src of imgs) {
             const im = document.createElement('img');
             im.className = 'post-img';
