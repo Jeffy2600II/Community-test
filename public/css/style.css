@@ -1,15 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
 
 /* ========================================================================
-   style.css — Feed & UI styling (updated)
+   style.css — Tuned feed header spacing & sizing
    - Avatar stays visible and fixed on the left (no absolute positioning)
-   - Username + timestamp are inline and sit close to content
-   - Post images: never cropped; original aspect ratio preserved
-   - Images top-aligned so different heights line up visually at the top
-   - Images must NOT be upscaled — we never enlarge a source image; we only
-     allow it to be downscaled to fit the container/viewport
-   - Mobile: multi-image posts become a horizontal scroller (swipe left/right)
-   - Desktop: allow taller images while still preserving original shape
+   - Username + timestamp are inline and can sit close to the content
+   - Post images: responsive, never cropped; constrained by max-height (viewport-based)
+   - Mobile: stricter max-height so tall images fit comfortably on-screen
    ======================================================================== */
 
 :root{
@@ -483,86 +479,37 @@ main {
 }
 
 /* ------------------------------------------------------------------ */
-/* Post image behavior: responsive, never cropped, top-aligned; do NOT upscale images
-   Important: to prevent images from being enlarged we:
-     - do not set width:100% on images
-     - ensure width:auto so the browser uses the intrinsic (natural) width
-     - use max-width:100% as a protective ceiling so very large images will downscale
-     - ensure flex items don't force width/height via flex-grow/stretch
-     - for galleries use flex:0 0 auto so images keep their natural size and are not stretched
-   Outcome: images larger than container will downscale to fit; images smaller than container
-   will be shown at their natural size (not upscaled).
+/* Post image behavior: responsive, no cropping
+   - Images keep aspect ratio (width/height scale together)
+   - Constrained by max-height (viewport-relative) to avoid overly tall images on mobile
+   - max-width:100% ensures very wide images fit container
+   - width:auto lets image shrink when height constraint applies (prevents distortion)
    ------------------------------------------------------------------ */
-
-/* Basic image reset: preserve natural dimensions but allow downscaling to fit container */
 .post-img {
   display: block;
-  width: auto;         /* use intrinsic width; do not force full width */
-  height: auto;        /* preserve aspect ratio */
-  max-width: 100%;     /* ceiling - prevents overflow and allows downscale when necessary */
+  max-width: 100%; /* never overflow the container width */
+  width: auto;     /* allow width to adjust when height constraint is active */
+  height: auto;    /* preserve aspect ratio */
   border-radius: 8px;
   margin-top: 10px;
-  object-fit: none;    /* do not crop or fill — preserve original shape */
-  object-position: top;/* top-align image content for consistent visual baseline */
-  align-self: flex-start; /* align images to the top inside flex containers */
-  flex: 0 0 auto;      /* prevent flex children from stretching images */
-  max-height: 75vh;    /* prevent images taller than viewport on desktop (adjustable) */
+  object-fit: contain; /* defensive: don't crop */
+  /* Desktop/tablet default: allow tall images but limit to viewport height */
+  max-height: 75vh;
 }
 
-/* Gallery: horizontal scroller and top-aligned images (mobile-first) */
-.post-gallery {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
-  align-items: flex-start;        /* align images to top edge so differing heights line up at top */
-  overflow-x: auto;               /* horizontal scroll for many images */
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 6px;
+/* Mobile: tighter max-height so tall images remain visible without scrolling off-screen */
+@media (max-width: 800px) {
+  .post-img {
+    max-height: 60vh; /* suitable for most phones — adjustable if you prefer */
+    margin-top: 8px;
+  }
 }
 
-/* Gallery images: keep intrinsic sizes, allow downscale but never upscale */
-.post-gallery .post-img {
-  flex: 0 0 auto; /* do not allow images to grow or shrink to fill row */
-  width: auto;
-  height: auto;
-  max-width: 100%;  /* ensure very wide images will downscale to container width */
-  max-height: 45vh; /* mobile ceiling to keep images in viewport */
-  object-fit: none;  /* preserve aspect ratio / shape */
-}
-
-/* Single-image posts: show image at its natural size (no upscaling). If image is larger than container it'll downscale. */
-.post .post-gallery.only-one .post-img,
-.post-img.single {
-  width: auto;
-  height: auto;
-  max-width: 100%;  /* downscale large image if needed; no forced expansion */
-  max-height: 80vh;
-  object-fit: none;
-  flex: 0 0 auto;
-}
-
-/* Desktop / large screens: slightly larger vertical allowances but still prevent upscaling */
-@media (min-width: 900px) {
-  .post-gallery { gap: 12px; }
-  .post-gallery .post-img { max-height: 60vh; }
-  .post-img { max-height: 80vh; }
-}
-
-/* Optional grid-like layout (kept inert unless the 'grid' class is applied) */
-.post-gallery.grid {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(160px, 1fr);
-  gap: 12px;
-  align-items: start;
-  overflow-x: auto;
-}
-
-/* Make sure general img rule doesn't force upscaling either */
-img {
-  max-width: 100%; /* allows downscale of very wide images; doesn't force upscaling */
-  height: auto;
-  display: block;
+/* If you want a stricter ceiling on very large desktop screens */
+@media (min-width: 1400px) {
+  .post-img {
+    max-height: 80vh;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -769,6 +716,9 @@ a { color: var(--accent); text-decoration: none; }
   .grid-2 { grid-template-columns: 1fr; }
   .avatar-circle { width: 110px; height: 110px; }
 }
+
+/* Ensure images don't overflow */
+img { max-width: 100%; height: auto; display: block; }
 
 /* ------------------------------------------------------------------ */
 /* Mobile-first stacked header behavior (UNCHANGED layout positions)    */
