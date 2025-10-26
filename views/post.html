@@ -1,464 +1,543 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Community Home</title>
-  <link rel="stylesheet" href="/css/style.css">
-  <style>
-    /* Feed & content visuals - updated to match new header layout (avatar inline, no left gutter) */
-    .post { position: relative; padding: 12px; border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); cursor: pointer; }
-    .post-header { display:flex; align-items:flex-start; gap:12px; width:100%; margin-bottom:6px; position: relative; padding-right: 56px; }
-    .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit: cover; flex-shrink:0; }
-    .post-header-meta { display:flex; flex-direction:column; gap:2px; min-width:0; }
-    .post-username a { font-weight:700; color:var(--text); text-decoration:none; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px; }
-    .post-time { color:var(--muted); font-size:0.88rem; }
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ดูโพสต์</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/comments.css">
+    <style>
+      /* Make single-post layout match feed/index.html 100% for post structure and gallery behavior.
+         All post-related classes (.post, .post-header, .post-body, .post-gallery, .post-img, etc.)
+         mirror the feed page so visuals/interaction are identical. */
 
-    /* Reduce gap between header and body so content sits closer to username/time */
-    .post-body { margin-top: 4px; line-height:1.55; }
-    .post-header { margin-bottom: 6px; }
+      .post { position: relative; padding: 12px; border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); }
+      .post-header { display:flex; align-items:flex-start; gap:12px; width:100%; margin-bottom:6px; }
+      .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit: cover; flex-shrink:0; }
+      .post-header-meta { display:flex; flex-direction:column; gap:2px; min-width:0; }
+      .post-username a { font-weight:700; color:var(--text); text-decoration:none; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px; }
+      .post-time { color:var(--muted); font-size:0.88rem; }
 
-    .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
-    .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; display:block; }
+      .post-body { margin-top: 4px; line-height:1.55; display:flex; flex-direction:column; gap:8px; }
+      .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
+      .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; display:block; }
 
-    /* ===== NEW: horizontal scrolling gallery (not grid) =====
-       - Gallery flows horizontally and can be scrolled left/right.
-       - Images keep aspect ratio (height:auto) and are constrained by max-height and max-width.
-       - Images are top-aligned so shorter images leave empty space below (no stretching).
-       - Wide images are scaled down so the full image is visible when scrolled into view.
-    */
-    .post-gallery {
-      display: flex;
-      gap: 8px;
-      margin-top: 10px;
-      overflow-x: auto;
-      overflow-y: hidden;
-      align-items: flex-start;         /* anchor all images to the top */
-      -webkit-overflow-scrolling: touch;
-      padding-bottom: 6px;             /* breathing room for horizontal scroll */
-      scroll-behavior: smooth;
-    }
-    .post-gallery .post-img {
-      flex: 0 0 auto;                  /* do not shrink/grow, keep intrinsic sizing within limits */
-      align-self: flex-start;          /* ensure each image is aligned to top of the gallery row */
-      max-height: 320px;               /* max height for images in the gallery (adjust as needed) */
-      max-width: calc(100vw - 96px);   /* ensure very wide images scale down to fit viewport when viewed */
-      height: auto;
-      width: auto;
-      object-fit: contain;             /* avoid cropping; preserve full image within the max box */
-      border-radius: 8px;
-      display: block;
-    }
-    /* If only a single image inside gallery, allow it to be taller but still bounded */
-    .post-gallery.only-one .post-img {
-      max-height: 75vh;
-      max-width: 100%;
-    }
+      /* Horizontal scrolling gallery — identical rules to index.html */
+      .post-gallery {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        align-items: flex-start;         /* anchor all images to the top */
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 6px;             /* breathing room for horizontal scroll */
+        scroll-behavior: smooth;
+      }
+      .post-gallery .post-img {
+        flex: 0 0 auto;                  /* do not shrink/grow, keep intrinsic sizing within limits */
+        align-self: flex-start;          /* ensure each image is aligned to top of the gallery row */
+        max-height: 420px;               /* max height for images in the gallery */
+        max-width: calc(100vw - 96px);   /* ensure very wide images scale down to fit viewport when viewed */
+        height: auto;
+        width: auto;
+        object-fit: contain;             /* avoid cropping; preserve full image within the max box */
+        border-radius: 8px;
+        display: block;
+      }
+      .post-gallery.only-one .post-img {
+        max-height: 75vh;
+        max-width: 100%;
+      }
 
-    /* make whole post show pointer, but interactive children keep their own cursor */
-    .post a, .post button, .post input, .post textarea { cursor: auto; }
+      /* Kebab & popup: same layout as index */
+      .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: aut;}
+      .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
 
-    /* Kebab placed on the right side of the header */
-    .post-kebab {
-      position: absolute;
-      right: 12px;
-      top: 12px;
-      background: transparent;
-      border: none;
-      cursor:pointer;
-      width:36px;
-      height:36px;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      border-radius:8px;
-    }
-    .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
+      .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
+      .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
+      .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
 
-    /* popup should align to the right of the post when kebab is on the right */
-    .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
-    .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
-    .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
+      .post-actions { display:none; }
 
-    /* Hide inline actions in feed (we use popup) */
-    .post-actions { display:none; }
+      @media (max-width:800px) {
+        .post-header .post-avatar .avatar-img { width:44px; height:44px; }
+        .post-header-meta .post-username a { font-size:0.95rem; }
+        .post-time { font-size:0.80rem; }
+        .post-gallery .post-img { max-height: 260px; max-width: calc(100vw - 56px); }
+      }
 
-    /* Excerpt clamp for long posts (if you want CSS clamp instead of JS truncation) */
-    .post-excerpt a.post-link {
-      color: inherit;
-      text-decoration: none;
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      -webkit-line-clamp: 5;
-    }
+      /* Minor spacing so bottom fixed bar does not overlay content on very small screens: overridden by comments.css JS spacer */
+      #postCard { padding-bottom: 32px; }
 
-    @media (max-width:560px) {
-      .post-username a { max-width:140px; }
-      .post-avatar .avatar-img { width:44px; height:44px; }
-      .post-username a { font-size:0.95rem; }
-      .post-time { font-size:0.80rem; }
-      .post-gallery .post-img { max-height: 220px; max-width: calc(100vw - 56px); }
-    }
-  </style>
+      /* ========================
+         Comment-specific: place kebab (three-dot) at the right edge
+         and ensure popup aligns to the right of the comment card.
+         ======================== */
+      .post.comment .post-header {
+        position: relative; /* make header a positioning context for absolute kebab */
+      }
+      .post.comment .post-kebab {
+        position: absolute;
+        right: 8px;
+        top: 12px;
+        margin-left: 0;
+      }
+      /* Ensure popup for comment is positioned under the kebab, not shifting layout */
+      .post.comment .post-popup {
+        position: absolute;
+        right: 8px;
+        top: 44px;
+        left: auto;
+        z-index: 2000;
+      }
+      /* When comment header is narrow on small screens, nudge kebab a bit */
+      @media (max-width: 600px) {
+        .post.comment .post-kebab { top: 8px; right: 8px; }
+        .post.comment .post-popup { right: 8px; top: 40px; }
+      }
+    </style>
 </head>
 <body>
   <div id="headerSlot"></div>
-
   <main>
     <div class="container">
-      <div class="card">
-        <div class="section-title"><span>ฟีดโพสต์ล่าสุด</span></div>
-        <div id="feed" class="feed">
-          <i class="small">กำลังโหลด...</i>
-        </div>
+      <div class="card" id="postCard">
+        <div id="postBox"></div>
+        <hr style="margin:16px 0;">
+        <div id="commentBox" aria-live="polite" aria-label="คอมเมนต์"></div>
+        <!-- spacer for non-JS fallback; will be updated by JS to match comment bar height -->
+        <div id="commentSpacer" style="height: 0;"></div>
       </div>
     </div>
   </main>
-
   <div id="footerSlot"></div>
 
-  <!-- main.js ต้องถูกโหลดเพื่อเติม partial header/footer และจัดการ header interactions -->
-  <script src="/js/main.js"></script>
+  <!-- Fixed comment input bar (ยึดติดด้านล่าง) -->
+  <div id="commentInputBar" class="comment-input-bar" role="complementary" aria-label="เขียนคอมเมนต์">
+    <form id="commentForm" class="comment-form" autocomplete="off">
+      <div class="comment-input-row">
+        <textarea name="content" id="commentContent" placeholder="เขียนคอมเมนต์..." required aria-label="เขียนคอมเมนต์"></textarea>
+        <button type="submit" class="btn btn-primary" id="commentSubmit">ส่ง</button>
+      </div>
+    </form>
+  </div>
 
-  <script>
-  (function () {
-    // Escape HTML and preserve line breaks as <br>
-    function escapeAndFormat(text) {
-      if (text === null || text === undefined) return '';
-      const s = String(text)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-      return s.replace(/\r\n|\r|\n/g, '<br>');
+<script src="/js/main.js"></script>
+<script>
+/*
+  Updated:
+  - Render comments as post-like DOM nodes (avatar, name, timestamp, content)
+  - Added a kebab (three-dot) button to each comment which opens a small dropdown/popup
+    with actions (delete for comment owner, or profile/report for others).
+  - Kebab for comments is positioned at the right edge of the comment (same place as post kebab)
+  - Fixed comment input bar at bottom; JS will ensure page content has spacer to avoid overlap
+  - On submit: post to /api/post/:id/comment (same as before) and reload comments area
+*/
+
+const postId = location.pathname.split('/').pop();
+let myUsername;
+const commentBox = document.getElementById('commentBox');
+const commentForm = document.getElementById('commentForm');
+const commentContent = document.getElementById('commentContent');
+const commentInputBar = document.getElementById('commentInputBar');
+const commentSpacer = document.getElementById('commentSpacer');
+
+function escapeHtml(s){ if (s===null||s===undefined) return ''; return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+// Create DOM node for a single comment (post-like structure but without images)
+function createCommentNode(c) {
+  const art = document.createElement('article');
+  art.className = 'post comment';
+  art.dataset.commentId = c.id || '';
+
+  // header
+  const header = document.createElement('div');
+  header.className = 'post-header';
+
+  const avatarA = document.createElement('a');
+  avatarA.className = 'post-avatar';
+  avatarA.href = '/user/' + encodeURIComponent(c.username || '');
+  avatarA.style.display = 'inline-flex';
+  avatarA.style.alignItems = 'center';
+  avatarA.style.textDecoration = 'none';
+
+  const img = document.createElement('img');
+  img.className = 'avatar-img';
+  img.alt = c.username || '';
+  img.dataset.username = c.username || '';
+  img.src = c.profilePic || '/img/default_profile.png';
+  avatarA.appendChild(img);
+  header.appendChild(avatarA);
+
+  const meta = document.createElement('div');
+  meta.className = 'post-header-meta';
+  const nameDiv = document.createElement('div');
+  nameDiv.className = 'post-username';
+  const nameLink = document.createElement('a');
+  nameLink.href = '/user/' + encodeURIComponent(c.username || '');
+  nameLink.textContent = (c.displayName || c.username) || '(ไม่ระบุ)';
+  nameDiv.appendChild(nameLink);
+  const timeDiv = document.createElement('div');
+  timeDiv.className = 'post-time small';
+  timeDiv.textContent = c.createdAt ? new Date(c.createdAt).toLocaleString() : '';
+  meta.appendChild(nameDiv);
+  meta.appendChild(timeDiv);
+  header.appendChild(meta);
+
+  // kebab button for comment actions (three-dot)
+  const kebab = document.createElement('button');
+  kebab.className = 'post-kebab';
+  kebab.type = 'button';
+  kebab.setAttribute('aria-haspopup', 'true');
+  kebab.setAttribute('aria-expanded', 'false');
+  kebab.title = 'ตัวเลือกคอมเมนต์';
+  kebab.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`;
+  // prevent the outer article click listener from firing when interacting with kebab
+  kebab.addEventListener('click', function (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const existing = art.querySelector('.post-popup');
+    if (existing) {
+      existing.remove();
+      kebab.setAttribute('aria-expanded', 'false');
+      return;
     }
 
-    // Truncate to approx N chars without cutting words awkwardly
-    function truncateText(str, max) {
-      if (!str) return '';
-      if (str.length <= max) return str;
-      const sub = str.slice(0, max);
-      const lastSpace = sub.lastIndexOf(' ');
-      if (lastSpace > Math.floor(max * 0.6)) return sub.slice(0, lastSpace) + '...';
-      return sub + '...';
-    }
+    const popup = document.createElement('div');
+    popup.className = 'post-popup';
+    popup.dataset.commentId = c.id || '';
 
-    // Load logged-in username (if any)
-    async function loadMyUsername() {
-      try {
-        const pr = await fetch('/api/profile');
-        if (!pr.ok) return null;
-        const data = await pr.json();
-        if (data && data.success && data.profile) return data.profile.username;
-      } catch (e) {}
-      return null;
-    }
+    const isOwner = (myUsername && c.username && myUsername === c.username);
 
-    // Single popup control
-    let openPopup = null;
-    function closePopup() {
-      if (openPopup && openPopup.parentElement) openPopup.remove();
-      openPopup = null;
-      document.querySelectorAll('.post-kebab[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded','false'));
-    }
-
-    function attachGlobalPopupHandlers() {
-      document.addEventListener('click', function (ev) {
-        if (!ev.target.closest('.post-popup') && !ev.target.closest('.post-kebab')) closePopup();
-      }, true);
-      document.addEventListener('keydown', function (ev) {
-        if (ev.key === 'Escape') closePopup();
+    if (isOwner) {
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.textContent = 'ลบคอมเมนต์';
+      delBtn.addEventListener('click', async function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!confirm('ลบคอมเมนต์นี้?')) return;
+        try {
+          // Attempt to delete comment via RESTful endpoint.
+          // Server should support DELETE /api/post/:postId/comment/:commentId
+          const resp = await fetch('/api/post/' + encodeURIComponent(postId) + '/comment/' + encodeURIComponent(c.id), {
+            method: 'DELETE'
+          });
+          // Try parse JSON if provided
+          let json = null;
+          try { json = await resp.json(); } catch (err) {}
+          if (resp.ok && (!json || json.success !== false)) {
+            // remove node from DOM
+            art.remove();
+          } else {
+            alert((json && json.msg) ? json.msg : 'ไม่สามารถลบคอมเมนต์ได้');
+          }
+        } catch (err) {
+          console.error('delete comment error', err);
+          alert('เกิดข้อผิดพลาดขณะลบคอมเมนต์');
+        } finally {
+          popup.remove();
+          kebab.setAttribute('aria-expanded', 'false');
+        }
       });
+      popup.appendChild(delBtn);
+    } else {
+      const profileA = document.createElement('a');
+      profileA.href = '/user/' + encodeURIComponent(c.username || '');
+      profileA.textContent = 'ไปยังโปรไฟล์';
+      popup.appendChild(profileA);
+
+      const reportBtn = document.createElement('button');
+      reportBtn.type = 'button';
+      reportBtn.textContent = 'รายงานคอมเมนต์';
+      reportBtn.addEventListener('click', function () {
+        alert('ฟีเจอร์รายงานยังไม่เปิดใช้งาน');
+        popup.remove();
+        kebab.setAttribute('aria-expanded', 'false');
+      });
+      popup.appendChild(reportBtn);
     }
 
-    async function renderFeed() {
-      const feedEl = document.getElementById('feed');
-      feedEl.innerHTML = '';
-      const myUsername = await loadMyUsername();
+    // attach popup to the comment node and handle outside click to dismiss
+    art.appendChild(popup);
+    kebab.setAttribute('aria-expanded', 'true');
+    setTimeout(() => {
+      const onDoc = (ev) => {
+        if (!popup.contains(ev.target) && ev.target !== kebab) {
+          popup.remove();
+          kebab.setAttribute('aria-expanded', 'false');
+          document.removeEventListener('click', onDoc, true);
+        }
+      };
+      document.addEventListener('click', onDoc, true);
+    }, 0);
+  }, { passive: false });
 
-      let posts = [];
+  header.appendChild(kebab);
+
+  art.appendChild(header);
+
+  // body
+  const body = document.createElement('div');
+  body.className = 'post-body';
+  const contentDiv = document.createElement('div');
+  contentDiv.className = 'post-content';
+  // preserve new lines but escape
+  contentDiv.innerHTML = escapeHtml(c.content || '').replace(/\r\n|\r|\n/g, '<br>');
+  body.appendChild(contentDiv);
+
+  art.appendChild(body);
+
+  return art;
+}
+
+// Render comments array (replace previous string-based rendering)
+function renderComments(comments) {
+  commentBox.innerHTML = '';
+  if (!comments || comments.length === 0) {
+    const empty = document.createElement('i');
+    empty.className = 'small';
+    empty.textContent = 'ยังไม่มีคอมเมนต์';
+    commentBox.appendChild(empty);
+    return;
+  }
+  for (const c of comments) {
+    const node = createCommentNode(c);
+    commentBox.appendChild(node);
+  }
+  // after DOM inserted, load avatars for comments (deduplicated)
+  loadAvatarsForNodes(commentBox);
+}
+
+// load avatars for images that have data-username attribute (dedupe requests)
+async function loadAvatarsForNodes(container) {
+  const imgs = Array.from(container.querySelectorAll('img[data-username]'));
+  const seen = new Set();
+  const usernames = [];
+  for (const img of imgs) {
+    const u = (img.dataset.username || '').trim();
+    if (!u) continue;
+    if (seen.has(u)) continue;
+    seen.add(u);
+    usernames.push(u);
+  }
+  // fetch profiles in parallel but not to exceed reasonable concurrency
+  await Promise.all(usernames.map(async (username) => {
+    try {
+      const url = '/api/user/' + encodeURIComponent(username);
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data || !data.success || !data.profile) return;
+      const pic = data.profile.profilePic;
+      if (!pic) return;
+      container.querySelectorAll('img[data-username="' + CSS.escape(username) + '"]').forEach(i => {
+        // set error handler once
+        i.addEventListener('error', function onErr() {
+          i.removeEventListener('error', onErr);
+          i.src = '/img/default_profile.png';
+        }, { once: true });
+        i.src = pic;
+      });
+    } catch (e) {
+      // ignore per-avatar fetch errors
+      console.warn('avatar fetch failed for', username);
+    }
+  }));
+}
+
+// Load the post + comments from API and render
+async function loadPost() {
+  try {
+    const res = await fetch('/api/post/' + encodeURIComponent(postId));
+    if (!res.ok) { document.getElementById('postBox').innerText = 'ไม่พบโพสต์'; return; }
+    const data = await res.json();
+    if (!data.success) return document.getElementById('postBox').innerText = 'ไม่พบโพสต์';
+    const { post, comments, owner, myUsername: apiUsername } = data;
+    myUsername = apiUsername;
+    // Build DOM for post (unchanged structure from earlier implementation)
+    const container = document.getElementById('postBox');
+    container.innerHTML = '';
+    const art = document.createElement('article');
+    art.className = 'post';
+
+    // header
+    const header = document.createElement('div'); header.className = 'post-header';
+    const avatarA = document.createElement('a'); avatarA.className = 'post-avatar'; avatarA.href = '/user/' + encodeURIComponent(post.username || '');
+    const avatarImg = document.createElement('img'); avatarImg.className = 'avatar-img';
+    avatarImg.alt = post.username || '';
+    avatarImg.id = `avatar-${post.username}-${post.id}`;
+    avatarImg.dataset.username = post.username || '';
+    avatarImg.src = '/img/default_profile.png';
+    avatarA.appendChild(avatarImg);
+    header.appendChild(avatarA);
+
+    const meta = document.createElement('div'); meta.className = 'post-header-meta';
+    const nameDiv = document.createElement('div'); nameDiv.className = 'post-username';
+    const nameLink = document.createElement('a'); nameLink.href = '/user/' + encodeURIComponent(post.username || ''); nameLink.textContent = post.username || '(ไม่ระบุ)';
+    nameDiv.appendChild(nameLink);
+    const timeDiv = document.createElement('div'); timeDiv.className = 'post-time small'; timeDiv.textContent = new Date(post.createdAt).toLocaleString();
+    meta.appendChild(nameDiv); meta.appendChild(timeDiv);
+    header.appendChild(meta);
+
+    const kebab = document.createElement('button');
+    kebab.className = 'post-kebab';
+    kebab.type = 'button';
+    kebab.setAttribute('aria-haspopup','true');
+    kebab.setAttribute('aria-expanded','false');
+    kebab.title = 'ตัวเลือกโพสต์';
+    kebab.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
+    header.appendChild(kebab);
+
+    art.appendChild(header);
+
+    // body
+    const body = document.createElement('div'); body.className = 'post-body';
+    const contentDiv = document.createElement('div'); contentDiv.className = 'post-content';
+    contentDiv.innerHTML = escapeHtml(post.content || '');
+    body.appendChild(contentDiv);
+
+    const imgs = Array.isArray(post.images) ? post.images.slice() : (post.image ? [post.image] : []);
+    if (imgs.length === 1) {
+      const im = document.createElement('img'); im.className = 'post-img'; im.src = imgs[0]; im.alt = 'post image'; im.loading = 'lazy'; body.appendChild(im);
+    } else if (imgs.length > 1) {
+      const gallery = document.createElement('div'); gallery.className = 'post-gallery';
+      if (imgs.length === 1) gallery.classList.add('only-one');
+      for (const src of imgs) {
+        const im = document.createElement('img'); im.className = 'post-img'; im.src = src; im.alt = 'post image'; im.loading = 'lazy';
+        gallery.appendChild(im);
+      }
+      body.appendChild(gallery);
+    }
+
+    art.appendChild(body);
+    container.appendChild(art);
+
+    // load avatar for post (like feed)
+    (async () => {
       try {
-        const res = await fetch('/api/posts');
-        if (res.ok) {
-          const j = await res.json();
-          posts = (j && j.posts) || [];
+        const up = await fetch(`/api/user/${encodeURIComponent(post.username)}`);
+        if (!up.ok) return;
+        const ud = await up.json();
+        if (ud && ud.success && ud.profile && ud.profile.profilePic) {
+          const imgElem = document.getElementById("avatar-"+post.username+"-"+post.id);
+          if (imgElem) imgElem.src = ud.profile.profilePic;
         }
-      } catch (e) {
-        console.error('failed to load posts', e);
-        feedEl.innerHTML = '<div class="small">ไม่สามารถโหลดโพสต์ได้ขณะนี้</div>';
-        return;
-      }
+      } catch(e){}
+    })();
 
-      if (!posts.length) {
-        feedEl.innerHTML = '<i class="small">ยังไม่มีโพสต์</i>';
-        return;
-      }
+    // render comments area using structured nodes
+    renderComments(comments || []);
 
-      for (const post of posts) {
-        const art = document.createElement('article');
-        art.className = 'post';
-        art.dataset.postId = post.id;
-        art.dataset.postOwner = post.username || '';
-        art.tabIndex = 0; // make focusable for keyboard
+    // wire kebab popup (simple)
+    kebab.addEventListener('click', function(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const existing = art.querySelector('.post-popup');
+      if (existing) { existing.remove(); kebab.setAttribute('aria-expanded','false'); return; }
+      const popup = document.createElement('div'); popup.className = 'post-popup'; popup.dataset.postId = post.id;
+      const isOwner = (myUsername && post.username && myUsername === post.username);
+      if (isOwner) {
+        const editA = document.createElement('a');
+        editA.href = '/post/' + encodeURIComponent(post.id) + '/edit';
+        editA.textContent = 'แก้ไขโพสต์';
+        popup.appendChild(editA);
 
-        // header
-        const header = document.createElement('div');
-        header.className = 'post-header';
-
-        // avatar (add data-username attribute so selection is robust even if username contains hyphens)
-        const avatarLink = document.createElement('a');
-        avatarLink.className = 'post-avatar';
-        avatarLink.href = '/user/' + encodeURIComponent(post.username || '');
-        avatarLink.style.display = 'inline-flex';
-        avatarLink.style.alignItems = 'center';
-        const img = document.createElement('img');
-        img.className = 'avatar-img';
-        img.alt = post.username || '';
-        img.dataset.username = post.username || '';
-        img.src = '/img/default_profile.png';
-        avatarLink.appendChild(img);
-        header.appendChild(avatarLink);
-
-        // meta
-        const meta = document.createElement('div');
-        meta.className = 'post-header-meta';
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'post-username';
-        const nameLink = document.createElement('a');
-        nameLink.href = '/user/' + encodeURIComponent(post.username || '');
-        nameLink.textContent = post.username || '(ไม่ระบุ)';
-        nameDiv.appendChild(nameLink);
-        const timeDiv = document.createElement('div');
-        timeDiv.className = 'post-time small';
-        timeDiv.textContent = new Date(post.createdAt).toLocaleString();
-        meta.appendChild(nameDiv);
-        meta.appendChild(timeDiv);
-        header.appendChild(meta);
-
-        // kebab button (right)
-        const kebab = document.createElement('button');
-        kebab.className = 'post-kebab';
-        kebab.type = 'button';
-        kebab.setAttribute('aria-haspopup','true');
-        kebab.setAttribute('aria-expanded','false');
-        kebab.title = 'ตัวเลือกโพสต์';
-        kebab.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`;
-        header.appendChild(kebab);
-
-        art.appendChild(header);
-
-        // body
-        const body = document.createElement('div');
-        body.className = 'post-body';
-
-        // content (truncated by JS)
-        const fullContent = post.content || '';
-        const truncated = truncateText(fullContent, 1000);
-        const formatted = escapeAndFormat(truncated);
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'post-content';
-        contentDiv.innerHTML = formatted;
-        body.appendChild(contentDiv);
-
-        // images: support post.images (array) or legacy post.image
-        const imgs = Array.isArray(post.images) ? post.images.slice() : (post.image ? [post.image] : []);
-        if (imgs.length === 1) {
-          const im = document.createElement('img');
-          im.className = 'post-img';
-          im.src = imgs[0];
-          im.alt = 'post image';
-          im.loading = 'lazy';
-          body.appendChild(im);
-        } else if (imgs.length > 1) {
-          const gallery = document.createElement('div');
-          gallery.className = 'post-gallery';
-          if (imgs.length === 1) gallery.classList.add('only-one');
-          for (const src of imgs) {
-            const im = document.createElement('img');
-            im.className = 'post-img';
-            im.src = src;
-            im.alt = 'post image';
-            im.loading = 'lazy';
-            gallery.appendChild(im);
-          }
-          body.appendChild(gallery);
-        }
-
-        // hidden actions placeholder
-        const actions = document.createElement('div');
-        actions.className = 'post-actions';
-        body.appendChild(actions);
-
-        art.appendChild(body);
-        feedEl.appendChild(art);
-
-        // attach click/key handlers on article to navigate to post unless interactive child clicked
-        art.addEventListener('click', function (ev) {
-          if (ev.target.closest('a, button, input, textarea, select, .post-popup, .post-kebab')) return;
-          window.location.href = '/post/' + encodeURIComponent(post.id);
-        });
-        art.addEventListener('keydown', function (ev) {
-          if (ev.key === 'Enter' || ev.key === ' ') {
-            const active = document.activeElement;
-            if (active && active !== art && active.closest && active.closest('a, button, input, textarea, select, .post-popup, .post-kebab')) {
-              return;
-            }
-            ev.preventDefault();
-            window.location.href = '/post/' + encodeURIComponent(post.id);
-          }
-        });
-      }
-
-      // after DOM created, load avatars and wire kebab
-      loadAvatarsAndWireKebab(myUsername);
-    }
-
-    /**
-     * Robust avatar loader:
-     * - Uses data-username attribute (safer than parsing id with hyphens)
-     * - Deduplicates by username
-     * - Fetches /api/user/:username and applies profilePic to all matching imgs
-     * - Adds image error handler to detect 404s /broken files
-     */
-    async function loadAvatarsAndWireKebab(myUsername) {
-      const avatarImgs = Array.from(document.querySelectorAll('img[data-username]'));
-      const seen = new Set();
-      const usernames = [];
-
-      // collect unique usernames (skip empty)
-      for (const img of avatarImgs) {
-        const username = (img.dataset.username || '').trim();
-        if (!username) continue;
-        if (seen.has(username)) continue;
-        seen.add(username);
-        usernames.push(username);
-      }
-
-      // fetch profile for each username (parallel-friendly)
-      for (const username of usernames) {
-        (async () => {
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.textContent = 'ลบโพสต์';
+        delBtn.addEventListener('click', async function (e) {
+          e.preventDefault();
+          if (!confirm('ลบโพสต์นี้?')) return;
           try {
-            const url = '/api/user/' + encodeURIComponent(username);
-            const up = await fetch(url);
-            if (!up.ok) {
-              console.warn('Failed to fetch', url, 'status', up.status);
-              return;
-            }
-            const ud = await up.json();
-            if (!ud || !ud.success) {
-              console.warn('/api/user/ response for', username, ud);
-              return;
-            }
-            if (!ud.profile) {
-              console.warn('No profile returned for', username);
-              return;
-            }
-
-            const pic = ud.profile.profilePic;
-            if (!pic) {
-              // Profile exists but no picture set
-              console.info('profilePic empty for', username);
-              return;
-            }
-
-            // apply to all images that match data-username
-            document.querySelectorAll('img[data-username="' + CSS.escape(username) + '"]').forEach(i => {
-              // if already set to that src, skip
-              try {
-                const currentPath = (new URL(i.src, location.href)).pathname;
-                const picPath = (new URL(pic, location.href)).pathname;
-                if (currentPath === picPath) return;
-              } catch (e) {}
-              i.addEventListener('error', function onErr() {
-                console.warn('Avatar image failed to load for', username, 'url=', pic, 'element id=', i.id);
-                i.removeEventListener('error', onErr);
-                i.src = '/img/default_profile.png';
-              }, { once: true });
-              i.src = pic;
-            });
+            await fetch('/api/post/' + encodeURIComponent(post.id), { method: 'DELETE' });
+            const el = document.querySelector('.post[data-post-id="' + post.id + '"]');
+            if (el) el.remove();
+            location.replace('/');
           } catch (err) {
-            console.error('error fetching profile for', username, err && err.message);
+            alert('เกิดข้อผิดพลาดขณะลบโพสต์');
+          } finally {
+            popup.remove();
+            kebab.setAttribute('aria-expanded','false');
           }
-        })();
+        });
+        popup.appendChild(delBtn);
+      } else {
+        const profileA = document.createElement('a');
+        profileA.href = '/user/' + encodeURIComponent(post.username || '');
+        profileA.textContent = 'ไปยังโปรไฟล์';
+        popup.appendChild(profileA);
+
+        const reportBtn = document.createElement('button');
+        reportBtn.type = 'button';
+        reportBtn.textContent = 'รายงานโพสต์';
+        reportBtn.addEventListener('click', function () { alert('ฟีเจอร์รายงานยังไม่เปิดใช้งาน'); });
+        popup.appendChild(reportBtn);
       }
+      art.appendChild(popup);
+      kebab.setAttribute('aria-expanded','true');
+      setTimeout(() => {
+        const onDoc = (ev) => { if (!popup.contains(ev.target) && ev.target !== kebab) { popup.remove(); kebab.setAttribute('aria-expanded','false'); document.removeEventListener('click', onDoc, true); } };
+        document.addEventListener('click', onDoc, true);
+      }, 0);
+    });
 
-      // kebab behavior (delegated)
-      const feed = document.getElementById('feed');
-      feed.addEventListener('click', function (ev) {
-        const kebab = ev.target.closest('.post-kebab');
-        if (!kebab) return;
-        ev.preventDefault();
-        ev.stopPropagation();
+  } catch (e) {
+    console.error('loadPost error', e);
+  } finally {
+    // ensure spacer height matches input bar so content isn't hidden
+    requestAnimationFrame(syncSpacerToBar);
+  }
+}
 
-        const postEl = kebab.closest('.post');
-        if (!postEl) return;
-        const postId = postEl.dataset.postId;
-        const owner = postEl.dataset.postOwner;
+// ensure spacer equals height of fixed input bar
+function syncSpacerToBar() {
+  try {
+    const h = commentInputBar ? commentInputBar.getBoundingClientRect().height : 0;
+    commentSpacer.style.height = (h + 16) + 'px'; // extra breathing room
+    // also ensure postCard has bottom padding on very small screens
+    const postCard = document.getElementById('postCard');
+    if (postCard) postCard.style.paddingBottom = (h + 24) + 'px';
+  } catch(e){}
+}
 
-        if (openPopup && openPopup.dataset.postId === postId) {
-          closePopup();
-          return;
-        }
-        closePopup();
+window.addEventListener('load', () => { loadPost(); syncSpacerToBar(); });
+window.addEventListener('resize', syncSpacerToBar);
 
-        const popup = document.createElement('div');
-        popup.className = 'post-popup';
-        popup.dataset.postId = postId;
-
-        const isOwner = (myUsername && owner && myUsername === owner);
-
-        if (isOwner) {
-          const editA = document.createElement('a');
-          editA.href = '/post/' + encodeURIComponent(postId) + '/edit';
-          editA.textContent = 'แก้ไขโพสต์';
-          popup.appendChild(editA);
-
-          const delBtn = document.createElement('button');
-          delBtn.type = 'button';
-          delBtn.textContent = 'ลบโพสต์';
-          delBtn.addEventListener('click', async function (e) {
-            e.preventDefault();
-            if (!confirm('ลบโพสต์นี้?')) return;
-            try {
-              await fetch('/api/post/' + encodeURIComponent(postId), { method: 'DELETE' });
-              const el = document.querySelector('.post[data-post-id="' + postId + '"]');
-              if (el) el.remove();
-            } catch (err) {
-              alert('เกิดข้อผิดพลาดขณะลบโพสต์');
-            } finally {
-              closePopup();
-            }
-          });
-          popup.appendChild(delBtn);
-        } else {
-          const profileA = document.createElement('a');
-          profileA.href = '/user/' + encodeURIComponent(owner || '');
-          profileA.textContent = 'ไปยังโปรไฟล์';
-          popup.appendChild(profileA);
-
-          const reportBtn = document.createElement('button');
-          reportBtn.type = 'button';
-          reportBtn.textContent = 'รายงานโพสต์';
-          reportBtn.addEventListener('click', function () {
-            alert('ฟีเจอร์รายงานยังไม่เปิดใช้งาน');
-            closePopup();
-          });
-          popup.appendChild(reportBtn);
-        }
-
-        postEl.appendChild(popup);
-        openPopup = popup;
-        kebab.setAttribute('aria-expanded','true');
-      }, true);
+// submit comment handler (AJAX)
+commentForm.addEventListener('submit', async function (ev) {
+  ev.preventDefault();
+  const txt = (commentContent.value || '').trim();
+  if (!txt) return;
+  const payload = { content: txt };
+  try {
+    commentContent.disabled = true;
+    document.getElementById('commentSubmit').disabled = true;
+    const res = await fetch('/api/post/' + encodeURIComponent(postId) + '/comment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data && data.success) {
+      commentContent.value = '';
+      // reload comments only, by calling loadPost
+      await loadPost();
+      // scroll to bottom of comments (new comment)
+      setTimeout(() => { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }, 60);
+    } else {
+      alert((data && data.msg) ? data.msg : 'ไม่สามารถส่งคอมเมนต์ได้');
     }
-
-    attachGlobalPopupHandlers();
-    document.addEventListener('DOMContentLoaded', renderFeed);
-  })();
-  </script>
+  } catch (e) {
+    console.error('submit comment error', e);
+    alert('เกิดข้อผิดพลาดขณะส่งคอมเมนต์');
+  } finally {
+    commentContent.disabled = false;
+    document.getElementById('commentSubmit').disabled = false;
+  }
+});
+</script>
 </body>
 </html>
