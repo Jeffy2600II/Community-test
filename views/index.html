@@ -21,33 +21,48 @@
     .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
     .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; display:block; }
 
-    /* gallery for multiple images: responsive grid */
+    /*
+      NEW: horizontal-scrolling gallery (replaces previous grid layout)
+      - gallery flows horizontally and can be scrolled left/right
+      - images preserve their aspect ratio and are constrained by max-height and max-width
+      - items are aligned to the top (align-items: flex-start) so shorter images leave empty space below
+      - each image is a flex item that does NOT grow/stretches (flex: 0 0 auto)
+      - enable smooth native scrolling on touch devices
+    */
     .post-gallery {
-      display: grid;
+      display: flex;
       gap: 8px;
       margin-top: 10px;
-      /* responsive columns: try to show up to 3 columns on wide screens */
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      align-items: stretch;
+      overflow-x: auto;
+      overflow-y: hidden;
+      align-items: flex-start;         /* anchor all images to the top */
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 6px;             /* breathing room for horizontal scroll */
+      scroll-behavior: smooth;
     }
     .post-gallery .post-img {
-      width: 100%;
-      height: 140px;
-      object-fit: cover;
-      border-radius: 8px;
-      margin: 0;
-    }
-    /* if only one image, make it taller / natural ratio */
-    .post .post-gallery.only-one .post-img {
+      flex: 0 0 auto;                  /* do not shrink/grow, keep intrinsic sizing within limits */
+      align-self: flex-start;          /* ensure each image is aligned to top of the gallery row */
+      max-height: 320px;               /* max height for images in the gallery (adjust as needed) */
+      max-width: 720px;                /* max width for images in the gallery */
       height: auto;
-      object-fit: contain;
+      width: auto;
+      object-fit: contain;             /* avoid cropping; preserve full image within the max box */
+      border-radius: 8px;
+      display: block;
+    }
+
+    /* If you need a special layout for a single image placed inside a gallery container */
+    .post-gallery.only-one .post-img {
+      max-height: 75vh;                /* allow a single image to be taller, but still limited by viewport */
+      max-width: 100%;
     }
 
     /* make whole post show pointer, but interactive children keep their own cursor */
     .post a, .post button, .post input, .post textarea { cursor: auto; }
 
     /* Kebab placed on the right side of the header */
-    .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
+    .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto;[...]
     .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
 
     /* popup should align to the right of the post when kebab is on the right */
@@ -74,7 +89,7 @@
       .post-avatar .avatar-img { width:44px; height:44px; }
       .post-username a { font-size:0.95rem; }
       .post-time { font-size:0.80rem; }
-      .post-gallery .post-img { height:120px; }
+      .post-gallery .post-img { max-height: 220px; }
     }
   </style>
 </head>
@@ -297,7 +312,7 @@
      * - Uses data-username attribute (safer than parsing id with hyphens)
      * - Deduplicates by username
      * - Fetches /api/user/:username and applies profilePic to all matching imgs
-     * - Adds image error handler to detect 404s / broken files
+     * - Adds image error handler to detect 404s /broken files
      */
     async function loadAvatarsAndWireKebab(myUsername) {
       const avatarImgs = Array.from(document.querySelectorAll('img[data-username]'));
@@ -371,7 +386,7 @@
 
         const postEl = kebab.closest('.post');
         if (!postEl) return;
-        const postId = postEl.dataset.postId;
+        const postId = kebab.closest('.post').dataset.postId;
         const owner = postEl.dataset.postOwner;
 
         if (openPopup && openPopup.dataset.postId === postId) {
