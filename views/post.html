@@ -106,7 +106,7 @@ async function loadPost() {
     const { post, comments, owner, myUsername: apiUsername } = data;
     myUsername = apiUsername;
 
-    // Build DOM using same structure as feed
+    // Build DOM using same structure as feed (content first, then images)
     const container = document.getElementById('postBox');
     container.innerHTML = '';
     const art = document.createElement('article');
@@ -145,7 +145,13 @@ async function loadPost() {
     // body
     const body = document.createElement('div'); body.className = 'post-body';
 
-    // images (keep array compatibility)
+    // --- CONTENT FIRST (exactly like index) ---
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'post-content';
+    contentDiv.innerHTML = escapeHtml(post.content || '');
+    body.appendChild(contentDiv);
+
+    // --- IMAGES AFTER CONTENT ---
     const imgs = Array.isArray(post.images) ? post.images.slice() : (post.image ? [post.image] : []);
     if (imgs.length === 1) {
       const im = document.createElement('img');
@@ -168,11 +174,6 @@ async function loadPost() {
       }
       body.appendChild(gallery);
     }
-
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'post-content';
-    contentDiv.innerHTML = escapeHtml(post.content || '');
-    body.appendChild(contentDiv);
 
     const actionsDiv = document.createElement('div'); actionsDiv.className = 'post-actions';
     if (myUsername === post.username) {
