@@ -7,95 +7,9 @@
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/comments.css">
     <style>
-      /* Make single-post layout match feed/index.html 100% for post structure and gallery behavior.
-         All post-related classes (.post, .post-header, .post-body, .post-gallery, .post-img, etc.)
-         mirror the feed page so visuals/interaction are identical. */
-
-      .post { position: relative; padding: 12px; border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); }
-      .post-header { display:flex; align-items:flex-start; gap:12px; width:100%; margin-bottom:6px; }
-      .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit: cover; flex-shrink:0; }
-      .post-header-meta { display:flex; flex-direction:column; gap:2px; min-width:0; }
-      .post-username a { font-weight:700; color:var(--text); text-decoration:none; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px; }
-      .post-time { color:var(--muted); font-size:0.88rem; }
-
-      .post-body { margin-top: 4px; line-height:1.55; display:flex; flex-direction:column; gap:8px; }
-      .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
-      .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:8px; display:block; }
-
-      /* Horizontal scrolling gallery — identical rules to index.html */
-      .post-gallery {
-        display: flex;
-        gap: 8px;
-        margin-top: 10px;
-        overflow-x: auto;
-        overflow-y: hidden;
-        align-items: flex-start;         /* anchor all images to the top */
-        -webkit-overflow-scrolling: touch;
-        padding-bottom: 6px;             /* breathing room for horizontal scroll */
-        scroll-behavior: smooth;
-      }
-      .post-gallery .post-img {
-        flex: 0 0 auto;                  /* do not shrink/grow, keep intrinsic sizing within limits */
-        align-self: flex-start;          /* ensure each image is aligned to top of the gallery row */
-        max-height: 420px;               /* max height for images in the gallery */
-        max-width: calc(100vw - 96px);   /* ensure very wide images scale down to fit viewport when viewed */
-        height: auto;
-        width: auto;
-        object-fit: contain;             /* avoid cropping; preserve full image within the max box */
-        border-radius: 15px;
-        display: block;
-      }
-      .post-gallery.only-one .post-img {
-        max-height: 75vh;
-        max-width: 100%;
-      }
-
-      /* Kebab & popup: same layout as index */
-      .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: aut;}
-      .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
-
-      .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
-      .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
-      .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
-
-      .post-actions { display:none; }
-
-      @media (max-width:800px) {
-        .post-header .post-avatar .avatar-img { width:44px; height:44px; }
-        .post-header-meta .post-username a { font-size:0.95rem; }
-        .post-time { font-size:0.80rem; }
-        .post-gallery .post-img { max-height: 260px; max-width: calc(100vw - 56px); }
-      }
-
-      /* Minor spacing so bottom fixed bar does not overlay content on very small screens: overridden by comments.css JS spacer */
+      /* Minimal page-scoped adjustments only — all post visuals moved into /css/style.css */
+      /* Ensure the fixed comment bar spacer behavior remains */
       #postCard { padding-bottom: 32px; }
-
-      /* ========================
-         Comment-specific: place kebab (three-dot) at the right edge
-         and ensure popup aligns to the right of the comment card.
-         ======================== */
-      .post.comment .post-header {
-        position: relative; /* make header a positioning context for absolute kebab */
-      }
-      .post.comment .post-kebab {
-        position: absolute;
-        right: 8px;
-        top: 12px;
-        margin-left: 0;
-      }
-      /* Ensure popup for comment is positioned under the kebab, not shifting layout */
-      .post.comment .post-popup {
-        position: absolute;
-        right: 8px;
-        top: 44px;
-        left: auto;
-        z-index: 2000;
-      }
-      /* When comment header is narrow on small screens, nudge kebab a bit */
-      @media (max-width: 600px) {
-        .post.comment .post-kebab { top: 8px; right: 8px; }
-        .post.comment .post-popup { right: 8px; top: 40px; }
-      }
     </style>
 </head>
 <body>
@@ -388,7 +302,7 @@ async function loadPost() {
     kebab.setAttribute('aria-haspopup','true');
     kebab.setAttribute('aria-expanded','false');
     kebab.title = 'ตัวเลือกโพสต์';
-    kebab.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>';
+    kebab.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" c[...]
     header.appendChild(kebab);
 
     art.appendChild(header);
@@ -479,7 +393,7 @@ async function loadPost() {
       art.appendChild(popup);
       kebab.setAttribute('aria-expanded','true');
       setTimeout(() => {
-        const onDoc = (ev) => { if (!popup.contains(ev.target) && ev.target !== kebab) { popup.remove(); kebab.setAttribute('aria-expanded','false'); document.removeEventListener('click', onDoc, true); } };
+        const onDoc = (ev) => { if (!popup.contains(ev.target) && ev.target !== kebab) { popup.remove(); kebab.setAttribute('aria-expanded','false'); document.removeEventListener('click', onDoc, true)[...]
         document.addEventListener('click', onDoc, true);
       }, 0);
     });
