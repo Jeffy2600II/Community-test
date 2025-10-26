@@ -59,72 +59,10 @@
 
       .post-actions { display:none; }
 
-      /* ===========================
-         Comment styles (mirror post layout but compact)
-         =========================== */
-      .comment {
-        display: block;
-        background: linear-gradient(180deg,#fff,#fcfdff);
-        border-radius: 10px;
-        border: 1px solid rgba(15,23,42,0.03);
-        padding: 10px;
-        margin-bottom: 10px;
-        box-shadow: 0 6px 16px rgba(15,23,42,0.02);
-      }
-      .comment .post-header { gap:10px; margin-bottom:6px; }
-      .comment .post-avatar .avatar-img { width:40px; height:40px; border-radius:8px; }
-      .comment .post-header-meta .post-username a { font-size:0.95rem; max-width:200px; }
-      .comment .post-time { font-size:0.82rem; color:var(--muted); }
-      .comment .post-body { margin-top:4px; line-height:1.45; }
-      .comment .post-content { color:#2e3a42; white-space:pre-wrap; }
-
-      /* small action area for comment owner (delete) */
-      .comment .comment-actions { margin-top:8px; display:flex; gap:8px; justify-content:flex-end; }
-
-      /* ===========================
-         Fixed comment input bar
-         =========================== */
-      .comment-input-bar {
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 2200;
-        background: linear-gradient(180deg,#fff,#fbfdff);
-        border-top: 1px solid rgba(15,23,42,0.06);
-        box-shadow: 0 -8px 30px rgba(15,23,42,0.06);
-        padding: 10px 12px;
-      }
-      .comment-input-inner {
-        max-width: var(--max-width-narrow);
-        margin: 0 auto;
-        display:flex;
-        gap:8px;
-        align-items:flex-end;
-      }
-      .comment-input-inner textarea {
-        flex: 1;
-        min-height:44px;
-        max-height: 160px;
-        resize: vertical;
-        padding:8px 10px;
-        border-radius:10px;
-        border: 1px solid rgba(15,23,42,0.06);
-        font-size: 0.96rem;
-        background: white;
-      }
-      .comment-input-inner button[type="submit"] {
-        white-space:nowrap;
-        padding: 10px 14px;
-      }
-
-      /* ensure page content isn't hidden behind fixed bar */
-      main, .container { padding-bottom: 120px; }
-
       @media (max-width:800px) {
-        .comment-input-inner { padding-left: 8px; padding-right: 8px; }
-        .comment-input-inner textarea { min-height:40px; }
-        main, .container { padding-bottom: 140px; }
+        .post-header .post-avatar .avatar-img { width:44px; height:44px; }
+        .post-header-meta .post-username a { font-size:0.95rem; }
+        .post-time { font-size:0.80rem; }
         .post-gallery .post-img { max-height: 260px; max-width: calc(100vw - 56px); }
       }
     </style>
@@ -137,11 +75,11 @@
         <div id="postBox"></div>
         <hr style="margin:16px 0;">
         <div id="commentBox"></div>
-        <!-- keep original form (will be displayed/hidden by script) but style it as fixed bar -->
-        <form id="commentForm" class="comment-input-bar hidden" aria-label="ฟอร์มแสดงความคิดเห็น">
-          <div class="comment-input-inner">
-            <textarea name="content" placeholder="แสดงความคิดเห็น..." required aria-label="ข้อความคอมเมนต์"></textarea>
-            <button type="submit" class="btn btn-primary">ส่ง</button>
+        <form id="commentForm" class="mt-16 hidden">
+          <label class="small">แสดงความคิดเห็น</label>
+          <textarea name="content" placeholder="แสดงความคิดเห็น" required></textarea>
+          <div class="text-right mt-16">
+            <button type="submit" class="btn btn-primary">แสดงความคิดเห็น</button>
           </div>
         </form>
       </div>
@@ -325,17 +263,18 @@ async function loadPost() {
       }, 0);
     });
 
-    // render comments using DOM (structure similar to posts)
-    renderComments(comments || []);
-
-    // show/hide comment form based on myUsername
-    const commentForm = document.getElementById('commentForm');
-    if (myUsername) {
-      commentForm.classList.remove('hidden');
-      // focus management: do not auto-focus, allow user to tap
-    } else {
-      commentForm.classList.add('hidden');
+    // render comments
+    let cHtml = '<h3>คอมเมนต์</h3>';
+    if (!comments || comments.length === 0) cHtml += '<i class="small">ยังไม่มีคอมเมนต์</i>';
+    for (let c of (comments || [])) {
+        cHtml += `<div class="comment">
+            <div class="meta"><strong><a href="/user/${c.username}">${c.username}</a></strong> • ${new Date(c.createdAt).toLocaleString()}</div>
+            <div>${escapeHtml(c.content)}</div>
+            ${myUsername === c.username ? `<div class="mt-16"><button class="btn btn-ghost" onclick="deleteComment('${c.id}')">ลบ</button></div>` : ''}
+        </div>`;
     }
+    document.getElementById('commentBox').innerHTML = cHtml;
+    if (myUsername) document.getElementById('commentForm').classList.remove("hidden");
 
     // delete handler if present
     const delBtn = document.getElementById('delBtn');
@@ -349,142 +288,22 @@ async function loadPost() {
     }
 }
 
-function renderComments(comments) {
-  const box = document.getElementById('commentBox');
-  box.innerHTML = '';
-  const title = document.createElement('h3');
-  title.textContent = 'คอมเมนต์';
-  box.appendChild(title);
-
-  if (!comments || comments.length === 0) {
-    const em = document.createElement('i');
-    em.className = 'small';
-    em.textContent = 'ยังไม่มีคอมเมนต์';
-    box.appendChild(em);
-    return;
-  }
-
-  // render each comment as a compact post-like article
-  for (const c of comments) {
-    const el = document.createElement('article');
-    el.className = 'comment';
-    el.dataset.commentId = c.id || '';
-
-    // header
-    const header = document.createElement('div');
-    header.className = 'post-header';
-
-    const avatarA = document.createElement('a');
-    avatarA.className = 'post-avatar';
-    avatarA.href = '/user/' + encodeURIComponent(c.username || '');
-    avatarA.style.display = 'inline-flex';
-    avatarA.style.alignItems = 'center';
-    const img = document.createElement('img');
-    img.className = 'avatar-img';
-    img.alt = c.username || '';
-    img.dataset.username = c.username || '';
-    img.src = '/img/default_profile.png';
-    avatarA.appendChild(img);
-    header.appendChild(avatarA);
-
-    const meta = document.createElement('div');
-    meta.className = 'post-header-meta';
-    const nameDiv = document.createElement('div');
-    nameDiv.className = 'post-username';
-    const nameLink = document.createElement('a');
-    nameLink.href = '/user/' + encodeURIComponent(c.username || '');
-    nameLink.textContent = c.username || '(ไม่ระบุ)';
-    nameDiv.appendChild(nameLink);
-    const timeDiv = document.createElement('div');
-    timeDiv.className = 'post-time small';
-    timeDiv.textContent = new Date(c.createdAt).toLocaleString();
-    meta.appendChild(nameDiv);
-    meta.appendChild(timeDiv);
-    header.appendChild(meta);
-
-    el.appendChild(header);
-
-    // body
-    const body = document.createElement('div');
-    body.className = 'post-body';
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'post-content';
-    contentDiv.innerHTML = escapeHtml(c.content || '');
-    body.appendChild(contentDiv);
-
-    // actions (delete for owner)
-    if (myUsername && myUsername === c.username) {
-      const actions = document.createElement('div');
-      actions.className = 'comment-actions';
-      const delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.className = 'btn btn-ghost';
-      delBtn.textContent = 'ลบ';
-      delBtn.addEventListener('click', async (ev) => {
-        ev.preventDefault();
-        if (!confirm('ลบคอมเมนต์นี้?')) return;
-        try {
-          await fetch(`/api/post/${encodeURIComponent(postId)}/comment/${encodeURIComponent(c.id)}`, { method: 'DELETE' });
-          // reload comments
-          loadPost();
-        } catch (e) {
-          alert('ไม่สามารถลบคอมเมนต์ได้');
-        }
-      });
-      actions.appendChild(delBtn);
-      body.appendChild(actions);
-    }
-
-    el.appendChild(body);
-    box.appendChild(el);
-
-    // lazy-load avatar for comment (fetch profile same as feed logic)
-    (async () => {
-      try {
-        if (!c.username) return;
-        const up = await fetch('/api/user/' + encodeURIComponent(c.username));
-        if (!up.ok) return;
-        const ud = await up.json();
-        if (!ud || !ud.success || !ud.profile) return;
-        const pic = ud.profile.profilePic;
-        if (!pic) return;
-        // apply
-        try {
-          img.src = pic;
-        } catch (e) {}
-      } catch (e) {}
-    })();
-  }
-}
-
 loadPost();
 
 document.getElementById('commentForm').onsubmit = async e => {
     e.preventDefault();
-    const textarea = e.target.querySelector('textarea[name="content"]');
-    if (!textarea) return;
-    const body = { content: textarea.value || '' };
-    try {
-      const res = await fetch('/api/post/' + encodeURIComponent(postId) + '/comment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
-      });
-      const data = await res.json();
-      if (data && data.success) {
-          e.target.reset();
-          // reload post (comments)
-          await loadPost();
-          // scroll to newest comment (bottom) after a short delay
-          setTimeout(() => {
-            const last = document.querySelector('#commentBox .comment:last-child');
-            if (last) last.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }, 180);
-      } else {
-          alert('ไม่สามารถส่งคอมเมนต์ได้');
-      }
-    } catch (err) {
-        alert('ไม่สามารถส่งคอมเมนต์ได้ (เครือข่าย)');
+    const fd = new FormData(e.target);
+    const res = await fetch('/api/post/' + encodeURIComponent(postId) + '/comment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.fromEntries(fd.entries()))
+    });
+    const data = await res.json();
+    if (data && data.success) {
+        e.target.reset();
+        loadPost();
+    } else {
+        alert('ไม่สามารถส่งคอมเมนต์ได้');
     }
 };
 
