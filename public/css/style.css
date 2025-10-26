@@ -501,7 +501,7 @@ main {
 @media (max-width: 800px) {
   .post-img {
     max-height: 60vh; /* suitable for most phones — adjustable if you prefer */
-    margin-top: 20px;
+    margin-top: 8px;
   }
 }
 
