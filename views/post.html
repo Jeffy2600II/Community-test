@@ -50,10 +50,10 @@
       }
 
       /* Kebab & popup: same layout as index */
-      .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
+      .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: aut[...]
       .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
 
-      .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
+      .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08);[...]
       .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
       .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
 
@@ -137,7 +137,7 @@ async function loadPost() {
     kebab.setAttribute('aria-haspopup','true');
     kebab.setAttribute('aria-expanded','false');
     kebab.title = 'ตัวเลือกโพสต์';
-    kebab.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`;
+    kebab.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" c[...]
     header.appendChild(kebab);
 
     art.appendChild(header);
@@ -177,7 +177,7 @@ async function loadPost() {
 
     const actionsDiv = document.createElement('div'); actionsDiv.className = 'post-actions';
     if (myUsername === post.username) {
-      const editA = document.createElement('a'); editA.className = 'btn btn-ghost'; editA.href = '/post/' + post.id + '/edit'; editA.textContent = 'แก้ไข';
+      const editA = document.createElement('a'); editA.className = 'btn btn-ghost'; editA.href = '/post/' + encodeURIComponent(post.id) + '/edit'; editA.textContent = 'แก้ไข';
       actionsDiv.appendChild(editA);
       const delBtn = document.createElement('button'); delBtn.className = 'btn btn-ghost'; delBtn.id = 'delBtn'; delBtn.type='button'; delBtn.textContent = 'ลบ';
       actionsDiv.appendChild(delBtn);
