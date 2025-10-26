@@ -50,111 +50,83 @@
       }
 
       /* Kebab & popup: same layout as index */
-      .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: aut[...]
+      .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto; }
       .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
 
-      .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08);[...]
+      .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
       .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
       .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
 
       .post-actions { display:none; }
 
-      @media (max-width:800px) {
-        .post-header .post-avatar .avatar-img { width:44px; height:44px; }
-        .post-header-meta .post-username a { font-size:0.95rem; }
-        .post-time { font-size:0.80rem; }
-        .post-gallery .post-img { max-height: 260px; max-width: calc(100vw - 56px); }
-      }
-
-      /* ===================== Comments (post-like structure) ===================== */
-      .comment-list {
-        display:flex;
-        flex-direction:column;
-        gap:12px;
-      }
-      .comment-item {
+      /* ===========================
+         Comment styles (mirror post layout but compact)
+         =========================== */
+      .comment {
+        display: block;
         background: linear-gradient(180deg,#fff,#fcfdff);
         border-radius: 10px;
         border: 1px solid rgba(15,23,42,0.03);
         padding: 10px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
+        margin-bottom: 10px;
+        box-shadow: 0 6px 16px rgba(15,23,42,0.02);
       }
-      .comment-header {
-        display:flex;
-        align-items:flex-start;
-        gap:12px;
-      }
-      .comment-avatar .avatar-img {
-        width:40px;
-        height:40px;
-        border-radius: 8px;
-        object-fit: cover;
-        flex-shrink:0;
-      }
-      .comment-header-meta {
-        display:flex;
-        flex-direction:column;
-        gap:2px;
-        min-width:0;
-      }
-      .comment-username a {
-        font-weight:700;
-        color:var(--text);
-        text-decoration:none;
-        white-space:nowrap;
-        overflow:hidden;
-        text-overflow:ellipsis;
-        display:inline-block;
-        max-width: 40ch;
-      }
-      .comment-time {
-        color:var(--muted);
-        font-size:0.85rem;
-      }
-      .comment-body {
-        color:#38414b;
-        white-space:pre-wrap;
-        word-break:break-word;
-        margin-left: 52px; /* align body under meta (gives small indent) */
-      }
-      /* When space is tight, remove left-margin since layout stacks */
-      @media (max-width:560px) {
-        .comment-body { margin-left: 0; }
-      }
+      .comment .post-header { gap:10px; margin-bottom:6px; }
+      .comment .post-avatar .avatar-img { width:40px; height:40px; border-radius:8px; }
+      .comment .post-header-meta .post-username a { font-size:0.95rem; max-width:200px; }
+      .comment .post-time { font-size:0.82rem; color:var(--muted); }
+      .comment .post-body { margin-top:4px; line-height:1.45; }
+      .comment .post-content { color:#2e3a42; white-space:pre-wrap; }
 
-      /* ===================== Fixed comment input (bottom) ===================== */
-      #commentForm {
+      /* small action area for comment owner (delete) */
+      .comment .comment-actions { margin-top:8px; display:flex; gap:8px; justify-content:flex-end; }
+
+      /* ===========================
+         Fixed comment input bar
+         =========================== */
+      .comment-input-bar {
         position: fixed;
         left: 0;
         right: 0;
         bottom: 0;
-        z-index: 1400;
+        z-index: 2200;
         background: linear-gradient(180deg,#fff,#fbfdff);
         border-top: 1px solid rgba(15,23,42,0.06);
-        padding: 10px;
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        box-shadow: 0 -8px 24px rgba(15,23,42,0.06);
+        box-shadow: 0 -8px 30px rgba(15,23,42,0.06);
+        padding: 10px 12px;
       }
-      #commentForm textarea {
+      .comment-input-inner {
+        max-width: var(--max-width-narrow);
+        margin: 0 auto;
+        display:flex;
+        gap:8px;
+        align-items:flex-end;
+      }
+      .comment-input-inner textarea {
         flex: 1;
-        min-height: 44px;
-        max-height: 140px;
+        min-height:44px;
+        max-height: 160px;
         resize: vertical;
-        padding: 8px;
-        border-radius: 8px;
+        padding:8px 10px;
+        border-radius:10px;
         border: 1px solid rgba(15,23,42,0.06);
-        font-size: 1rem;
+        font-size: 0.96rem;
+        background: white;
       }
-      #commentForm button[type="submit"] {
-        white-space: nowrap;
-        padding: 8px 12px;
+      .comment-input-inner button[type="submit"] {
+        white-space:nowrap;
+        padding: 10px 14px;
       }
-      /* spacer to avoid content behind fixed input */
-      #commentSpacer { height: 86px; width: 100%; display:block; }
+
+      /* ensure page content isn't hidden behind fixed bar */
+      main, .container { padding-bottom: 120px; }
+
+      @media (max-width:800px) {
+        .comment-input-inner { padding-left: 8px; padding-right: 8px; }
+        .comment-input-inner textarea { min-height:40px; }
+        main, .container { padding-bottom: 140px; }
+        .post-gallery .post-img { max-height: 260px; max-width: calc(100vw - 56px); }
+      }
     </style>
 </head>
 <body>
@@ -165,13 +137,12 @@
         <div id="postBox"></div>
         <hr style="margin:16px 0;">
         <div id="commentBox"></div>
-
-        <!-- spacer that ensures bottom fixed comment input doesn't cover content -->
-        <div id="commentSpacer" aria-hidden="true"></div>
-
-        <form id="commentForm" class="mt-16 hidden" aria-label="ฟอร์มคอมเมนต์">
-          <textarea name="content" placeholder="แสดงความคิดเห็น" required aria-label="ข้อความคอมเมนต์"></textarea>
-          <button type="submit" class="btn btn-primary">ส่ง</button>
+        <!-- keep original form (will be displayed/hidden by script) but style it as fixed bar -->
+        <form id="commentForm" class="comment-input-bar hidden" aria-label="ฟอร์มแสดงความคิดเห็น">
+          <div class="comment-input-inner">
+            <textarea name="content" placeholder="แสดงความคิดเห็น..." required aria-label="ข้อความคอมเมนต์"></textarea>
+            <button type="submit" class="btn btn-primary">ส่ง</button>
+          </div>
         </form>
       </div>
     </div>
@@ -228,7 +199,7 @@ async function loadPost() {
     kebab.setAttribute('aria-haspopup','true');
     kebab.setAttribute('aria-expanded','false');
     kebab.title = 'ตัวเลือกโพสต์';
-    kebab.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" c[...]
+    kebab.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`;
     header.appendChild(kebab);
 
     art.appendChild(header);
@@ -354,141 +325,134 @@ async function loadPost() {
       }, 0);
     });
 
-    // render comments using post-like structure (avatar + meta + body)
+    // render comments using DOM (structure similar to posts)
     renderComments(comments || []);
 
-    // render comments end
-    // load avatars for comments
-    loadCommentAvatars(comments || []);
+    // show/hide comment form based on myUsername
+    const commentForm = document.getElementById('commentForm');
+    if (myUsername) {
+      commentForm.classList.remove('hidden');
+      // focus management: do not auto-focus, allow user to tap
+    } else {
+      commentForm.classList.add('hidden');
+    }
+
+    // delete handler if present
+    const delBtn = document.getElementById('delBtn');
+    if (delBtn) {
+      delBtn.onclick = async () => {
+        if (confirm('ลบโพสต์?')) {
+          await fetch('/api/post/' + encodeURIComponent(postId), { method: 'DELETE' });
+          location.replace('/');
+        }
+      };
+    }
 }
 
 function renderComments(comments) {
   const box = document.getElementById('commentBox');
   box.innerHTML = '';
-  const h3 = document.createElement('h3');
-  h3.textContent = 'คอมเมนต์';
-  box.appendChild(h3);
-
-  const list = document.createElement('div');
-  list.className = 'comment-list';
+  const title = document.createElement('h3');
+  title.textContent = 'คอมเมนต์';
+  box.appendChild(title);
 
   if (!comments || comments.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'small';
-    empty.textContent = 'ยังไม่มีคอมเมนต์';
-    list.appendChild(empty);
-  } else {
-    for (const c of comments) {
-      const item = document.createElement('article');
-      item.className = 'comment-item';
-      item.dataset.commentId = c.id;
+    const em = document.createElement('i');
+    em.className = 'small';
+    em.textContent = 'ยังไม่มีคอมเมนต์';
+    box.appendChild(em);
+    return;
+  }
 
-      // header row (avatar + meta + optional kebab)
-      const header = document.createElement('div');
-      header.className = 'comment-header';
+  // render each comment as a compact post-like article
+  for (const c of comments) {
+    const el = document.createElement('article');
+    el.className = 'comment';
+    el.dataset.commentId = c.id || '';
 
-      const avatarLink = document.createElement('a');
-      avatarLink.className = 'comment-avatar';
-      avatarLink.href = '/user/' + encodeURIComponent(c.username || '');
-      const avatarImg = document.createElement('img');
-      avatarImg.className = 'avatar-img';
-      avatarImg.alt = c.username || '';
-      avatarImg.dataset.username = c.username || '';
-      avatarImg.src = '/img/default_profile.png';
-      avatarLink.appendChild(avatarImg);
-      header.appendChild(avatarLink);
+    // header
+    const header = document.createElement('div');
+    header.className = 'post-header';
 
-      const meta = document.createElement('div');
-      meta.className = 'comment-header-meta';
-      const nameDiv = document.createElement('div');
-      nameDiv.className = 'comment-username';
-      const nameLink = document.createElement('a');
-      nameLink.href = '/user/' + encodeURIComponent(c.username || '');
-      nameLink.textContent = c.username || '(ไม่ระบุ)';
-      nameDiv.appendChild(nameLink);
-      const timeDiv = document.createElement('div');
-      timeDiv.className = 'comment-time small';
-      timeDiv.textContent = new Date(c.createdAt).toLocaleString();
-      meta.appendChild(nameDiv);
-      meta.appendChild(timeDiv);
-      header.appendChild(meta);
+    const avatarA = document.createElement('a');
+    avatarA.className = 'post-avatar';
+    avatarA.href = '/user/' + encodeURIComponent(c.username || '');
+    avatarA.style.display = 'inline-flex';
+    avatarA.style.alignItems = 'center';
+    const img = document.createElement('img');
+    img.className = 'avatar-img';
+    img.alt = c.username || '';
+    img.dataset.username = c.username || '';
+    img.src = '/img/default_profile.png';
+    avatarA.appendChild(img);
+    header.appendChild(avatarA);
 
-      // optional kebab for own comment
-      if (myUsername && myUsername === c.username) {
-        const kebab = document.createElement('button');
-        kebab.className = 'post-kebab';
-        kebab.type = 'button';
-        kebab.title = 'ตัวเลือก';
-        kebab.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`;
-        kebab.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          if (!confirm('ลบคอมเมนต์นี้?')) return;
-          deleteComment(c.id);
-        });
-        // push kebab to the far right
-        kebab.style.marginLeft = 'auto';
-        header.appendChild(kebab);
-      }
+    const meta = document.createElement('div');
+    meta.className = 'post-header-meta';
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'post-username';
+    const nameLink = document.createElement('a');
+    nameLink.href = '/user/' + encodeURIComponent(c.username || '');
+    nameLink.textContent = c.username || '(ไม่ระบุ)';
+    nameDiv.appendChild(nameLink);
+    const timeDiv = document.createElement('div');
+    timeDiv.className = 'post-time small';
+    timeDiv.textContent = new Date(c.createdAt).toLocaleString();
+    meta.appendChild(nameDiv);
+    meta.appendChild(timeDiv);
+    header.appendChild(meta);
 
-      item.appendChild(header);
+    el.appendChild(header);
 
-      const body = document.createElement('div');
-      body.className = 'comment-body';
-      body.innerHTML = escapeHtml(c.content || '');
-      item.appendChild(body);
+    // body
+    const body = document.createElement('div');
+    body.className = 'post-body';
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'post-content';
+    contentDiv.innerHTML = escapeHtml(c.content || '');
+    body.appendChild(contentDiv);
 
-      // keyboard support
-      item.tabIndex = 0;
-      item.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          // focus textarea so user can quickly reply
-          const ta = document.querySelector('#commentForm textarea');
-          if (ta) ta.focus();
+    // actions (delete for owner)
+    if (myUsername && myUsername === c.username) {
+      const actions = document.createElement('div');
+      actions.className = 'comment-actions';
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'btn btn-ghost';
+      delBtn.textContent = 'ลบ';
+      delBtn.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        if (!confirm('ลบคอมเมนต์นี้?')) return;
+        try {
+          await fetch(`/api/post/${encodeURIComponent(postId)}/comment/${encodeURIComponent(c.id)}`, { method: 'DELETE' });
+          // reload comments
+          loadPost();
+        } catch (e) {
+          alert('ไม่สามารถลบคอมเมนต์ได้');
         }
       });
-
-      list.appendChild(item);
+      actions.appendChild(delBtn);
+      body.appendChild(actions);
     }
-  }
 
-  box.appendChild(list);
+    el.appendChild(body);
+    box.appendChild(el);
 
-  // show comment form for logged-in users
-  if (myUsername) {
-    const form = document.getElementById('commentForm');
-    if (form) form.classList.remove('hidden');
-  }
-}
-
-// batch-load avatars for comment authors (deduplicated)
-async function loadCommentAvatars(comments) {
-  const imgs = Array.from(document.querySelectorAll('img[data-username]'));
-  const uniq = new Set();
-  for (const img of imgs) {
-    const u = (img.dataset.username || '').trim();
-    if (u) uniq.add(u);
-  }
-  // for each username, fetch once
-  for (const username of uniq) {
+    // lazy-load avatar for comment (fetch profile same as feed logic)
     (async () => {
       try {
-        const res = await fetch('/api/user/' + encodeURIComponent(username));
-        if (!res.ok) return;
-        const j = await res.json();
-        if (!j || !j.success || !j.profile) return;
-        const pic = j.profile.profilePic;
+        if (!c.username) return;
+        const up = await fetch('/api/user/' + encodeURIComponent(c.username));
+        if (!up.ok) return;
+        const ud = await up.json();
+        if (!ud || !ud.success || !ud.profile) return;
+        const pic = ud.profile.profilePic;
         if (!pic) return;
-        document.querySelectorAll('img[data-username="' + CSS.escape(username) + '"]').forEach(i => {
-          i.addEventListener('error', function onErr() {
-            i.removeEventListener('error', onErr);
-            i.src = '/img/default_profile.png';
-          }, { once: true });
-          i.src = pic;
-        });
-      } catch (e) {
-        console.warn('loadCommentAvatars error', e && e.message);
-      }
+        // apply
+        try {
+          img.src = pic;
+        } catch (e) {}
+      } catch (e) {}
     })();
   }
 }
@@ -497,36 +461,37 @@ loadPost();
 
 document.getElementById('commentForm').onsubmit = async e => {
     e.preventDefault();
-    const fd = new FormData(e.target);
-    const body = Object.fromEntries(fd.entries());
+    const textarea = e.target.querySelector('textarea[name="content"]');
+    if (!textarea) return;
+    const body = { content: textarea.value || '' };
     try {
       const res = await fetch('/api/post/' + encodeURIComponent(postId) + '/comment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
       });
       const data = await res.json();
       if (data && data.success) {
-        e.target.reset();
-        // reload comments only (avoid full page navigation)
-        const res2 = await fetch('/api/post/' + encodeURIComponent(postId));
-        const d2 = await res2.json();
-        if (d2 && d2.success) renderComments(d2.comments || []);
+          e.target.reset();
+          // reload post (comments)
+          await loadPost();
+          // scroll to newest comment (bottom) after a short delay
+          setTimeout(() => {
+            const last = document.querySelector('#commentBox .comment:last-child');
+            if (last) last.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 180);
       } else {
-        alert('ไม่สามารถส่งคอมเมนต์ได้');
+          alert('ไม่สามารถส่งคอมเมนต์ได้');
       }
     } catch (err) {
-      alert('ไม่สามารถส่งคอมเมนต์ได้');
+        alert('ไม่สามารถส่งคอมเมนต์ได้ (เครือข่าย)');
     }
 };
 
 window.deleteComment = async (cid) => {
     if (confirm('ยืนยันลบคอมเมนต์?')) {
         await fetch(`/api/post/${encodeURIComponent(postId)}/comment/${encodeURIComponent(cid)}`, {method:'DELETE'});
-        // reload comments
-        const res2 = await fetch('/api/post/' + encodeURIComponent(postId));
-        const d2 = await res2.json();
-        if (d2 && d2.success) renderComments(d2.comments || []);
+        loadPost();
     }
 };
 </script>
