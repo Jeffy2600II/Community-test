@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Community Home</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* Feed & content visuals - updated to match new header layout (avatar inline, no left gutter) */
+    .post { position: relative; padding: 12px; border-radius: 10px; background: linear-gradient(180deg,#fff,#fcfdff); margin-bottom: 12px; border: 1px solid rgba(15,23,42,0.03); cursor: pointer; }
+    .post-header { display:flex; align-items:flex-start; gap:12px; width:100%; margin-bottom:6px; }
+    .post-avatar .avatar-img { width:48px; height:48px; border-radius:10px; object-fit: cover; flex-shrink:0; }
+    .post-header-meta { display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .post-username a { font-weight:700; color:var(--text); text-decoration:none; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px; }
+    .post-time { color:var(--muted); font-size:0.88rem; }
+
+    /* Reduce gap between header and body so content sits closer to username/time */
+    .post-body { margin-top: 4px; line-height:1.55; }
+    .post-header { margin-bottom: 6px; }
+
+    .post-content { color:#38414b; white-space:pre-wrap; word-break:break-word; }
+    .post-img { margin-top:10px; max-width:100%; height:auto; border-radius:20px; display:block; }
+
+    /* ===== NEW: horizontal scrolling gallery (not grid) =====
+       - Gallery flows horizontally and can be scrolled left/right.
+       - Images keep aspect ratio (height:auto) and are constrained by max-height and max-width.
+       - Images are top-aligned so shorter images leave empty space below (no stretching).
+       - Wide images are scaled down so the full image is visible when scrolled into view.
+    */
+    .post-gallery {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      align-items: flex-start;         /* anchor all images to the top */
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 6px;             /* breathing room for horizontal scroll */
+      scroll-behavior: smooth;
+    }
+    .post-gallery .post-img {
+      flex: 0 0 auto;                  /* do not shrink/grow, keep intrinsic sizing within limits */
+      align-self: flex-start;          /* ensure each image is aligned to top of the gallery row */
+      max-height: 320px;               /* max height for images in the gallery (adjust as needed) */
+      max-width: calc(100vw - 96px);   /* ensure very wide images scale down to fit viewport when viewed */
+      height: auto;
+      width: auto;
+      object-fit: contain;             /* avoid cropping; preserve full image within the max box */
+      border-radius: 15px;
+      display: block;
+    }
+    /* If only a single image inside gallery, allow it to be taller but still bounded */
+    .post-gallery.only-one .post-img {
+      max-height: 75vh;
+      max-width: 100%;
+    }
+
+    /* make whole post show pointer, but interactive children keep their own cursor */
+    .post a, .post button, .post input, .post textarea { cursor: auto; }
+
+    /* Kebab placed on the right side of the header */
+    .post-kebab { background: transparent; border: none; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; margin-left: auto;[...]
+    .post-kebab:focus { outline: 2px solid rgba(47,128,237,0.12); }
+
+    /* popup should align to the right of the post when kebab is on the right */
+    .post-popup { position:absolute; right:8px; top:44px; left: auto; background:var(--surface); border:1px solid rgba(15,23,42,0.06); border-radius:10px; box-shadow:0 10px 30px rgba(16,24,40,0.08); }
+    .post-popup a, .post-popup button { display:block; width:100%; padding:10px 12px; text-align:left; border:none; background:transparent; cursor:pointer; font-weight:600; color:var(--text); }
+    .post-popup a:hover, .post-popup button:hover { background:#fbfdff; }
+
+    /* Hide inline actions in feed (we use popup) */
+    .post-actions { display:none; }
+
+    /* Excerpt clamp for long posts (if you want CSS clamp instead of JS truncation) */
+    .post-excerpt a.post-link {
+      color: inherit;
+      text-decoration: none;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      -webkit-line-clamp: 5;
+    }
+
+    @media (max-width:560px) {
+      .post-username a { max-width:140px; }
+      .post-avatar .avatar-img { width:44px; height:44px; }
+      .post-username a { font-size:0.95rem; }
+      .post-time { font-size:0.80rem; }
+      .post-gallery .post-img { max-height: 220px; max-width: calc(100vw - 56px); }
+    }
+  </style>
+</head>
+<body>
+  <div id="headerSlot"></div>
+
+  <main>
+    <div class="container">
+      <div class="card">
+        <div class="section-title"><span>ฟีดโพสต์ล่าสุด</span></div>
+        <div id="feed" class="feed">
+          <i class="small">กำลังโหลด...</i>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="footerSlot"></div>
+
+  <!-- main.js ต้องถูกโหลดเพื่อเติม partial header/footer และจัดการ header interactions -->
+  <script src="/js/main.js"></script>
+
+  <script>
+  (function () {
+    // Escape HTML and preserve line breaks as <br>
+    function escapeAndFormat(text) {
+      if (text === null || text === undefined) return '';
+      const s = String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+      return s.replace(/\r\n|\r|\n/g, '<br>');
+    }
+
+    // Truncate to approx N chars without cutting words awkwardly
+    function truncateText(str, max) {
+      if (!str) return '';
+      if (str.length <= max) return str;
+      const sub = str.slice(0, max);
+      const lastSpace = sub.lastIndexOf(' ');
+      if (lastSpace > Math.floor(max * 0.6)) return sub.slice(0, lastSpace) + '...';
+      return sub + '...';
+    }
+
+    // Load logged-in username (if any)
+    async function loadMyUsername() {
+      try {
+        const pr = await fetch('/api/profile');
+        if (!pr.ok) return null;
+        const data = await pr.json();
+        if (data && data.success && data.profile) return data.profile.username;
+      } catch (e) {}
+      return null;
+    }
+
+    // Single popup control
+    let openPopup = null;
+    function closePopup() {
+      if (openPopup && openPopup.parentElement) openPopup.remove();
+      openPopup = null;
+      document.querySelectorAll('.post-kebab[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded','false'));
+    }
+
+    function attachGlobalPopupHandlers() {
+      document.addEventListener('click', function (ev) {
+        if (!ev.target.closest('.post-popup') && !ev.target.closest('.post-kebab')) closePopup();
+      }, true);
+      document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape') closePopup();
+      });
+    }
+
+    async function renderFeed() {
+      const feedEl = document.getElementById('feed');
+      feedEl.innerHTML = '';
+      const myUsername = await loadMyUsername();
+
+      let posts = [];
+      try {
+        const res = await fetch('/api/posts');
+        if (res.ok) {
+          const j = await res.json();
+          posts = (j && j.posts) || [];
+        }
+      } catch (e) {
+        console.error('failed to load posts', e);
+        feedEl.innerHTML = '<div class="small">ไม่สามารถโหลดโพสต์ได้ขณะนี้</div>';
+        return;
+      }
+
+      if (!posts.length) {
+        feedEl.innerHTML = '<i class="small">ยังไม่มีโพสต์</i>';
+        return;
+      }
+
+      for (const post of posts) {
+        const art = document.createElement('article');
+        art.className = 'post';
+        art.dataset.postId = post.id;
+        art.dataset.postOwner = post.username || '';
+        art.tabIndex = 0; // make focusable for keyboard
+
+        // header
+        const header = document.createElement('div');
+        header.className = 'post-header';
+
+        // avatar (add data-username attribute so selection is robust even if username contains hyphens)
+        const avatarLink = document.createElement('a');
+        avatarLink.className = 'post-avatar';
+        avatarLink.href = '/user/' + encodeURIComponent(post.username || '');
+        avatarLink.style.display = 'inline-flex';
+        avatarLink.style.alignItems = 'center';
+        const img = document.createElement('img');
+        img.className = 'avatar-img';
+        img.alt = post.username || '';
+        img.dataset.username = post.username || '';
+        img.src = '/img/default_profile.png';
+        avatarLink.appendChild(img);
+        header.appendChild(avatarLink);
+
+        // meta
+        const meta = document.createElement('div');
+        meta.className = 'post-header-meta';
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'post-username';
+        const nameLink = document.createElement('a');
+        nameLink.href = '/user/' + encodeURIComponent(post.username || '');
+        nameLink.textContent = post.username || '(ไม่ระบุ)';
+        nameDiv.appendChild(nameLink);
+        const timeDiv = document.createElement('div');
+        timeDiv.className = 'post-time small';
+        timeDiv.textContent = new Date(post.createdAt).toLocaleString();
+        meta.appendChild(nameDiv);
+        meta.appendChild(timeDiv);
+        header.appendChild(meta);
+
+        // kebab button (right)
+        const kebab = document.createElement('button');
+        kebab.className = 'post-kebab';
+        kebab.type = 'button';
+        kebab.setAttribute('aria-haspopup','true');
+        kebab.setAttribute('aria-expanded','false');
+        kebab.title = 'ตัวเลือกโพสต์';
+        kebab.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97a0b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`;
+        header.appendChild(kebab);
+
+        art.appendChild(header);
+
+        // body
+        const body = document.createElement('div');
+        body.className = 'post-body';
+
+        // content (truncated by JS)
+        const fullContent = post.content || '';
+        const truncated = truncateText(fullContent, 1000);
+        const formatted = escapeAndFormat(truncated);
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'post-content';
+        contentDiv.innerHTML = formatted;
+        body.appendChild(contentDiv);
+
+        // images: support post.images (array) or legacy post.image
+        const imgs = Array.isArray(post.images) ? post.images.slice() : (post.image ? [post.image] : []);
+        if (imgs.length === 1) {
+          const im = document.createElement('img');
+          im.className = 'post-img';
+          im.src = imgs[0];
+          im.alt = 'post image';
+          im.loading = 'lazy';
+          body.appendChild(im);
+        } else if (imgs.length > 1) {
+          const gallery = document.createElement('div');
+          gallery.className = 'post-gallery';
+          if (imgs.length === 1) gallery.classList.add('only-one');
+          for (const src of imgs) {
+            const im = document.createElement('img');
+            im.className = 'post-img';
+            im.src = src;
+            im.alt = 'post image';
+            im.loading = 'lazy';
+            gallery.appendChild(im);
+          }
+          body.appendChild(gallery);
+        }
+
+        // hidden actions placeholder
+        const actions = document.createElement('div');
+        actions.className = 'post-actions';
+        body.appendChild(actions);
+
+        art.appendChild(body);
+        feedEl.appendChild(art);
+
+        // attach click/key handlers on article to navigate to post unless interactive child clicked
+        art.addEventListener('click', function (ev) {
+          if (ev.target.closest('a, button, input, textarea, select, .post-popup, .post-kebab')) return;
+          window.location.href = '/post/' + encodeURIComponent(post.id);
+        });
+        art.addEventListener('keydown', function (ev) {
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            const active = document.activeElement;
+            if (active && active !== art && active.closest && active.closest('a, button, input, textarea, select, .post-popup, .post-kebab')) {
+              return;
+            }
+            ev.preventDefault();
+            window.location.href = '/post/' + encodeURIComponent(post.id);
+          }
+        });
+      }
+
+      // after DOM created, load avatars and wire kebab
+      loadAvatarsAndWireKebab(myUsername);
+    }
+
+    /**
+     * Robust avatar loader:
+     * - Uses data-username attribute (safer than parsing id with hyphens)
+     * - Deduplicates by username
+     * - Fetches /api/user/:username and applies profilePic to all matching imgs
+     * - Adds image error handler to detect 404s /broken files
+     */
+    async function loadAvatarsAndWireKebab(myUsername) {
+      const avatarImgs = Array.from(document.querySelectorAll('img[data-username]'));
+      const seen = new Set();
+      const usernames = [];
+
+      // collect unique usernames (skip empty)
+      for (const img of avatarImgs) {
+        const username = (img.dataset.username || '').trim();
+        if (!username) continue;
+        if (seen.has(username)) continue;
+        seen.add(username);
+        usernames.push(username);
+      }
+
+      // fetch profile for each username (parallel-friendly)
+      for (const username of usernames) {
+        (async () => {
+          try {
+            const url = '/api/user/' + encodeURIComponent(username);
+            const up = await fetch(url);
+            if (!up.ok) {
+              console.warn('Failed to fetch', url, 'status', up.status);
+              return;
+            }
+            const ud = await up.json();
+            if (!ud || !ud.success) {
+              console.warn('/api/user/ response for', username, ud);
+              return;
+            }
+            if (!ud.profile) {
+              console.warn('No profile returned for', username);
+              return;
+            }
+
+            const pic = ud.profile.profilePic;
+            if (!pic) {
+              // Profile exists but no picture set
+              console.info('profilePic empty for', username);
+              return;
+            }
+
+            // apply to all images that match data-username
+            document.querySelectorAll('img[data-username="' + CSS.escape(username) + '"]').forEach(i => {
+              // if already set to that src, skip
+              try {
+                const currentPath = (new URL(i.src, location.href)).pathname;
+                const picPath = (new URL(pic, location.href)).pathname;
+                if (currentPath === picPath) return;
+              } catch (e) {}
+              i.addEventListener('error', function onErr() {
+                console.warn('Avatar image failed to load for', username, 'url=', pic, 'element id=', i.id);
+                i.removeEventListener('error', onErr);
+                i.src = '/img/default_profile.png';
+              }, { once: true });
+              i.src = pic;
+            });
+          } catch (err) {
+            console.error('error fetching profile for', username, err && err.message);
+          }
+        })();
+      }
+
+      // kebab behavior (delegated)
+      const feed = document.getElementById('feed');
+      feed.addEventListener('click', function (ev) {
+        const kebab = ev.target.closest('.post-kebab');
+        if (!kebab) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+
+        const postEl = kebab.closest('.post');
+        if (!postEl) return;
+        const postId = postEl.dataset.postId;
+        const owner = postEl.dataset.postOwner;
+
+        if (openPopup && openPopup.dataset.postId === postId) {
+          closePopup();
+          return;
+        }
+        closePopup();
+
+        const popup = document.createElement('div');
+        popup.className = 'post-popup';
+        popup.dataset.postId = postId;
+
+        const isOwner = (myUsername && owner && myUsername === owner);
+
+        if (isOwner) {
+          const editA = document.createElement('a');
+          editA.href = '/post/' + encodeURIComponent(postId) + '/edit';
+          editA.textContent = 'แก้ไขโพสต์';
+          popup.appendChild(editA);
+
+          const delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.textContent = 'ลบโพสต์';
+          delBtn.addEventListener('click', async function (e) {
+            e.preventDefault();
+            if (!confirm('ลบโพสต์นี้?')) return;
+            try {
+              await fetch('/api/post/' + encodeURIComponent(postId), { method: 'DELETE' });
+              const el = document.querySelector('.post[data-post-id="' + postId + '"]');
+              if (el) el.remove();
+            } catch (err) {
+              alert('เกิดข้อผิดพลาดขณะลบโพสต์');
+            } finally {
+              closePopup();
+            }
+          });
+          popup.appendChild(delBtn);
+        } else {
+          const profileA = document.createElement('a');
+          profileA.href = '/user/' + encodeURIComponent(owner || '');
+          profileA.textContent = 'ไปยังโปรไฟล์';
+          popup.appendChild(profileA);
+
+          const reportBtn = document.createElement('button');
+          reportBtn.type = 'button';
+          reportBtn.textContent = 'รายงานโพสต์';
+          reportBtn.addEventListener('click', function () {
+            alert('ฟีเจอร์รายงานยังไม่เปิดใช้งาน');
+            closePopup();
+          });
+          popup.appendChild(reportBtn);
+        }
+
+        postEl.appendChild(popup);
+        openPopup = popup;
+        kebab.setAttribute('aria-expanded','true');
+      }, true);
+    }
+
+    attachGlobalPopupHandlers();
+    document.addEventListener('DOMContentLoaded', renderFeed);
+  })();
+  </script>
+</body>
+</html>
