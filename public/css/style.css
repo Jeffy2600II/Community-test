@@ -6,8 +6,6 @@
    - Username + timestamp are inline and can sit close to the content
    - Post images: responsive, never cropped; constrained by max-height (viewport-based)
    - Mobile: stricter max-height so tall images fit comfortably on-screen
-   - Gallery update: images must never be cropped, maintain original aspect ratio,
-     align to the top edge, and for small screens provide a horizontal scroller.
    ======================================================================== */
 
 :root{
@@ -486,88 +484,32 @@ main {
    - Constrained by max-height (viewport-relative) to avoid overly tall images on mobile
    - max-width:100% ensures very wide images fit container
    - width:auto lets image shrink when height constraint applies (prevents distortion)
-   - IMPORTANT: never crop (no object-fit: cover), never force same height across different aspect ratios
-   - Gallery: horizontally scroll on small screens; on wide screens use a grid with items aligned to top
    ------------------------------------------------------------------ */
-
-/* Single image in a post — keep original aspect ratio and never crop/stretch
-   Allow the image to be as wide as the container but limit its max-height so very tall images
-   don't overflow the viewport. The image is not forced to match other images' heights. */
 .post-img {
   display: block;
-  max-width: 100%;   /* never overflow the container width */
-  width: auto;       /* let width adapt when height constraint applies */
-  height: auto;      /* preserve aspect ratio */
+  max-width: 100%; /* never overflow the container width */
+  width: auto;     /* allow width to adjust when height constraint is active */
+  height: auto;    /* preserve aspect ratio */
   border-radius: 8px;
   margin-top: 10px;
   object-fit: contain; /* defensive: don't crop */
-  max-height: 75vh;    /* desktop/tablet default: allow tall images but limit to viewport height */
-}
-
-/* Gallery: treat images as independent items, keep aspect ratio, align all to the top edge.
-   Mobile / narrow viewports: horizontal scroller (touch-friendly). Items won't shrink to same height,
-   they keep their intrinsic aspect ratio limited by max-height/max-width.
-*/
-.post-gallery {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
-  align-items: flex-start;    /* align images to the top edge */
-  overflow-x: auto;           /* allow horizontal scroll on narrow screens */
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 6px;        /* give a little space for touch */
-}
-
-/* Each image in the gallery is a non-flexing item (keeps intrinsic width when possible) */
-.post-gallery .post-img {
-  flex: 0 0 auto;    /* don't stretch to fill row */
-  max-height: 60vh;  /* prevent extremely tall images */
-  max-width: 100%;   /* but don't grow beyond container when space forces it */
-  width: auto;
-  height: auto;
-  object-fit: contain; /* never crop */
-  display: block;
-  border-radius: 8px;
-}
-
-/* Improve keyboard focus inside horizontally scrollable gallery */
-.post-gallery:focus { outline: none; }
-.post-gallery img { vertical-align: top; }
-
-/* Desktop / wide screens: use a grid layout that preserves each image's intrinsic aspect ratio,
-   but aligns all grid items to the top. Grid cells are sized to content (min-content / auto).
-   This keeps short/portrait images from being stretched to match tall landscape images.
-*/
-@media (min-width: 900px) {
-  .post-gallery {
-    display: grid;
-    gap: 12px;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    align-items: start;       /* align images to top of their cells */
-    grid-auto-rows: min-content;
-    overflow: visible;        /* no horizontal scroll on desktop by default */
-    padding-bottom: 0;
-  }
-  .post-gallery .post-img {
-    width: 100%;              /* fill the grid cell width but keep height auto */
-    height: auto;
-    max-height: 70vh;
-    object-fit: contain;
-  }
-}
-
-/* Very small screens: be stricter with max-height so huge portraits don't take the whole screen */
-@media (max-width: 520px) {
-  .post-img { max-height: 55vh; }
-  .post-gallery .post-img { max-height: 45vh; }
-}
-
-/* Ensure we don't inadvertently crop when previous rules expected cover behavior */
-.post .post-gallery.only-one .post-img {
-  width: 100%;
-  height: auto;
-  object-fit: contain;
+  /* Desktop/tablet default: allow tall images but limit to viewport height */
   max-height: 75vh;
+}
+
+/* Mobile: tighter max-height so tall images remain visible without scrolling off-screen */
+@media (max-width: 800px) {
+  .post-img {
+    max-height: 60vh; /* suitable for most phones — adjustable if you prefer */
+    margin-top: 8px;
+  }
+}
+
+/* If you want a stricter ceiling on very large desktop screens */
+@media (min-width: 1400px) {
+  .post-img {
+    max-height: 80vh;
+  }
 }
 
 /* ------------------------------------------------------------------ */
