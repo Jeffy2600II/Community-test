@@ -370,6 +370,7 @@ main {
   padding: 12px;
   margin-bottom: 12px;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* header row: avatar + meta inline (shared for feed and single post) */
