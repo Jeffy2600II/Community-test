@@ -2,7 +2,8 @@
    style.css — Tuned feed header spacing & sizing (consolidated)
    - Duplicate/overlapping rules merged for maintainability
    - Behaviour for media queries preserved (mobile/desktop overrides kept)
-   - Popups/dropdowns updated to be small floating menus with soft entrance animation
+   - Popups/dropdowns kept as small floating menus with soft entrance animation
+   - Adjusted post image max-height and gallery image max-width/height (reduced slightly)
    ======================================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
@@ -41,6 +42,12 @@
   /* popup sizes */
   --popup-max-width: 320px;
   --popup-min-width: 140px;
+
+  /* post image sizing (reduced slightly from previous values) */
+  --post-img-max-height: 68vh;          /* was 75vh */
+  --post-img-mobile-max-height: 55vh;   /* was 60vh */
+  --gallery-img-max-height: 480px;      /* was 520px */
+  --gallery-img-max-width-offset: 120px; /* used in calc(100vw - offset) (was 96px) */
 }
 
 /* Respect user reduced motion */
@@ -439,19 +446,19 @@ main {
 /* ------------------------------------------------------------------ */
 /* Post images behavior (consolidated)
    - Preserve aspect ratio
-   - Responsive max-height to avoid overly tall images
+   - Slightly reduced max-height and gallery width to make images less dominating
    - Keep object-fit: contain to avoid cropping
    ------------------------------------------------------------------ */
 .post-img {
   display: block;
-  max-width: 100%;
+  max-width: 98%; /* slightly reduced from 100% to give horizontal breathing room */
   width: auto;
   height: auto;
   margin-top: 10px;
   object-fit: contain;
   border-radius: 15px;
-  /* sensible default ceiling for tall images */
-  max-height: 75vh;
+  /* reduced ceiling for tall images to keep them less dominant */
+  max-height: var(--post-img-max-height);
 }
 
 /* Gallery: horizontal scrolling, each image top-aligned, preserve aspect ratio */
@@ -469,8 +476,8 @@ main {
 .post-gallery .post-img {
   flex: 0 0 auto;
   align-self: flex-start;
-  max-height: 520px; /* allow larger gallery images */
-  max-width: calc(100vw - 96px);
+  max-height: var(--gallery-img-max-height);
+  max-width: calc(100vw - var(--gallery-img-max-width-offset));
   height: auto;
   width: auto;
   display: block;
@@ -478,12 +485,12 @@ main {
 
 /* Mobile: tighter max-height so tall images remain visible without scrolling off-screen */
 @media (max-width: 800px) {
-  .post-img { max-height: 60vh; margin-top: 8px; }
+  .post-img { max-height: var(--post-img-mobile-max-height); margin-top: 8px; }
 }
 
 /* If you want a stricter ceiling on very large desktop screens */
 @media (min-width: 1400px) {
-  .post-img { max-height: 80vh; }
+  .post-img { max-height: calc(var(--post-img-max-height) + 8vh); }
 }
 
 /* ------------------------------------------------------------------ */
@@ -750,7 +757,7 @@ img { max-width: 100%; height: auto; display: block; }
   .post .post-left { width: 100%; display:flex; align-items:center; gap:12px; }
   .post .post-body { order: 2; }
   .post .post-excerpt { display:none; }
-  .post .post-img { max-width: 100%; height: auto; margin-top: var(--space-sm); }
+  .post .post-img { max-width: 98%; height: auto; margin-top: var(--space-sm); }
 
   .site-footer .footer-inner { flex-direction: column; text-align: center; gap: var(--space-sm); }
   .footer-links { flex-direction: column; gap: 8px; }
@@ -819,7 +826,7 @@ img { max-width: 100%; height: auto; display: block; }
     box-shadow: var(--shadow-1);
     padding: calc(var(--space-md));
   }
-  .post .post-img, .card img { max-width: 100%; height: auto; display: block; }
+  .post .post-img, .card img { max-width: 98%; height: auto; display: block; }
   .card { gap: 12px; }
   .post { gap: 12px; }
   .profile-hero { padding-left: calc(var(--space-md)); padding-right: calc(var(--space-md)); border-radius: 10px; }
@@ -841,7 +848,7 @@ img { max-width: 100%; height: auto; display: block; }
 
 /* -------------------------------------------------------------------------
    Popups / dropdowns: small floating menus with soft entrance animation
-   (replaces previous full-width behavior on small screens)
+   (keeps compact menus even on small screens)
    ------------------------------------------------------------------------- */
 
 /* animation: soft slide + scale + fade */
@@ -906,7 +913,6 @@ img { max-width: 100%; height: auto; display: block; }
   gap: 6px;
   transform-origin: top right;
   opacity: 1;
-  /* prepare for reduced-motion preference */
   will-change: transform, opacity;
 }
 
@@ -965,8 +971,7 @@ img { max-width: 100%; height: auto; display: block; }
 }
 
 /* For very narrow screens, keep popup compact and anchored near the kebab
-   instead of stretching full-width. We allow slight horizontal center if needed,
-   but clamp to viewport with safe margins. */
+   instead of stretching full-width. We clamp width to viewport with safe margins. */
 @media (max-width: 720px) {
   .post .post-popup,
   .post.comment .post-popup {
